@@ -23,7 +23,7 @@
 - [x] Map the minimal set of Engine APIs needed for MVP Python usage. *(2025-10-02)*
 - [ ] Review the `barter-bindings` repository for prior art and reusable assets.
 - [x] Prototype a dedicated `barter-python` crate with PyO3 and maturin config.
-- [ ] Define data marshaling strategy for market events and commands across the FFI boundary.
+- [x] Define data marshaling strategy for market events and commands across the FFI boundary. *(2025-10-02)*
 - [ ] Draft a testing matrix covering core Engine flows invoked from Python.
 
 ## Engine Command Surface (MVP)
@@ -35,5 +35,5 @@
 - **CancelOrders**: cancel orders matching an `InstrumentFilter` without explicit order ids.
 
 Notes:
-- Initial bindings will lean on strongly-typed Rust wrappers to avoid manual JSON packing from Python.
+- Engine events can now cross the FFI boundary via serde-backed JSON/dict helpers.
 - Target Python ergonomics: simple constructors for keys, order requests, and instrument filters feeding higher-level helpers on `SystemHandle`.
