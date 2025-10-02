@@ -20,8 +20,20 @@
 5. **Distribution:** Package wheels via maturin, integrate CI, and document Python usage.
 
 ## Immediate TODOs
-- [ ] Map the minimal set of Engine APIs needed for MVP Python usage.
+- [x] Map the minimal set of Engine APIs needed for MVP Python usage. *(2025-10-02)*
 - [ ] Review the `barter-bindings` repository for prior art and reusable assets.
 - [x] Prototype a dedicated `barter-python` crate with PyO3 and maturin config.
 - [ ] Define data marshaling strategy for market events and commands across the FFI boundary.
 - [ ] Draft a testing matrix covering core Engine flows invoked from Python.
+
+## Engine Command Surface (MVP)
+- **TradingState Update**: toggle live trading via `EngineEvent::TradingStateUpdate` with `TradingState::{Enabled, Disabled}`.
+- **Graceful Shutdown**: trigger system shutdown using `EngineEvent::Shutdown`.
+- **SendOpenRequests**: submit one or many `OrderRequestOpen` payloads (market or limit) keyed by exchange, instrument, strategy, and client order id.
+- **SendCancelRequests**: mirror `OrderRequestCancel` to revoke outstanding orders by key and optional order id.
+- **ClosePositions**: drive position unwinds using `InstrumentFilter::{None, Exchanges, Instruments, Underlyings}`.
+- **CancelOrders**: cancel orders matching an `InstrumentFilter` without explicit order ids.
+
+Notes:
+- Initial bindings will lean on strongly-typed Rust wrappers to avoid manual JSON packing from Python.
+- Target Python ergonomics: simple constructors for keys, order requests, and instrument filters feeding higher-level helpers on `SystemHandle`.
