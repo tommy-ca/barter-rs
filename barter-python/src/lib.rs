@@ -17,7 +17,7 @@ use command::{
     collect_cancel_requests, collect_open_requests,
 };
 use config::PySystemConfig;
-use pyo3::{Bound, prelude::*, types::PyModule};
+use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use system::{PySystemHandle, run_historic_backtest, start_system};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
@@ -74,6 +74,24 @@ impl PyEngineEvent {
         Self {
             inner: EngineEvent::shutdown(),
         }
+    }
+
+    /// Construct an [`EngineEvent`] from a JSON string.
+    #[staticmethod]
+    pub fn from_json(data: &str) -> PyResult<Self> {
+        let inner =
+            serde_json::from_str(data).map_err(|err| PyValueError::new_err(err.to_string()))?;
+        Ok(Self { inner })
+    }
+
+    /// Construct an [`EngineEvent`] from a Python dictionary-like object.
+    #[staticmethod]
+    pub fn from_dict(py: Python<'_>, value: PyObject) -> PyResult<Self> {
+        let json_module = PyModule::import_bound(py, "json")?;
+        let dumps = json_module.getattr("dumps")?;
+        let serialized: String = dumps.call1((value,))?.extract()?;
+
+        Self::from_json(&serialized)
     }
 
     /// Construct a trading state update event.
@@ -139,6 +157,19 @@ impl PyEngineEvent {
         self.inner.is_terminal()
     }
 
+    /// Serialize the [`EngineEvent`] to a JSON string.
+    pub fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|err| PyValueError::new_err(err.to_string()))
+    }
+
+    /// Convert the [`EngineEvent`] into a Python dictionary via JSON round-trip.
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let json = self.to_json()?;
+        let json_module = PyModule::import_bound(py, "json")?;
+        let loads = json_module.getattr("loads")?;
+        Ok(loads.call1((json,))?.into_py(py))
+    }
+
     /// Debug style string representation.
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("EngineEvent({:?})", self.inner))
@@ -184,6 +215,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use pyo3::{Python, types::PyDict};
 
     #[test]
     fn engine_event_shutdown_is_terminal() {
@@ -217,5 +249,34 @@ mod tests {
 
         assert_eq!(timed.value(), 42.5);
         assert_eq!(timed.time(), time);
+    }
+
+    #[test]
+    fn engine_event_json_roundtrip() {
+        let event = PyEngineEvent::trading_state(true);
+        let json = event.to_json().unwrap();
+        let restored = PyEngineEvent::from_json(&json).unwrap();
+        assert_eq!(restored.inner, event.inner);
+    }
+
+    #[test]
+    fn engine_event_dict_roundtrip() {
+        Python::with_gil(|py| {
+            let dict = PyDict::new_bound(py);
+            dict.set_item("Shutdown", PyDict::new_bound(py)).unwrap();
+
+            let event = PyEngineEvent::from_dict(py, dict.into_py(py)).unwrap();
+            assert!(event.inner.is_terminal());
+
+            let object = event.to_dict(py).unwrap();
+            let json_module = PyModule::import_bound(py, "json").unwrap();
+            let dumps = json_module.getattr("dumps").unwrap();
+            let dumped: String = dumps
+                .call1((object.clone_ref(py),))
+                .unwrap()
+                .extract()
+                .unwrap();
+            assert!(dumped.contains("Shutdown"));
+        });
     }
 }

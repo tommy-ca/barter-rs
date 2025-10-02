@@ -4,7 +4,7 @@ use barter_python::barter_python;
 use pyo3::{
     PyObject,
     prelude::*,
-    types::{PyList, PyModule},
+    types::{PyDict, PyList, PyModule},
 };
 
 #[test]
@@ -182,6 +182,37 @@ fn engine_event_command_builders() {
                 .call_method0("is_terminal")?
                 .extract::<bool>()?
         );
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn engine_event_serialization_helpers() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let engine_event_cls = module.getattr("EngineEvent")?;
+        let json_module = PyModule::import_bound(py, "json")?;
+
+        let dict = PyDict::new_bound(py);
+        dict.set_item("Shutdown", PyDict::new_bound(py))?;
+
+        let event = engine_event_cls.call_method1("from_dict", (dict.clone(),))?;
+        assert!(event.call_method0("is_terminal")?.extract::<bool>()?);
+
+        let json: String = event.call_method0("to_json")?.extract()?;
+        let round_trip = engine_event_cls.call_method1("from_json", (json,))?;
+        assert!(round_trip.call_method0("is_terminal")?.extract::<bool>()?);
+
+        let dict_rt = round_trip.call_method0("to_dict")?;
+        let flattened: String = json_module
+            .getattr("dumps")?
+            .call1((dict_rt.clone(),))?
+            .extract()?;
+        assert!(flattened.contains("Shutdown"));
 
         Ok(())
     })
