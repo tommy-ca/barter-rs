@@ -20,6 +20,7 @@ barter = { path = "../barter" }
 barter-integration = { path = "../barter-integration" }
 barter-data = { path = "../barter-data" }
 barter-instrument = { path = "../barter-instrument" }
+barter-execution = { path = "../barter-execution" }
 pyo3 = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }

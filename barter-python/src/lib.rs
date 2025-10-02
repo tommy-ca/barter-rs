@@ -8,7 +8,7 @@ mod command;
 mod config;
 mod system;
 
-use barter::engine::state::trading::TradingState;
+use barter::engine::{command::Command, state::trading::TradingState};
 use barter::{EngineEvent, Timed};
 use barter_integration::Terminal;
 use chrono::{DateTime, Utc};
@@ -96,7 +96,7 @@ impl PyEngineEvent {
         py: Python<'_>,
         requests: Vec<Py<PyOrderRequestOpen>>,
     ) -> PyResult<Self> {
-        let command = barter::Command::SendOpenRequests(collect_open_requests(py, requests)?);
+        let command = Command::SendOpenRequests(collect_open_requests(py, requests)?);
         Ok(Self {
             inner: EngineEvent::Command(command),
         })
@@ -108,7 +108,7 @@ impl PyEngineEvent {
         py: Python<'_>,
         requests: Vec<Py<PyOrderRequestCancel>>,
     ) -> PyResult<Self> {
-        let command = barter::Command::SendCancelRequests(collect_cancel_requests(py, requests)?);
+        let command = Command::SendCancelRequests(collect_cancel_requests(py, requests)?);
         Ok(Self {
             inner: EngineEvent::Command(command),
         })
@@ -118,7 +118,7 @@ impl PyEngineEvent {
     #[staticmethod]
     #[pyo3(signature = (filter=None))]
     pub fn close_positions(filter: Option<&PyInstrumentFilter>) -> Self {
-        let command = barter::Command::ClosePositions(clone_filter(filter));
+        let command = Command::ClosePositions(clone_filter(filter));
         Self {
             inner: EngineEvent::Command(command),
         }
@@ -128,7 +128,7 @@ impl PyEngineEvent {
     #[staticmethod]
     #[pyo3(signature = (filter=None))]
     pub fn cancel_orders(filter: Option<&PyInstrumentFilter>) -> Self {
-        let command = barter::Command::CancelOrders(clone_filter(filter));
+        let command = Command::CancelOrders(clone_filter(filter));
         Self {
             inner: EngineEvent::Command(command),
         }

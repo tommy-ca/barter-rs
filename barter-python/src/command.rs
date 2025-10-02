@@ -1,8 +1,10 @@
 use barter::engine::state::instrument::filter::InstrumentFilter;
+use barter_execution::order::request::{
+    OrderRequestCancel, OrderRequestOpen, RequestCancel, RequestOpen,
+};
 use barter_execution::order::{
-    OrderKey, OrderKind, OrderRequestCancel, OrderRequestOpen, TimeInForce,
+    OrderKey, OrderKind, TimeInForce,
     id::{ClientOrderId, OrderId, StrategyId},
-    request::{RequestCancel, RequestOpen},
 };
 use barter_instrument::{
     Side, Underlying, asset::AssetIndex, exchange::ExchangeIndex, instrument::InstrumentIndex,
