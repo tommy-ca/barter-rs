@@ -9,7 +9,11 @@ description = "Python bindings for the Barter trading engine"
 
 [lib]
 name = "barter_python"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+python-tests = []
 
 [dependencies]
 barter = { path = "../barter" }

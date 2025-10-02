@@ -90,7 +90,7 @@ pub fn timed_f64(value: f64, time: DateTime<Utc>) -> PyTimedF64 {
 
 /// Python module definition entry point.
 #[pymodule]
-fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
@@ -101,4 +101,29 @@ fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("SHUTDOWN_EVENT", shutdown.into_py(py))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn engine_event_shutdown_is_terminal() {
+        let event = PyEngineEvent {
+            inner: EngineEvent::shutdown(),
+        };
+        assert!(event.inner.is_terminal());
+    }
+
+    #[test]
+    fn timed_f64_surfaces_value_and_time() {
+        let time = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let timed = PyTimedF64 {
+            inner: Timed { value: 42.5, time },
+        };
+
+        assert_eq!(timed.value(), 42.5);
+        assert_eq!(timed.time(), time);
+    }
 }
