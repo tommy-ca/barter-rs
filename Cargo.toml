@@ -6,7 +6,8 @@ members = [
     "barter-execution",
     "barter-integration",
     "barter-macro", 
-    "barter-instrument"
+    "barter-instrument",
+    "barter-python"
 ]
 
 [workspace.dependencies]
@@ -71,3 +72,6 @@ rust_decimal_macros = { version = "1.29.1" }
 bytes = { version = "1.5.0" }
 spin_sleep = { version = "1.3.0 "}
 criterion = { version = "0.5.1" }
+
+# Python
+pyo3 = { version = "0.22.6", features = ["auto-initialize", "chrono", "extension-module"] }

@@ -1,0 +1,18 @@
+[package]
+name = "barter-python"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+readme = "README.md"
+description = "Python bindings for the Barter trading engine"
+
+[lib]
+name = "barter_python"
+crate-type = ["cdylib"]
+
+[dependencies]
+barter = { path = "../barter" }
+barter-integration = { path = "../barter-integration" }
+pyo3 = { workspace = true }
+chrono = { workspace = true }
