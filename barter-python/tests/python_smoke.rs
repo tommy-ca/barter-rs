@@ -1,7 +1,11 @@
 #![cfg(feature = "python-tests")]
 
 use barter_python::barter_python;
-use pyo3::{PyObject, prelude::*, types::PyModule};
+use pyo3::{
+    PyObject,
+    prelude::*,
+    types::{PyList, PyModule},
+};
 
 #[test]
 fn shutdown_event_is_terminal() {
@@ -132,6 +136,98 @@ fn start_system_handle_lifecycle() {
         handle.call_method1("set_trading_enabled", (true,))?;
         let trading_disabled = engine_event_cls.call_method1("trading_state", (false,))?;
         handle.call_method1("send_event", (trading_disabled,))?;
+
+        handle.call_method0("shutdown")?;
+        assert!(!handle.call_method0("is_running")?.extract::<bool>()?);
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn engine_event_command_builders() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let order_key_cls = module.getattr("OrderKey")?;
+        let order_open_cls = module.getattr("OrderRequestOpen")?;
+        let order_cancel_cls = module.getattr("OrderRequestCancel")?;
+        let instrument_filter_cls = module.getattr("InstrumentFilter")?;
+        let engine_event_cls = module.getattr("EngineEvent")?;
+
+        let key = order_key_cls.call1((0usize, 0usize, "strategy-alpha", Some("cid-open")))?;
+        let open = order_open_cls.call1((key.clone(), "buy", 101.25_f64, 0.5_f64))?;
+        let open_list = PyList::new_bound(py, &[open]);
+        let open_event = engine_event_cls.call_method1("send_open_requests", (open_list,))?;
+        assert!(!open_event.call_method0("is_terminal")?.extract::<bool>()?);
+
+        let cancel = order_cancel_cls.call1((key.clone(),))?;
+        let cancel_list = PyList::new_bound(py, &[cancel]);
+        let cancel_event = engine_event_cls.call_method1("send_cancel_requests", (cancel_list,))?;
+        assert!(
+            !cancel_event
+                .call_method0("is_terminal")?
+                .extract::<bool>()?
+        );
+
+        let filter = instrument_filter_cls.call_method0("none")?;
+        let close_event = engine_event_cls.call_method1("close_positions", (filter.clone(),))?;
+        assert!(!close_event.call_method0("is_terminal")?.extract::<bool>()?);
+
+        let cancel_orders_event = engine_event_cls.call_method1("cancel_orders", (filter,))?;
+        assert!(
+            !cancel_orders_event
+                .call_method0("is_terminal")?
+                .extract::<bool>()?
+        );
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn system_handle_command_helpers() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let system_config_cls = module.getattr("SystemConfig")?;
+        let start_system = module.getattr("start_system")?;
+        let order_key_cls = module.getattr("OrderKey")?;
+        let order_open_cls = module.getattr("OrderRequestOpen")?;
+        let order_cancel_cls = module.getattr("OrderRequestCancel")?;
+        let instrument_filter_cls = module.getattr("InstrumentFilter")?;
+
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let base_path = std::path::Path::new(&manifest_dir).join("..");
+        let config_path = base_path
+            .join("barter")
+            .join("examples")
+            .join("config")
+            .join("system_config.json");
+
+        let config =
+            system_config_cls.call_method1("from_json", (config_path.display().to_string(),))?;
+        let handle = start_system.call1((config,))?;
+
+        assert!(handle.call_method0("is_running")?.extract::<bool>()?);
+
+        let key = order_key_cls.call1((0usize, 0usize, "strategy-beta", Some("cid-beta")))?;
+        let open = order_open_cls.call1((key.clone(), "sell", 99.5_f64, 0.25_f64))?;
+        let cancel = order_cancel_cls.call1((key,))?;
+
+        let open_list = PyList::new_bound(py, &[open]);
+        handle.call_method1("send_open_requests", (open_list,))?;
+
+        let cancel_list = PyList::new_bound(py, &[cancel]);
+        handle.call_method1("send_cancel_requests", (cancel_list,))?;
+
+        let filter = instrument_filter_cls.call_method0("none")?;
+        handle.call_method1("close_positions", (filter.clone(),))?;
+        handle.call_method1("cancel_orders", (filter,))?;
 
         handle.call_method0("shutdown")?;
         assert!(!handle.call_method0("is_running")?.extract::<bool>()?);
