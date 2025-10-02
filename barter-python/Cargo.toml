@@ -18,7 +18,13 @@ python-tests = []
 [dependencies]
 barter = { path = "../barter" }
 barter-integration = { path = "../barter-integration" }
+barter-data = { path = "../barter-data" }
+barter-instrument = { path = "../barter-instrument" }
 pyo3 = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+rust_decimal = { workspace = true }

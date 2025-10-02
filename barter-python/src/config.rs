@@ -9,6 +9,12 @@ pub struct PySystemConfig {
     pub(crate) inner: SystemConfig,
 }
 
+impl PySystemConfig {
+    pub(crate) fn clone_inner(&self) -> SystemConfig {
+        self.inner.clone()
+    }
+}
+
 #[pymethods]
 impl PySystemConfig {
     /// Load a [`SystemConfig`] from a JSON file located at `path`.

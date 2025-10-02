@@ -5,12 +5,14 @@
 //! Python bindings for the Barter trading engine.
 
 mod config;
+mod system;
 
 use barter::{EngineEvent, Timed};
 use barter_integration::Terminal;
 use chrono::{DateTime, Utc};
 use config::PySystemConfig;
 use pyo3::{Bound, prelude::*, types::PyModule};
+use system::run_historic_backtest;
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]
@@ -99,6 +101,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTimedF64>()?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
+    m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();

@@ -69,3 +69,38 @@ fn system_config_from_json() {
     })
     .unwrap();
 }
+
+#[test]
+fn run_historic_backtest_returns_summary() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let system_config_cls = module.getattr("SystemConfig")?;
+        let run_backtest = module.getattr("run_historic_backtest")?;
+
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let base_path = std::path::Path::new(&manifest_dir).join("..");
+        let config_path = base_path
+            .join("barter")
+            .join("examples")
+            .join("config")
+            .join("system_config.json");
+        let market_path = base_path
+            .join("barter")
+            .join("examples")
+            .join("data")
+            .join("binance_spot_market_data_with_disconnect_events.json");
+
+        let system_config =
+            system_config_cls.call_method1("from_json", (config_path.display().to_string(),))?;
+        let summary = run_backtest.call1((system_config, market_path.display().to_string()))?;
+
+        let instruments = summary.get_item("instruments").unwrap();
+        let instruments: Vec<(String, PyObject)> = instruments.extract()?;
+        assert!(!instruments.is_empty());
+
+        Ok(())
+    })
+    .unwrap();
+}
