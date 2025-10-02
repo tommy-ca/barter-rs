@@ -1,17 +1,22 @@
-use crate::config::PySystemConfig;
+use crate::{PyEngineEvent, config::PySystemConfig};
 use barter::{
     EngineEvent,
     engine::{
-        clock::HistoricalClock,
+        Engine,
+        clock::{HistoricalClock, LiveClock},
+        execution_tx::MultiExchangeTxMap,
         state::{
-            global::DefaultGlobalData, instrument::data::DefaultInstrumentMarketData,
+            EngineState, global::DefaultGlobalData, instrument::data::DefaultInstrumentMarketData,
             trading::TradingState,
         },
     },
     risk::DefaultRiskManager,
     statistic::{summary::TradingSummary, time::Daily},
     strategy::DefaultStrategy,
-    system::builder::{AuditMode, EngineFeedMode, SystemArgs, SystemBuilder},
+    system::{
+        System,
+        builder::{AuditMode, EngineFeedMode, SystemArgs, SystemBuilder},
+    },
 };
 use barter_data::{
     event::DataKind,
@@ -21,13 +26,154 @@ use barter_data::{
     },
 };
 use barter_instrument::{index::IndexedInstruments, instrument::InstrumentIndex};
-use futures::{Stream, StreamExt};
+use barter_integration::channel::Tx;
+use futures::{Stream, StreamExt, stream};
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyModule};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
-use std::{fs::File, io::Read, path::Path};
-use tokio::runtime::Builder as RuntimeBuilder;
+use std::{
+    fs::File,
+    io::Read,
+    path::Path,
+    sync::{Arc, Mutex, MutexGuard},
+};
+use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 use tracing::{info, warn};
+
+type DefaultEngineState = EngineState<DefaultGlobalData, DefaultInstrumentMarketData>;
+type TradingEngine = Engine<
+    LiveClock,
+    DefaultEngineState,
+    MultiExchangeTxMap,
+    DefaultStrategy<DefaultEngineState>,
+    DefaultRiskManager<DefaultEngineState>,
+>;
+type RunningSystem = System<TradingEngine, EngineEvent>;
+
+#[pyclass(module = "barter_python", name = "SystemHandle", unsendable)]
+pub struct PySystemHandle {
+    runtime: Arc<Runtime>,
+    system: Mutex<Option<RunningSystem>>,
+}
+
+impl PySystemHandle {
+    fn new(runtime: Arc<Runtime>, system: RunningSystem) -> Self {
+        Self {
+            runtime,
+            system: Mutex::new(Some(system)),
+        }
+    }
+
+    fn lock_system(&self) -> PyResult<MutexGuard<'_, Option<RunningSystem>>> {
+        self.system
+            .lock()
+            .map_err(|_| PyValueError::new_err("system handle poisoned"))
+    }
+
+    fn take_system(&self) -> PyResult<RunningSystem> {
+        let mut guard = self.lock_system()?;
+        guard.take().ok_or_else(Self::system_not_running_err)
+    }
+
+    fn system_not_running_err() -> PyErr {
+        PyValueError::new_err("system is not running")
+    }
+}
+
+#[pymethods]
+impl PySystemHandle {
+    /// Return `True` if the underlying system is still running.
+    pub fn is_running(&self) -> PyResult<bool> {
+        Ok(self.lock_system()?.is_some())
+    }
+
+    /// Send an [`EngineEvent`] to the running system.
+    pub fn send_event(&self, event: &PyEngineEvent) -> PyResult<()> {
+        let guard = self.lock_system()?;
+        let system = guard.as_ref().ok_or_else(Self::system_not_running_err)?;
+
+        system
+            .feed_tx
+            .send(event.inner.clone())
+            .map_err(|err| PyValueError::new_err(err.to_string()))
+    }
+
+    /// Toggle algorithmic trading on or off.
+    pub fn set_trading_enabled(&self, enabled: bool) -> PyResult<()> {
+        let guard = self.lock_system()?;
+        let system = guard.as_ref().ok_or_else(Self::system_not_running_err)?;
+
+        let state = if enabled {
+            TradingState::Enabled
+        } else {
+            TradingState::Disabled
+        };
+        system.trading_state(state);
+        Ok(())
+    }
+
+    /// Gracefully shut down the system.
+    pub fn shutdown(&self, py: Python<'_>) -> PyResult<()> {
+        let system = self.take_system()?;
+        let runtime = Arc::clone(&self.runtime);
+
+        match py.allow_threads(|| runtime.block_on(system.shutdown())) {
+            Ok((_engine, _audit)) => Ok(()),
+            Err(err) => Err(PyValueError::new_err(err.to_string())),
+        }
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let running = self.lock_system()?.is_some();
+        Ok(format!("SystemHandle(running={running})"))
+    }
+}
+
+/// Start a live or paper trading system using the provided configuration.
+#[pyfunction]
+#[pyo3(signature = (config, *, trading_enabled = true))]
+pub fn start_system(config: &PySystemConfig, trading_enabled: bool) -> PyResult<PySystemHandle> {
+    let runtime = Arc::new(
+        RuntimeBuilder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(|err| PyValueError::new_err(err.to_string()))?,
+    );
+
+    let mut config_inner = config.clone_inner();
+    let instruments = IndexedInstruments::new(config_inner.instruments.drain(..));
+    let market_stream = stream::pending::<MarketStreamEvent<InstrumentIndex, DataKind>>();
+
+    let args = SystemArgs::new(
+        &instruments,
+        config_inner.executions,
+        LiveClock,
+        DefaultStrategy::default(),
+        DefaultRiskManager::default(),
+        market_stream,
+        DefaultGlobalData::default(),
+        |_| DefaultInstrumentMarketData::default(),
+    );
+
+    let trading_state = if trading_enabled {
+        TradingState::Enabled
+    } else {
+        TradingState::Disabled
+    };
+
+    let system_build = SystemBuilder::new(args)
+        .engine_feed_mode(EngineFeedMode::Stream)
+        .audit_mode(AuditMode::Disabled)
+        .trading_state(trading_state)
+        .build::<EngineEvent, _>()
+        .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+    let system = runtime
+        .block_on(system_build.init_with_runtime(runtime.handle().clone()))
+        .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+    Ok(PySystemHandle::new(runtime, system))
+}
 
 /// Run a historic backtest using a [`SystemConfig`] and market data events encoded as JSON.
 #[pyfunction]

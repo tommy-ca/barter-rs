@@ -7,12 +7,13 @@
 mod config;
 mod system;
 
+use barter::engine::state::trading::TradingState;
 use barter::{EngineEvent, Timed};
 use barter_integration::Terminal;
 use chrono::{DateTime, Utc};
 use config::PySystemConfig;
 use pyo3::{Bound, prelude::*, types::PyModule};
-use system::run_historic_backtest;
+use system::{PySystemHandle, run_historic_backtest, start_system};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]
@@ -70,6 +71,20 @@ impl PyEngineEvent {
         }
     }
 
+    /// Construct a trading state update event.
+    #[staticmethod]
+    pub fn trading_state(enabled: bool) -> Self {
+        let state = if enabled {
+            TradingState::Enabled
+        } else {
+            TradingState::Disabled
+        };
+
+        Self {
+            inner: EngineEvent::TradingStateUpdate(state),
+        }
+    }
+
     /// Check if the underlying event is terminal.
     pub fn is_terminal(&self) -> bool {
         self.inner.is_terminal()
@@ -99,9 +114,11 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySystemConfig>()?;
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
+    m.add_class::<PySystemHandle>()?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
+    m.add_function(wrap_pyfunction!(start_system, m)?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();
@@ -121,6 +138,21 @@ mod tests {
             inner: EngineEvent::shutdown(),
         };
         assert!(event.inner.is_terminal());
+    }
+
+    #[test]
+    fn engine_event_trading_state_constructor() {
+        let enabled = PyEngineEvent::trading_state(true);
+        match enabled.inner {
+            EngineEvent::TradingStateUpdate(state) => assert_eq!(state, TradingState::Enabled),
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+
+        let disabled = PyEngineEvent::trading_state(false);
+        match disabled.inner {
+            EngineEvent::TradingStateUpdate(state) => assert_eq!(state, TradingState::Disabled),
+            other => panic!("unexpected event variant: {other:?}"),
+        }
     }
 
     #[test]
