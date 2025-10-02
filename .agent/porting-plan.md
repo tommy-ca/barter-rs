@@ -22,6 +22,6 @@
 ## Immediate TODOs
 - [ ] Map the minimal set of Engine APIs needed for MVP Python usage.
 - [ ] Review the `barter-bindings` repository for prior art and reusable assets.
-- [ ] Prototype a dedicated `barter-python` crate with PyO3 and maturin config.
+- [x] Prototype a dedicated `barter-python` crate with PyO3 and maturin config.
 - [ ] Define data marshaling strategy for market events and commands across the FFI boundary.
 - [ ] Draft a testing matrix covering core Engine flows invoked from Python.
