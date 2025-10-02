@@ -1,4 +1,4 @@
-- [ ] Expand `barter-python` bindings to cover engine configuration and system control.
+- [x] Expand `barter-python` bindings to cover engine configuration and system control.
 - [x] Mirror key configuration structs (SystemConfig) in Python API.
 - [x] Provide runtime helpers to run trading system from Python via async tasks.
 - [x] Add Python-level integration tests exercising basic system lifecycle.
