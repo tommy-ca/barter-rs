@@ -4,6 +4,7 @@
 
 //! Python bindings for the Barter trading engine.
 
+mod command;
 mod config;
 mod system;
 
@@ -11,6 +12,10 @@ use barter::engine::state::trading::TradingState;
 use barter::{EngineEvent, Timed};
 use barter_integration::Terminal;
 use chrono::{DateTime, Utc};
+use command::{
+    PyInstrumentFilter, PyOrderKey, PyOrderRequestCancel, PyOrderRequestOpen, clone_filter,
+    collect_cancel_requests, collect_open_requests,
+};
 use config::PySystemConfig;
 use pyo3::{Bound, prelude::*, types::PyModule};
 use system::{PySystemHandle, run_historic_backtest, start_system};
@@ -85,6 +90,50 @@ impl PyEngineEvent {
         }
     }
 
+    /// Construct an [`EngineEvent::Command`] to send open order requests.
+    #[staticmethod]
+    pub fn send_open_requests(
+        py: Python<'_>,
+        requests: Vec<Py<PyOrderRequestOpen>>,
+    ) -> PyResult<Self> {
+        let command = barter::Command::SendOpenRequests(collect_open_requests(py, requests)?);
+        Ok(Self {
+            inner: EngineEvent::Command(command),
+        })
+    }
+
+    /// Construct an [`EngineEvent::Command`] to send cancel order requests.
+    #[staticmethod]
+    pub fn send_cancel_requests(
+        py: Python<'_>,
+        requests: Vec<Py<PyOrderRequestCancel>>,
+    ) -> PyResult<Self> {
+        let command = barter::Command::SendCancelRequests(collect_cancel_requests(py, requests)?);
+        Ok(Self {
+            inner: EngineEvent::Command(command),
+        })
+    }
+
+    /// Construct an [`EngineEvent::Command`] to close positions using an optional filter.
+    #[staticmethod]
+    #[pyo3(signature = (filter=None))]
+    pub fn close_positions(filter: Option<&PyInstrumentFilter>) -> Self {
+        let command = barter::Command::ClosePositions(clone_filter(filter));
+        Self {
+            inner: EngineEvent::Command(command),
+        }
+    }
+
+    /// Construct an [`EngineEvent::Command`] to cancel orders using an optional filter.
+    #[staticmethod]
+    #[pyo3(signature = (filter=None))]
+    pub fn cancel_orders(filter: Option<&PyInstrumentFilter>) -> Self {
+        let command = barter::Command::CancelOrders(clone_filter(filter));
+        Self {
+            inner: EngineEvent::Command(command),
+        }
+    }
+
     /// Check if the underlying event is terminal.
     pub fn is_terminal(&self) -> bool {
         self.inner.is_terminal()
@@ -115,6 +164,10 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
     m.add_class::<PySystemHandle>()?;
+    m.add_class::<PyOrderKey>()?;
+    m.add_class::<PyOrderRequestOpen>()?;
+    m.add_class::<PyOrderRequestCancel>()?;
+    m.add_class::<PyInstrumentFilter>()?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
