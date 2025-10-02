@@ -1,4 +1,8 @@
-use crate::{PyEngineEvent, config::PySystemConfig};
+use crate::{
+    PyEngineEvent,
+    command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen},
+    config::PySystemConfig,
+};
 use barter::{
     EngineEvent,
     engine::{
@@ -96,6 +100,42 @@ impl PySystemHandle {
             .feed_tx
             .send(event.inner.clone())
             .map_err(|err| PyValueError::new_err(err.to_string()))
+    }
+
+    /// Send open order requests to the engine.
+    #[pyo3(signature = (requests))]
+    pub fn send_open_requests(
+        &self,
+        py: Python<'_>,
+        requests: Vec<Py<PyOrderRequestOpen>>,
+    ) -> PyResult<()> {
+        let event = PyEngineEvent::send_open_requests(py, requests)?;
+        self.send_event(&event)
+    }
+
+    /// Send cancel order requests to the engine.
+    #[pyo3(signature = (requests))]
+    pub fn send_cancel_requests(
+        &self,
+        py: Python<'_>,
+        requests: Vec<Py<PyOrderRequestCancel>>,
+    ) -> PyResult<()> {
+        let event = PyEngineEvent::send_cancel_requests(py, requests)?;
+        self.send_event(&event)
+    }
+
+    /// Trigger a close positions command using an optional filter.
+    #[pyo3(signature = (filter=None))]
+    pub fn close_positions(&self, filter: Option<&PyInstrumentFilter>) -> PyResult<()> {
+        let event = PyEngineEvent::close_positions(filter);
+        self.send_event(&event)
+    }
+
+    /// Trigger a cancel orders command using an optional filter.
+    #[pyo3(signature = (filter=None))]
+    pub fn cancel_orders(&self, filter: Option<&PyInstrumentFilter>) -> PyResult<()> {
+        let event = PyEngineEvent::cancel_orders(filter);
+        self.send_event(&event)
     }
 
     /// Toggle algorithmic trading on or off.
