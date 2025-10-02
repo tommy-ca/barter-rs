@@ -4,9 +4,12 @@
 
 //! Python bindings for the Barter trading engine.
 
+mod config;
+
 use barter::{EngineEvent, Timed};
 use barter_integration::Terminal;
 use chrono::{DateTime, Utc};
+use config::PySystemConfig;
 use pyo3::{Bound, prelude::*, types::PyModule};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
@@ -91,6 +94,7 @@ pub fn timed_f64(value: f64, time: DateTime<Utc>) -> PyTimedF64 {
 /// Python module definition entry point.
 #[pymodule]
 pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PySystemConfig>()?;
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;

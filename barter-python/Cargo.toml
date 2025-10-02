@@ -20,3 +20,5 @@ barter = { path = "../barter" }
 barter-integration = { path = "../barter-integration" }
 pyo3 = { workspace = true }
 chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

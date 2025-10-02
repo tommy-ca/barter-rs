@@ -1,7 +1,7 @@
 #![cfg(feature = "python-tests")]
 
 use barter_python::barter_python;
-use pyo3::{prelude::*, types::PyModule};
+use pyo3::{PyObject, prelude::*, types::PyModule};
 
 #[test]
 fn shutdown_event_is_terminal() {
@@ -35,6 +35,35 @@ fn timed_f64_round_trip() {
 
         assert_eq!(value, 42.5);
         assert_eq!(time_repr, "datetime.datetime(2024, 1, 1, 0, 0)");
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn system_config_from_json() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let system_config_cls = module.getattr("SystemConfig")?;
+
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let config_path = std::path::Path::new(&manifest_dir)
+            .join("..")
+            .join("barter")
+            .join("examples")
+            .join("config")
+            .join("system_config.json");
+
+        let system_config =
+            system_config_cls.call_method1("from_json", (config_path.display().to_string(),))?;
+        let config_dict = system_config.call_method0("to_dict")?;
+
+        let instruments = config_dict.get_item("instruments").unwrap();
+        let instruments: Vec<PyObject> = instruments.extract()?;
+        assert!(!instruments.is_empty());
 
         Ok(())
     })
