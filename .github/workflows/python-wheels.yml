@@ -47,3 +47,22 @@ jobs:
         with:
           name: barter-python-${{ matrix.os }}-py${{ matrix.python }}
           path: barter-python/target/wheels/*.whl
+
+  publish:
+    name: "Publish to PyPI"
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && secrets.PYPI_API_TOKEN != ''
+
+    steps:
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.10.3
+        with:
+          packages-dir: dist
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
