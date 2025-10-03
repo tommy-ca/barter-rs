@@ -1,6 +1,10 @@
 use barter::system::config::SystemConfig;
 use pyo3::{PyObject, exceptions::PyValueError, prelude::*, types::PyModule};
-use std::{fs::File, io::BufReader, path::Path};
+use std::{
+    fs::File,
+    io::{BufReader, BufWriter},
+    path::Path,
+};
 
 /// Python wrapper around [`SystemConfig`].
 #[pyclass(module = "barter_python", name = "SystemConfig")]
@@ -25,6 +29,15 @@ impl PySystemConfig {
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
         let config = serde_json::from_reader(reader)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+        Ok(Self { inner: config })
+    }
+
+    /// Construct a [`SystemConfig`] from a JSON string.
+    #[staticmethod]
+    pub fn from_json_str(data: &str) -> PyResult<Self> {
+        let config = serde_json::from_str(data)
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
         Ok(Self { inner: config })
@@ -58,6 +71,16 @@ impl PySystemConfig {
     /// Serialize the configuration to a JSON string.
     pub fn to_json(&self) -> PyResult<String> {
         serde_json::to_string_pretty(&self.inner)
+            .map_err(|err| PyValueError::new_err(err.to_string()))
+    }
+
+    /// Serialize the configuration to `path` in JSON format.
+    pub fn to_json_file(&self, path: &str) -> PyResult<()> {
+        let file = File::create(Path::new(path))
+            .map(BufWriter::new)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+        serde_json::to_writer_pretty(file, &self.inner)
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 

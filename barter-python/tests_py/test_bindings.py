@@ -41,6 +41,25 @@ def test_system_config_dict_roundtrip(example_paths: dict[str, Path]) -> None:
     assert restored.to_dict() == config_dict
 
 
+def test_system_config_from_json_str(example_paths: dict[str, Path]) -> None:
+    contents = example_paths["system_config"].read_text()
+    config = bp.SystemConfig.from_json_str(contents)
+
+    assert config.to_dict()["instruments"], "Config should load instruments from string"
+
+
+def test_system_config_to_json_file(
+    tmp_path: Path, example_paths: dict[str, Path]
+) -> None:
+    config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    output_path = tmp_path / "system_config_copy.json"
+
+    config.to_json_file(str(output_path))
+    restored = bp.SystemConfig.from_json(str(output_path))
+
+    assert restored.to_dict() == config.to_dict()
+
+
 def test_run_historic_backtest_summary(example_paths: dict[str, Path]) -> None:
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
     summary = bp.run_historic_backtest(
