@@ -56,5 +56,6 @@
 ## Next Steps
 - [x] Implement `pytest` markers and fixtures mirroring the above scenarios.
   - Implemented on 2025-10-03 via `tests_py/test_integration_*.py` and `pyproject.toml` marker.
-- [ ] Add CI job invoking `pytest -m integration --maxfail=1` post wheel build.
+- [x] Add CI job invoking `pytest -m integration --maxfail=1` post wheel build.
+  - Added 2025-10-03 as the `python-tests` job in `.github/workflows/ci.yml` running against `barter-python`.
 - [ ] Evaluate need for synthetic market data fixture with shorter event stream to improve runtime.
