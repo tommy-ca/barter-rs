@@ -26,6 +26,12 @@
 - [x] Add coverage in tests for account event round trip
 - [x] Document binding usage in README update
 
+## Upcoming (2025-10-03)
+- [ ] Expose risk manager configuration knobs to Python API (capture spec).
+- [ ] Surface portfolio analytics helpers (eg. Sharpe, Sortino calculators) for Python summaries.
+- [ ] Provide combined test runner script (Rust + Python) for contributors.
+- [ ] Draft release cadence doc aligning Rust crate and Python wheel versioning.
+
 ## Later Opportunities
 - [x] Expand bindings for market stream events (2025-10-03)
 - [x] Add CLI example for Python package (2025-10-03)
