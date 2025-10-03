@@ -16,7 +16,7 @@ use barter::{
         },
     },
     risk::DefaultRiskManager,
-    statistic::time::Daily,
+    statistic::time::{Annual252, Annual365, Daily},
     strategy::DefaultStrategy,
     system::{
         System,
@@ -186,11 +186,12 @@ impl PySystemHandle {
     }
 
     /// Shut down the system and return a trading summary.
-    #[pyo3(signature = (risk_free_return = 0.05))]
+    #[pyo3(signature = (risk_free_return = 0.05, interval = None))]
     pub fn shutdown_with_summary(
         &self,
         py: Python<'_>,
         risk_free_return: f64,
+        interval: Option<&str>,
     ) -> PyResult<Py<PyTradingSummary>> {
         let system = self.take_system()?;
         let runtime = Arc::clone(&self.runtime);
@@ -200,10 +201,13 @@ impl PySystemHandle {
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
         let decimal_rfr = parse_risk_free_return(risk_free_return)?;
+        let summary_interval = parse_summary_interval(interval)?;
         let mut generator = engine.trading_summary_generator(decimal_rfr);
-        let summary = generator.generate(Daily);
-
-        summary_to_py(py, summary)
+        match summary_interval {
+            SummaryInterval::Daily => summary_to_py(py, generator.generate(Daily)),
+            SummaryInterval::Annual252 => summary_to_py(py, generator.generate(Annual252)),
+            SummaryInterval::Annual365 => summary_to_py(py, generator.generate(Annual365)),
+        }
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -260,12 +264,13 @@ pub fn start_system(config: &PySystemConfig, trading_enabled: bool) -> PyResult<
 
 /// Run a historic backtest using a [`SystemConfig`] and market data events encoded as JSON.
 #[pyfunction]
-#[pyo3(signature = (config, market_data_path, risk_free_return = 0.05))]
+#[pyo3(signature = (config, market_data_path, risk_free_return = 0.05, interval = None))]
 pub fn run_historic_backtest(
     py: Python<'_>,
     config: &PySystemConfig,
     market_data_path: &str,
     risk_free_return: f64,
+    interval: Option<&str>,
 ) -> PyResult<Py<PyTradingSummary>> {
     let (clock, market_stream) =
         load_historic_clock_and_market_stream(Path::new(market_data_path))?;
@@ -305,15 +310,49 @@ pub fn run_historic_backtest(
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
     let decimal_rfr = parse_risk_free_return(risk_free_return)?;
+    let summary_interval = parse_summary_interval(interval)?;
 
     let mut summary = engine.trading_summary_generator(decimal_rfr);
-    let summary = summary.generate(Daily);
-
-    summary_to_py(py, summary)
+    match summary_interval {
+        SummaryInterval::Daily => summary_to_py(py, summary.generate(Daily)),
+        SummaryInterval::Annual252 => summary_to_py(py, summary.generate(Annual252)),
+        SummaryInterval::Annual365 => summary_to_py(py, summary.generate(Annual365)),
+    }
 }
 
 fn parse_risk_free_return(value: f64) -> PyResult<Decimal> {
     Decimal::from_f64(value).ok_or_else(|| PyValueError::new_err("risk_free_return must be finite"))
+}
+
+fn parse_summary_interval(value: Option<&str>) -> PyResult<SummaryInterval> {
+    match value {
+        None => Ok(SummaryInterval::Daily),
+        Some(raw) => {
+            let normalized: String = raw
+                .chars()
+                .filter(|ch| ch.is_ascii_alphanumeric())
+                .collect::<String>()
+                .to_ascii_lowercase();
+
+            match normalized.as_str() {
+                "" => Ok(SummaryInterval::Daily),
+                "daily" => Ok(SummaryInterval::Daily),
+                "annual252" => Ok(SummaryInterval::Annual252),
+                "annual365" => Ok(SummaryInterval::Annual365),
+                _ => Err(PyValueError::new_err(format!(
+                    "invalid interval '{raw}'. valid values are: daily, annual_252, annual_365",
+                    raw = raw.trim()
+                ))),
+            }
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum SummaryInterval {
+    Daily,
+    Annual252,
+    Annual365,
 }
 
 fn load_historic_clock_and_market_stream(

@@ -17,9 +17,11 @@ def test_historic_backtest_summary(
     """Ensure historic backtests produce deterministic trading summaries."""
 
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    market_data_path = str(example_paths["market_data"])
+
     summary = bp.run_historic_backtest(
         config,
-        str(example_paths["market_data"]),
+        market_data_path,
         risk_free_return=0.01,
     )
 
@@ -36,6 +38,26 @@ def test_historic_backtest_summary(
     assert tear_sheet.sharpe_ratio.interval == "Daily"
     assert tear_sheet.sortino_ratio.interval == "Daily"
     assert tear_sheet.calmar_ratio.interval == "Daily"
+
+    summary_annual = bp.run_historic_backtest(
+        config,
+        market_data_path,
+        risk_free_return=0.01,
+        interval="annual_252",
+    )
+
+    annual_sheet = next(iter(summary_annual.instruments.values()))
+    assert annual_sheet.pnl_return.interval == "Annual(252)"
+    assert annual_sheet.sharpe_ratio.interval == "Annual(252)"
+    assert annual_sheet.sortino_ratio.interval == "Annual(252)"
+    assert annual_sheet.calmar_ratio.interval == "Annual(252)"
+
+    with pytest.raises(ValueError):
+        bp.run_historic_backtest(
+            config,
+            market_data_path,
+            interval="unknown",
+        )
 
     assets = summary.assets
     assert assets

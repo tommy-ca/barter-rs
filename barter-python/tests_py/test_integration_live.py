@@ -50,7 +50,7 @@ def test_live_system_lifecycle(example_paths: dict[str, Path]) -> None:
         ]
         handle.feed_events(events)
     finally:
-        summary = handle.shutdown_with_summary()
+        summary = handle.shutdown_with_summary(interval="annual_365")
 
     assert summary is not None
     assert not handle.is_running()
@@ -64,7 +64,10 @@ def test_live_system_lifecycle(example_paths: dict[str, Path]) -> None:
     assert isinstance(name, str)
     assert tear_sheet.pnl == Decimal("0")
     assert tear_sheet.pnl_return.value == Decimal("0")
-    assert tear_sheet.pnl_return.interval == "Daily"
+    assert tear_sheet.pnl_return.interval == "Annual(365)"
+    assert tear_sheet.sharpe_ratio.interval == "Annual(365)"
+    assert tear_sheet.sortino_ratio.interval == "Annual(365)"
+    assert tear_sheet.calmar_ratio.interval == "Annual(365)"
 
     summary_dict = summary.to_dict()
     assert name in summary_dict["instruments"]

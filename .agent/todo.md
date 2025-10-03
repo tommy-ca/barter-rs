@@ -41,3 +41,4 @@
 - [x] Expose abort helper on Python `SystemHandle` for immediate teardown (2025-10-03).
 - [x] Expose additional market event constructors (L1 order book, candle, liquidation) in Python bindings (2025-10-03).
 - [x] Add Python binding helper for account trade events (2025-10-03).
+- [x] Allow selecting annualisation interval for Python trading summaries (2025-10-03).

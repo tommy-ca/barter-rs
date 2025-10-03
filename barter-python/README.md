@@ -30,7 +30,7 @@ import barter_python as bp
 
 config = bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
 handle = bp.start_system(config, trading_enabled=False)
-summary = handle.shutdown_with_summary()
+summary = handle.shutdown_with_summary(interval="annual_365")
 
 print("Summary start:", summary.time_engine_start)
 print("Instrument keys:", list(summary.instruments.keys()))
@@ -57,14 +57,20 @@ PY
 barter-backtest \
   --config ../barter/examples/config/system_config.json \
   --market-data ../barter/examples/data/binance_spot_market_data_with_disconnect_events.json \
+  --interval annual-252 \
   --pretty
 
 # Alternatively invoke the example script directly during development
 python examples/backtest_cli.py \
   --config ../barter/examples/config/system_config.json \
   --market-data ../barter/examples/data/binance_spot_market_data_with_disconnect_events.json \
+  --interval annual-365 \
   --pretty
 ```
+
+Both `SystemHandle.shutdown_with_summary` and `run_historic_backtest` accept an optional
+`interval` argument (`"daily"`, `"annual_252"`, or `"annual_365"`, case-insensitive) which controls
+how risk and return metrics are annualised in the generated trading summary.
 
 ## Development
 

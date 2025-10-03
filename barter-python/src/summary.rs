@@ -7,7 +7,7 @@ use barter::statistic::{
         sortino::SortinoRatio,
     },
     summary::{TradingSummary, asset::TearSheetAsset, instrument::TearSheet},
-    time::{Daily, TimeInterval},
+    time::TimeInterval,
 };
 use barter_execution::balance::Balance;
 use chrono::{DateTime, Utc};
@@ -19,10 +19,13 @@ use pyo3::{
 use rust_decimal::Decimal;
 use std::fmt::Write;
 
-pub fn summary_to_py(
+pub fn summary_to_py<Interval>(
     py: Python<'_>,
-    summary: TradingSummary<Daily>,
-) -> PyResult<Py<PyTradingSummary>> {
+    summary: TradingSummary<Interval>,
+) -> PyResult<Py<PyTradingSummary>>
+where
+    Interval: TimeInterval,
+{
     PyTradingSummary::from_summary(py, summary)
 }
 
@@ -35,10 +38,13 @@ pub struct PyTradingSummary {
 }
 
 impl PyTradingSummary {
-    fn from_summary(
+    fn from_summary<Interval>(
         py: Python<'_>,
-        summary: TradingSummary<Daily>,
-    ) -> PyResult<Py<PyTradingSummary>> {
+        summary: TradingSummary<Interval>,
+    ) -> PyResult<Py<PyTradingSummary>>
+    where
+        Interval: TimeInterval,
+    {
         let TradingSummary {
             time_engine_start,
             time_engine_end,
@@ -164,10 +170,13 @@ pub struct PyInstrumentTearSheet {
 }
 
 impl PyInstrumentTearSheet {
-    fn from_tear_sheet(
+    fn from_tear_sheet<Interval>(
         py: Python<'_>,
-        sheet: TearSheet<Daily>,
-    ) -> PyResult<Py<PyInstrumentTearSheet>> {
+        sheet: TearSheet<Interval>,
+    ) -> PyResult<Py<PyInstrumentTearSheet>>
+    where
+        Interval: TimeInterval,
+    {
         let TearSheet {
             pnl,
             pnl_return,
