@@ -7,6 +7,7 @@
 - [ ] Implement pytest integration suite per new spec.
   - [x] Add live system lifecycle coverage (`tests_py/test_integration_live.py`).
   - [x] Cover historic backtest summary scenario (`tests_py/test_integration_backtest.py`).
+  - [x] Exercise command builder round-trip (`tests_py/test_integration_commands.py`).
 - [ ] Wire integration test marker into CI workflow after maturin build.
 - [ ] Add tracing/log capture fixture to aid debugging slow tests.
 - [ ] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
