@@ -55,6 +55,26 @@ and back-testing systems. It is made up of several easy-to-use, extensible crate
 
 [barter-examples]: https://github.com/barter-rs/barter-rs/tree/develop/barter/examples
 
+## Python Bindings
+The `barter-python` crate provides official Python bindings for the trading engine via
+[PyO3](https://pyo3.rs/). This repository already includes everything needed to build and exercise
+the extension locally:
+
+```
+pip install maturin
+maturin develop
+python -c "import barter_python as bp; print(bp.shutdown_event().is_terminal())"
+
+# Run the packaged backtest CLI once the extension is built
+barter-backtest \
+  --config barter/examples/config/system_config.json \
+  --market-data barter/examples/data/binance_spot_market_data_with_disconnect_events.json \
+  --pretty
+```
+
+See `barter-python/README.md` for additional examples, integration guidance, and release process
+details.
+
 ## Examples
 * See [here][barter-examples] for the compilable example including imports.
 * See sub-crates for further examples of each library.

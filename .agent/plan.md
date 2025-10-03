@@ -19,4 +19,5 @@
 3. ✅ Implement core binding modules and integrate with Rust components.
 4. ✅ Add Python packaging metadata plus unit and end-to-end tests (integration suite landed
    2025-10-03; automated wheel publishing wired up via `python-wheels` workflow).
-5. ⏳ Refresh documentation, examples, and CI pipelines for the hybrid project.
+5. 🔄 Refresh documentation, examples, and CI pipelines for the hybrid project (README python
+   quickstart updated 2025-10-03; further updates pending).

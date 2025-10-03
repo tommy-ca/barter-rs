@@ -19,6 +19,7 @@
 - [x] Document new feature flag workflow in developer README once stabilised. (2025-10-03)
 
 ## Planned (2025-10-03)
+- [x] Update top-level README with Python quickstart guidance. (2025-10-03)
 - [x] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*
 - [x] Run `pytest -q tests_py`
 - [x] Expose account event constructors in Python bindings
