@@ -42,6 +42,17 @@ summary_dict = summary.to_dict()
 print(summary_dict["instruments"][first_name]["pnl"])
 PY
 
+# Abort a running system immediately without waiting for a summary
+python - <<'PY'
+import barter_python as bp
+
+config = bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
+handle = bp.start_system(config, trading_enabled=False)
+handle.abort()
+
+print("Running after abort:", handle.is_running())
+PY
+
 # Run the example CLI to execute a historic backtest
 python examples/backtest_cli.py \
   --config ../barter/examples/config/system_config.json \

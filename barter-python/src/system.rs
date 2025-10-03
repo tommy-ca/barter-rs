@@ -174,6 +174,17 @@ impl PySystemHandle {
         }
     }
 
+    /// Abort the system without waiting for a graceful shutdown.
+    pub fn abort(&self, py: Python<'_>) -> PyResult<()> {
+        let system = self.take_system()?;
+        let runtime = Arc::clone(&self.runtime);
+
+        match py.allow_threads(|| runtime.block_on(system.abort())) {
+            Ok((_engine, _audit)) => Ok(()),
+            Err(err) => Err(PyValueError::new_err(err.to_string())),
+        }
+    }
+
     /// Shut down the system and return a trading summary.
     #[pyo3(signature = (risk_free_return = 0.05))]
     pub fn shutdown_with_summary(

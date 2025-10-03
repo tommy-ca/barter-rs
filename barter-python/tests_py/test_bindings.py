@@ -222,6 +222,20 @@ def test_system_handle_feed_events(example_paths: dict[str, Path]) -> None:
     assert not handle.is_running()
 
 
+def test_system_handle_abort(example_paths: dict[str, Path]) -> None:
+    config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    handle = bp.start_system(config, trading_enabled=False)
+
+    assert handle.is_running()
+
+    handle.abort()
+
+    assert not handle.is_running()
+
+    with pytest.raises(ValueError):
+        handle.shutdown()
+
+
 def test_shutdown_with_summary(example_paths: dict[str, Path]) -> None:
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
     handle = bp.start_system(config)

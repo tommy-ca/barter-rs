@@ -37,3 +37,4 @@
 - [x] Provide runtime helpers to run trading system from Python via async tasks.
 - [x] Add Python-level integration tests exercising basic system lifecycle.
 - [x] Expose account reconnect events in Python API (2025-10-03).
+- [x] Expose abort helper on Python `SystemHandle` for immediate teardown (2025-10-03).
