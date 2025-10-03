@@ -15,8 +15,8 @@
       building with the `extension-module` feature enabled.
 
 ## Planned (2025-10-03)
-- [ ] Run `cargo test -p barter-python`
-- [ ] Run `pytest -q tests_py`
+- [ ] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*
+- [x] Run `pytest -q tests_py`
 - [ ] Expose account event constructors in Python bindings
 - [ ] Add coverage in tests for account event round trip
 - [ ] Document binding usage in README update
