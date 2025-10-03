@@ -340,7 +340,7 @@ pub(crate) fn clone_filter(filter: Option<&PyInstrumentFilter>) -> DefaultInstru
         .unwrap_or(InstrumentFilter::None)
 }
 
-fn parse_side(value: &str) -> PyResult<Side> {
+pub(crate) fn parse_side(value: &str) -> PyResult<Side> {
     match value.to_ascii_lowercase().as_str() {
         "buy" | "b" => Ok(Side::Buy),
         "sell" | "s" => Ok(Side::Sell),

@@ -24,7 +24,7 @@
 - [x] Document binding usage in README update
 
 ## Later Opportunities
-- [ ] Expand bindings for market stream events
+- [x] Expand bindings for market stream events (2025-10-03)
 - [ ] Add CLI example for Python package
 - [ ] Evaluate packaging automation
 

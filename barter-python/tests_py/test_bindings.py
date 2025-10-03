@@ -71,6 +71,43 @@ def test_engine_event_balance_snapshot_builder() -> None:
     assert not round_trip.is_terminal()
 
 
+def test_engine_event_market_trade_builder() -> None:
+    timestamp = dt.datetime(2024, 3, 4, 5, 6, 7, tzinfo=dt.timezone.utc)
+
+    event = bp.EngineEvent.market_trade(
+        "binance_spot",
+        1,
+        101.25,
+        0.75,
+        "buy",
+        timestamp,
+        trade_id="py-trade-1",
+    )
+
+    payload = event.to_dict()
+    market = payload["Market"]["Item"]
+
+    assert market["exchange"] == "binance_spot"
+    assert market["instrument"] == 1
+    assert market["time_exchange"] == timestamp.isoformat().replace("+00:00", "Z")
+    assert market["time_received"] == timestamp.isoformat().replace("+00:00", "Z")
+
+    trade = market["kind"]["Trade"]
+    assert trade["id"] == "py-trade-1"
+    assert trade["price"] == pytest.approx(101.25)
+    assert trade["amount"] == pytest.approx(0.75)
+    assert trade["side"].lower() == "buy"
+
+
+def test_engine_event_market_reconnecting_builder() -> None:
+    event = bp.EngineEvent.market_reconnecting("kraken")
+
+    payload = event.to_dict()
+    reconnecting = payload["Market"]["Reconnecting"]
+
+    assert reconnecting == "kraken"
+
+
 def test_timed_f64_roundtrip() -> None:
     timestamp = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
     timed = bp.timed_f64(42.5, timestamp)

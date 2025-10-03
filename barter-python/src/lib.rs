@@ -13,16 +13,25 @@ mod system;
 use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
 use barter::{EngineEvent, Timed};
+use barter_data::{
+    event::{DataKind, MarketEvent},
+    streams::consumer::MarketStreamEvent,
+    subscription::trade::PublicTrade,
+};
 use barter_execution::{
     AccountEvent, AccountEventKind,
     balance::{AssetBalance, Balance},
 };
-use barter_instrument::{asset::AssetIndex, exchange::ExchangeIndex};
+use barter_instrument::{
+    asset::AssetIndex,
+    exchange::{ExchangeId, ExchangeIndex},
+    instrument::InstrumentIndex,
+};
 use barter_integration::{Terminal, snapshot::Snapshot};
 use chrono::{DateTime, Utc};
 use command::{
     PyInstrumentFilter, PyOrderKey, PyOrderRequestCancel, PyOrderRequestOpen, clone_filter,
-    collect_cancel_requests, collect_open_requests, parse_decimal,
+    collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
 use config::PySystemConfig;
 use logging::init_tracing;
@@ -182,6 +191,65 @@ impl PyEngineEvent {
         }
     }
 
+    /// Construct an [`EngineEvent::Market`] wrapping a public trade update.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (exchange, instrument, price, quantity, side, time_exchange, trade_id=None, time_received=None))]
+    pub fn market_trade(
+        exchange: &str,
+        instrument: usize,
+        price: f64,
+        quantity: f64,
+        side: &str,
+        time_exchange: DateTime<Utc>,
+        trade_id: Option<&str>,
+        time_received: Option<DateTime<Utc>>,
+    ) -> PyResult<Self> {
+        if !price.is_finite() {
+            return Err(PyValueError::new_err(
+                "price must be a finite numeric value",
+            ));
+        }
+
+        if !quantity.is_finite() || quantity <= 0.0 {
+            return Err(PyValueError::new_err(
+                "quantity must be a positive, finite numeric value",
+            ));
+        }
+
+        let exchange_id = parse_exchange_id(exchange)?;
+        let instrument_index = InstrumentIndex(instrument);
+        let trade_side = parse_side(side)?;
+
+        let trade = PublicTrade {
+            id: trade_id.unwrap_or_default().to_owned(),
+            price,
+            amount: quantity,
+            side: trade_side,
+        };
+
+        let event = MarketEvent {
+            time_exchange,
+            time_received: time_received.unwrap_or(time_exchange),
+            exchange: exchange_id,
+            instrument: instrument_index,
+            kind: DataKind::Trade(trade),
+        };
+
+        Ok(Self {
+            inner: EngineEvent::Market(MarketStreamEvent::Item(event)),
+        })
+    }
+
+    /// Construct an [`EngineEvent::Market`] signalling the stream is reconnecting.
+    #[staticmethod]
+    pub fn market_reconnecting(exchange: &str) -> PyResult<Self> {
+        let exchange_id = parse_exchange_id(exchange)?;
+        Ok(Self {
+            inner: EngineEvent::Market(MarketStreamEvent::Reconnecting(exchange_id)),
+        })
+    }
+
     /// Construct an [`EngineEvent::Account`] with a balance snapshot update.
     #[staticmethod]
     #[pyo3(signature = (exchange, asset, total, free, time_exchange))]
@@ -239,6 +307,20 @@ impl PyEngineEvent {
     }
 }
 
+fn parse_exchange_id(value: &str) -> PyResult<ExchangeId> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(PyValueError::new_err("exchange must not be empty"));
+    }
+
+    let normalized = trimmed.to_ascii_lowercase();
+    serde_json::from_value(Value::String(normalized)).map_err(|_| {
+        PyValueError::new_err(format!(
+            "unknown exchange identifier: {trimmed}. expected snake_case exchange ids such as 'binance_spot'"
+        ))
+    })
+}
+
 /// Convenience function returning a shutdown [`EngineEvent`].
 #[pyfunction]
 pub fn shutdown_event() -> PyEngineEvent {
@@ -286,7 +368,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+    use barter_data::{event::DataKind, streams::consumer::MarketStreamEvent};
+    use barter_instrument::{Side, exchange::ExchangeId, instrument::InstrumentIndex};
+    use chrono::{TimeDelta, TimeZone};
     use pyo3::{Python, types::PyDict};
 
     #[test]
@@ -321,6 +405,85 @@ mod tests {
 
         assert_eq!(timed.value(), 42.5);
         assert_eq!(timed.time(), time);
+    }
+
+    #[test]
+    fn engine_event_market_trade_constructor() {
+        let time_exchange = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
+        let time_received = time_exchange + TimeDelta::seconds(1);
+
+        let event = PyEngineEvent::market_trade(
+            "binance_spot",
+            2,
+            101.25,
+            0.5,
+            "buy",
+            time_exchange,
+            Some("trade-1"),
+            Some(time_received),
+        )
+        .unwrap();
+
+        match event.inner {
+            EngineEvent::Market(MarketStreamEvent::Item(item)) => {
+                assert_eq!(item.exchange, ExchangeId::BinanceSpot);
+                assert_eq!(item.instrument, InstrumentIndex(2));
+                assert_eq!(item.time_exchange, time_exchange);
+                assert_eq!(item.time_received, time_received);
+
+                match item.kind {
+                    DataKind::Trade(trade) => {
+                        assert_eq!(trade.id, "trade-1");
+                        assert_eq!(trade.price, 101.25);
+                        assert_eq!(trade.amount, 0.5);
+                        assert_eq!(trade.side, Side::Buy);
+                    }
+                    other => panic!("unexpected market data kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_market_trade_defaults() {
+        let time_exchange = Utc.with_ymd_and_hms(2024, 5, 6, 7, 8, 9).unwrap();
+
+        let event =
+            PyEngineEvent::market_trade("mock", 0, 1.25, 3.5, "sell", time_exchange, None, None)
+                .unwrap();
+
+        match event.inner {
+            EngineEvent::Market(MarketStreamEvent::Item(item)) => {
+                assert_eq!(item.exchange, ExchangeId::Mock);
+                assert_eq!(item.instrument, InstrumentIndex(0));
+                assert_eq!(item.time_exchange, time_exchange);
+                assert_eq!(item.time_received, time_exchange);
+
+                match item.kind {
+                    DataKind::Trade(trade) => {
+                        assert!(trade.id.is_empty());
+                        assert_eq!(trade.price, 1.25);
+                        assert_eq!(trade.amount, 3.5);
+                        assert_eq!(trade.side, Side::Sell);
+                    }
+                    other => panic!("unexpected market data kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_market_reconnecting_constructor() {
+        let event = PyEngineEvent::market_reconnecting("kraken").unwrap();
+
+        match event.inner {
+            EngineEvent::Market(MarketStreamEvent::Reconnecting(exchange)) => {
+                assert_eq!(exchange, ExchangeId::Kraken);
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
     }
 
     #[test]
