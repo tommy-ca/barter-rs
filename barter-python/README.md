@@ -41,6 +41,12 @@ print(first_name, "PnL", tear_sheet.pnl, "Sharpe", tear_sheet.sharpe_ratio.value
 summary_dict = summary.to_dict()
 print(summary_dict["instruments"][first_name]["pnl"])
 PY
+
+# Run the example CLI to execute a historic backtest
+python examples/backtest_cli.py \
+  --config ../barter/examples/config/system_config.json \
+  --market-data ../barter/examples/data/binance_spot_market_data_with_disconnect_events.json \
+  --pretty
 ```
 
 ## Development

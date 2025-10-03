@@ -25,7 +25,7 @@
 
 ## Later Opportunities
 - [x] Expand bindings for market stream events (2025-10-03)
-- [ ] Add CLI example for Python package
+- [x] Add CLI example for Python package (2025-10-03)
 - [ ] Evaluate packaging automation
 
 ## Completed
