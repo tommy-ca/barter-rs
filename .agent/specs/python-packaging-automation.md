@@ -51,4 +51,4 @@
 - [x] Decide on publish trigger semantics (manual vs. auto on tags).
 - [x] Document packaging workflow in `barter-python/README.md` once automated
       release flow is active.
-- [ ] Capture a release checklist once PyPI credentials are configured and a tagged publish is executed.
+- [x] Capture a release checklist once PyPI credentials are configured and a tagged publish is executed. *(Documented in `.agent/specs/python-release-checklist.md`, 2025-10-03.)*
