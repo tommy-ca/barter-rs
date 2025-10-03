@@ -27,6 +27,7 @@ use command::{
 use config::PySystemConfig;
 use logging::init_tracing;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
+use serde_json::Value;
 use summary::{
     PyAssetTearSheet, PyBalance, PyDrawdown, PyInstrumentTearSheet, PyMeanDrawdown,
     PyMetricWithInterval, PyTradingSummary,
@@ -103,8 +104,24 @@ impl PyEngineEvent {
         let json_module = PyModule::import_bound(py, "json")?;
         let dumps = json_module.getattr("dumps")?;
         let serialized: String = dumps.call1((value,))?.extract()?;
+        let mut json_value: Value = serde_json::from_str(&serialized)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
-        Self::from_json(&serialized)
+        if let Value::Object(ref mut outer) = json_value {
+            let needs_patch = outer
+                .get("Shutdown")
+                .map(|inner| matches!(inner, Value::Object(map) if map.is_empty()))
+                .unwrap_or(false);
+
+            if needs_patch {
+                outer.insert("Shutdown".to_string(), Value::Null);
+            }
+        }
+
+        let inner = serde_json::from_value(json_value)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+        Ok(Self { inner })
     }
 
     /// Construct a trading state update event.

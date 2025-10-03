@@ -11,11 +11,13 @@
   - [x] Capture failure surface behaviour (`tests_py/test_integration_failures.py`).
 - [x] Wire integration test marker into CI workflow after maturin build.
 - [x] Add tracing/log capture fixture to aid debugging slow tests.
-- [ ] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
-      building with the `extension-module` feature enabled.
+- [x] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
+      building with the `extension-module` feature enabled. (2025-10-03)
+
+- [ ] Document new feature flag workflow in developer README once stabilised.
 
 ## Planned (2025-10-03)
-- [ ] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*
+- [x] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*
 - [x] Run `pytest -q tests_py`
 - [x] Expose account event constructors in Python bindings
 - [x] Add coverage in tests for account event round trip

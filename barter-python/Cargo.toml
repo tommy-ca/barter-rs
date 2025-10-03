@@ -13,7 +13,8 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-python-tests = []
+extension-module = ["pyo3/extension-module"]
+python-tests = ["extension-module"]
 
 [dependencies]
 barter = { path = "../barter" }

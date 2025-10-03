@@ -40,7 +40,7 @@ test = [
 [tool.maturin]
 bindings = "pyo3"
 module-name = "barter_python"
-features = []
+features = ["extension-module"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
