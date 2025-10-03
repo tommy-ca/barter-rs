@@ -37,8 +37,8 @@ impl PySystemConfig {
     /// Construct a [`SystemConfig`] from a JSON string.
     #[staticmethod]
     pub fn from_json_str(data: &str) -> PyResult<Self> {
-        let config = serde_json::from_str(data)
-            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+        let config =
+            serde_json::from_str(data).map_err(|err| PyValueError::new_err(err.to_string()))?;
 
         Ok(Self { inner: config })
     }

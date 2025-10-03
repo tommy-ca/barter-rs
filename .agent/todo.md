@@ -1,6 +1,6 @@
 - [x] Remove tracked Python bytecode artefacts from `barter-python/tests_py/__pycache__`.
-- [ ] Finalize `shutdown_with_summary` bindings (Rust + Python tests + docs).
-- [ ] Ensure summary serialization returns rich Python objects.
+- [x] Finalize `shutdown_with_summary` bindings (Rust + Python tests + docs).
+- [x] Ensure summary serialization returns rich Python objects.
 - [ ] Update packaging metadata (wheel classifiers, maturin settings) once API settles.
 - [ ] Plan integration tests covering live system lifecycle vs. backtest.
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -66,9 +67,29 @@ def test_run_historic_backtest_summary(example_paths: dict[str, Path]) -> None:
         config, str(example_paths["market_data"])
     )
 
-    assert "instruments" in summary
-    assert "assets" in summary
-    assert summary["instruments"], "Summary should include instrument breakdown"
+    assert isinstance(summary, bp.TradingSummary)
+    assert summary.time_engine_start <= summary.time_engine_end
+
+    instruments = summary.instruments
+    assert instruments, "Summary should include instrument breakdown"
+
+    instrument_name, instrument_summary = next(iter(instruments.items()))
+    assert isinstance(instrument_name, str)
+    assert isinstance(instrument_summary, bp.InstrumentTearSheet)
+
+    assert instrument_summary.pnl == Decimal("0")
+    assert instrument_summary.pnl_return.value == Decimal("0")
+    assert instrument_summary.pnl_return.interval == "Daily"
+
+    assert instrument_summary.sharpe_ratio.interval == "Daily"
+    assert instrument_summary.sortino_ratio.interval == "Daily"
+    assert instrument_summary.calmar_ratio.interval == "Daily"
+
+    assets = summary.assets
+    assert assets
+    asset_name, asset_summary = next(iter(assets.items()))
+    assert isinstance(asset_name, str)
+    assert isinstance(asset_summary, bp.AssetTearSheet)
 
 
 def test_system_handle_lifecycle(example_paths: dict[str, Path]) -> None:
@@ -96,8 +117,20 @@ def test_shutdown_with_summary(example_paths: dict[str, Path]) -> None:
 
     summary = handle.shutdown_with_summary()
 
-    for key in ("time_engine_start", "time_engine_end", "instruments", "assets"):
-        assert key in summary
+    assert isinstance(summary, bp.TradingSummary)
+    assert summary.time_engine_start <= summary.time_engine_end
+
+    instruments = summary.instruments
+    assert instruments
+
+    tear_sheet = next(iter(instruments.values()))
+    assert isinstance(tear_sheet, bp.InstrumentTearSheet)
+    assert tear_sheet.pnl == Decimal("0")
+    assert tear_sheet.win_rate is None
+    assert tear_sheet.profit_factor is None
+
+    summary_dict = summary.to_dict()
+    assert summary_dict["instruments"]
 
 
 def test_order_request_helpers() -> None:

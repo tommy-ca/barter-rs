@@ -2,6 +2,7 @@ use crate::{
     PyEngineEvent,
     command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen},
     config::PySystemConfig,
+    summary::{PyTradingSummary, summary_to_py},
 };
 use barter::{
     EngineEvent,
@@ -15,10 +16,7 @@ use barter::{
         },
     },
     risk::DefaultRiskManager,
-    statistic::{
-        summary::{TradingSummary, asset::TearSheetAsset, instrument::TearSheet},
-        time::Daily,
-    },
+    statistic::time::Daily,
     strategy::DefaultStrategy,
     system::{
         System,
@@ -34,14 +32,11 @@ use barter_data::{
 };
 use barter_instrument::{index::IndexedInstruments, instrument::InstrumentIndex};
 use barter_integration::channel::Tx;
-use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, stream};
-use pyo3::{exceptions::PyValueError, prelude::*, types::PyModule};
+use pyo3::{exceptions::PyValueError, prelude::*};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
-use serde::Serialize;
 use std::{
-    collections::BTreeMap,
     fs::File,
     io::Read,
     path::Path,
@@ -175,7 +170,7 @@ impl PySystemHandle {
         &self,
         py: Python<'_>,
         risk_free_return: f64,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyTradingSummary>> {
         let system = self.take_system()?;
         let runtime = Arc::clone(&self.runtime);
 
@@ -250,7 +245,7 @@ pub fn run_historic_backtest(
     config: &PySystemConfig,
     market_data_path: &str,
     risk_free_return: f64,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyTradingSummary>> {
     let (clock, market_stream) =
         load_historic_clock_and_market_stream(Path::new(market_data_path))?;
 
@@ -342,52 +337,4 @@ fn load_historic_clock_and_market_stream(
         });
 
     Ok((clock, stream))
-}
-
-#[derive(Serialize)]
-struct PyTradingSummary<Interval> {
-    time_engine_start: DateTime<Utc>,
-    time_engine_end: DateTime<Utc>,
-    instruments: BTreeMap<String, TearSheet<Interval>>,
-    assets: BTreeMap<String, TearSheetAsset>,
-}
-
-fn summary_to_py(py: Python<'_>, summary: TradingSummary<Daily>) -> PyResult<PyObject> {
-    let TradingSummary {
-        time_engine_start,
-        time_engine_end,
-        instruments,
-        assets,
-    } = summary;
-
-    let instruments = instruments
-        .into_iter()
-        .map(|(instrument, tear_sheet)| (instrument.to_string(), tear_sheet))
-        .collect::<BTreeMap<_, _>>();
-
-    let assets = assets
-        .into_iter()
-        .map(|(exchange_asset, tear_sheet)| {
-            let key = format!(
-                "{}:{}",
-                exchange_asset.exchange.as_str(),
-                exchange_asset.asset.as_ref()
-            );
-            (key, tear_sheet)
-        })
-        .collect::<BTreeMap<_, _>>();
-
-    let serializable = PyTradingSummary {
-        time_engine_start,
-        time_engine_end,
-        instruments,
-        assets,
-    };
-
-    let json = serde_json::to_string(&serializable)
-        .map_err(|err| PyValueError::new_err(err.to_string()))?;
-
-    let json_module = PyModule::import_bound(py, "json")?;
-    let loads = json_module.getattr("loads")?;
-    Ok(loads.call1((json,))?.into_py(py))
 }

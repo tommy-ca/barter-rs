@@ -6,6 +6,7 @@
 
 mod command;
 mod config;
+mod summary;
 mod system;
 
 use barter::engine::{command::Command, state::trading::TradingState};
@@ -18,6 +19,10 @@ use command::{
 };
 use config::PySystemConfig;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
+use summary::{
+    PyAssetTearSheet, PyBalance, PyDrawdown, PyInstrumentTearSheet, PyMeanDrawdown,
+    PyMetricWithInterval, PyTradingSummary,
+};
 use system::{PySystemHandle, run_historic_backtest, start_system};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
@@ -199,6 +204,13 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;
     m.add_class::<PyInstrumentFilter>()?;
+    m.add_class::<PyTradingSummary>()?;
+    m.add_class::<PyInstrumentTearSheet>()?;
+    m.add_class::<PyAssetTearSheet>()?;
+    m.add_class::<PyMetricWithInterval>()?;
+    m.add_class::<PyDrawdown>()?;
+    m.add_class::<PyMeanDrawdown>()?;
+    m.add_class::<PyBalance>()?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
