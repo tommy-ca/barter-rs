@@ -2,6 +2,10 @@
 Cargo.lock
 /target
 
+# Python
+__pycache__/
+*.pyc
+
 # IDE
 .idea/
 *.iml
