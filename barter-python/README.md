@@ -8,6 +8,22 @@ Python bindings for the [Barter](https://github.com/barter-rs/barter-rs) trading
 maturin develop
 python -c "import barter_python as bp; print(bp.shutdown_event().is_terminal())"
 
+# Build an account balance snapshot event
+python - <<'PY'
+import datetime as dt
+import barter_python as bp
+
+snapshot = bp.EngineEvent.account_balance_snapshot(
+    exchange=0,
+    asset=1,
+    total=125.5,
+    free=100.0,
+    time_exchange=dt.datetime(2024, 1, 2, tzinfo=dt.timezone.utc),
+)
+
+print(snapshot.to_json())
+PY
+
 # Retrieve a trading summary when shutting down a running system
 python - <<'PY'
 import barter_python as bp

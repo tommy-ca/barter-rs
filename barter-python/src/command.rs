@@ -358,7 +358,7 @@ fn parse_order_kind(value: &str) -> PyResult<OrderKind> {
     }
 }
 
-fn parse_decimal(value: f64, field: &str) -> PyResult<Decimal> {
+pub(crate) fn parse_decimal(value: f64, field: &str) -> PyResult<Decimal> {
     Decimal::from_f64(value)
         .ok_or_else(|| PyValueError::new_err(format!("{field} must be a finite numeric value")))
 }

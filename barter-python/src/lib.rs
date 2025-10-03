@@ -10,12 +10,18 @@ mod summary;
 mod system;
 
 use barter::engine::{command::Command, state::trading::TradingState};
+use barter::execution::AccountStreamEvent;
 use barter::{EngineEvent, Timed};
-use barter_integration::Terminal;
+use barter_execution::{
+    AccountEvent, AccountEventKind,
+    balance::{AssetBalance, Balance},
+};
+use barter_instrument::{asset::AssetIndex, exchange::ExchangeIndex};
+use barter_integration::{Terminal, snapshot::Snapshot};
 use chrono::{DateTime, Utc};
 use command::{
     PyInstrumentFilter, PyOrderKey, PyOrderRequestCancel, PyOrderRequestOpen, clone_filter,
-    collect_cancel_requests, collect_open_requests,
+    collect_cancel_requests, collect_open_requests, parse_decimal,
 };
 use config::PySystemConfig;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
@@ -155,6 +161,39 @@ impl PyEngineEvent {
         Self {
             inner: EngineEvent::Command(command),
         }
+    }
+
+    /// Construct an [`EngineEvent::Account`] with a balance snapshot update.
+    #[staticmethod]
+    #[pyo3(signature = (exchange, asset, total, free, time_exchange))]
+    pub fn account_balance_snapshot(
+        exchange: usize,
+        asset: usize,
+        total: f64,
+        free: f64,
+        time_exchange: DateTime<Utc>,
+    ) -> PyResult<Self> {
+        if free > total {
+            return Err(PyValueError::new_err(
+                "free balance cannot exceed total balance",
+            ));
+        }
+
+        let total_decimal = parse_decimal(total, "total balance")?;
+        let free_decimal = parse_decimal(free, "free balance")?;
+
+        let balance = Balance::new(total_decimal, free_decimal);
+        let asset_balance = AssetBalance::new(AssetIndex(asset), balance, time_exchange);
+        let snapshot = Snapshot::new(asset_balance);
+
+        let event = AccountEvent::new(
+            ExchangeIndex(exchange),
+            AccountEventKind::BalanceSnapshot(snapshot),
+        );
+
+        Ok(Self {
+            inner: EngineEvent::Account(AccountStreamEvent::Item(event)),
+        })
     }
 
     /// Check if the underlying event is terminal.

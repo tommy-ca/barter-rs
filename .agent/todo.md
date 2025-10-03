@@ -17,9 +17,9 @@
 ## Planned (2025-10-03)
 - [ ] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*
 - [x] Run `pytest -q tests_py`
-- [ ] Expose account event constructors in Python bindings
-- [ ] Add coverage in tests for account event round trip
-- [ ] Document binding usage in README update
+- [x] Expose account event constructors in Python bindings
+- [x] Add coverage in tests for account event round trip
+- [x] Document binding usage in README update
 
 ## Later Opportunities
 - [ ] Expand bindings for market stream events

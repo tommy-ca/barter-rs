@@ -31,6 +31,36 @@ def test_engine_event_roundtrip() -> None:
     assert not replayed.is_terminal()
 
 
+def test_engine_event_balance_snapshot_builder() -> None:
+    timestamp = dt.datetime(2024, 1, 2, tzinfo=dt.timezone.utc)
+
+    event = bp.EngineEvent.account_balance_snapshot(
+        exchange=3,
+        asset=7,
+        total=125.5,
+        free=100.0,
+        time_exchange=timestamp,
+    )
+
+    assert not event.is_terminal()
+
+    payload = event.to_dict()
+    account = payload["Account"]
+    assert "Item" in account
+
+    item = account["Item"]
+    assert item["exchange"] == 3
+
+    balance_snapshot = item["kind"]["BalanceSnapshot"]
+    assert balance_snapshot["asset"] == 7
+    assert balance_snapshot["balance"]["total"] == "125.5"
+    assert balance_snapshot["balance"]["free"] == "100"
+    assert balance_snapshot["time_exchange"] == timestamp.isoformat().replace("+00:00", "Z")
+
+    round_trip = bp.EngineEvent.from_json(event.to_json())
+    assert not round_trip.is_terminal()
+
+
 def test_timed_f64_roundtrip() -> None:
     timestamp = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
     timed = bp.timed_f64(42.5, timestamp)
