@@ -24,9 +24,11 @@ use barter_data::{
 use barter_execution::{
     AccountEvent, AccountEventKind,
     balance::{AssetBalance, Balance},
+    order::id::{OrderId, StrategyId},
+    trade::{AssetFees, Trade, TradeId},
 };
 use barter_instrument::{
-    asset::AssetIndex,
+    asset::{AssetIndex, QuoteAsset},
     exchange::{ExchangeId, ExchangeIndex},
     instrument::InstrumentIndex,
 };
@@ -447,6 +449,66 @@ impl PyEngineEvent {
         })
     }
 
+    /// Construct an [`EngineEvent::Account`] with a trade fill update.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (exchange, instrument, strategy_id, order_id, trade_id, side, price, quantity, time_exchange, fees=None))]
+    pub fn account_trade(
+        exchange: usize,
+        instrument: usize,
+        strategy_id: &str,
+        order_id: &str,
+        trade_id: &str,
+        side: &str,
+        price: f64,
+        quantity: f64,
+        time_exchange: DateTime<Utc>,
+        fees: Option<f64>,
+    ) -> PyResult<Self> {
+        if price <= 0.0 || !price.is_finite() {
+            return Err(PyValueError::new_err(
+                "price must be a positive, finite numeric value",
+            ));
+        }
+
+        if quantity <= 0.0 || !quantity.is_finite() {
+            return Err(PyValueError::new_err(
+                "quantity must be a positive, finite numeric value",
+            ));
+        }
+
+        if let Some(fee_value) = fees {
+            if fee_value < 0.0 || !fee_value.is_finite() {
+                return Err(PyValueError::new_err(
+                    "fees must be a non-negative, finite numeric value",
+                ));
+            }
+        }
+
+        let side = parse_side(side)?;
+        let price_decimal = parse_decimal(price, "price")?;
+        let quantity_decimal = parse_decimal(quantity, "quantity")?;
+        let fees_decimal = parse_decimal(fees.unwrap_or(0.0), "fees")?;
+
+        let trade = Trade::<QuoteAsset, InstrumentIndex> {
+            id: TradeId::new(trade_id),
+            order_id: OrderId::new(order_id),
+            instrument: InstrumentIndex(instrument),
+            strategy: StrategyId::new(strategy_id),
+            time_exchange,
+            side,
+            price: price_decimal,
+            quantity: quantity_decimal,
+            fees: AssetFees::quote_fees(fees_decimal),
+        };
+
+        let event = AccountEvent::new(ExchangeIndex(exchange), AccountEventKind::Trade(trade));
+
+        Ok(Self {
+            inner: EngineEvent::Account(AccountStreamEvent::Item(event)),
+        })
+    }
+
     /// Check if the underlying event is terminal.
     pub fn is_terminal(&self) -> bool {
         self.inner.is_terminal()
@@ -557,6 +619,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
     use barter_data::{event::DataKind, streams::consumer::MarketStreamEvent};
+    use barter_execution::order::id::{OrderId, StrategyId};
+    use barter_execution::trade::TradeId;
     use barter_instrument::{Side, exchange::ExchangeId, instrument::InstrumentIndex};
     use chrono::{TimeDelta, TimeZone};
     use pyo3::{Python, types::PyDict};
@@ -804,6 +868,47 @@ mod tests {
         match event.inner {
             EngineEvent::Account(AccountStreamEvent::Reconnecting(exchange)) => {
                 assert_eq!(exchange, ExchangeId::BinanceSpot);
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_account_trade_constructor() {
+        let time_exchange = Utc.with_ymd_and_hms(2025, 8, 9, 10, 11, 12).unwrap();
+
+        let event = PyEngineEvent::account_trade(
+            3,
+            4,
+            "strategy-123",
+            "order-456",
+            "trade-789",
+            "buy",
+            125.25,
+            0.75,
+            time_exchange,
+            Some(0.0015),
+        )
+        .unwrap();
+
+        match event.inner {
+            EngineEvent::Account(AccountStreamEvent::Item(account_event)) => {
+                assert_eq!(account_event.exchange, ExchangeIndex(3));
+
+                match account_event.kind {
+                    AccountEventKind::Trade(trade) => {
+                        assert_eq!(trade.instrument, InstrumentIndex(4));
+                        assert_eq!(trade.strategy, StrategyId::new("strategy-123"));
+                        assert_eq!(trade.order_id, OrderId::new("order-456"));
+                        assert_eq!(trade.id, TradeId::new("trade-789"));
+                        assert_eq!(trade.side, Side::Buy);
+                        assert_eq!(trade.price.to_f64().unwrap(), 125.25);
+                        assert_eq!(trade.quantity.to_f64().unwrap(), 0.75);
+                        assert_eq!(trade.time_exchange, time_exchange);
+                        assert_eq!(trade.fees.fees.to_f64().unwrap(), 0.0015);
+                    }
+                    other => panic!("unexpected account event kind: {other:?}"),
+                }
             }
             other => panic!("unexpected event variant: {other:?}"),
         }
