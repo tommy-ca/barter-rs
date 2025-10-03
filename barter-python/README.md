@@ -57,3 +57,13 @@ python examples/backtest_cli.py \
 - Rust tests that exercise the Python embedding layer: `cargo test -p barter-python --features python-tests`
   - The `python-tests` feature enables the `extension-module` flag so `libpython` is linked only when needed.
 - Python tests (after `maturin develop`): `pytest -q tests_py`
+
+## Releasing
+
+- Wheels are built automatically by the `Build Python Wheels` workflow for Python 3.9–3.12 across
+  Linux, macOS and Windows whenever `main` is updated or a tag matching `v*` is pushed.
+- To publish to PyPI, configure the `PYPI_API_TOKEN` secret in the repository and push a release tag
+  (for example `v0.1.0`). The workflow downloads the matrix artifacts and uploads them to PyPI in a
+  dedicated `Publish to PyPI` job.
+- Manual `workflow_dispatch` runs can be used to validate wheel builds before cutting a release; they
+  will skip the publish step unless the run targets a `v*` tag and the secret is available.

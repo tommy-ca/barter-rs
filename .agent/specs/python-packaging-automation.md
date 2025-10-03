@@ -11,6 +11,9 @@
   no workflow builds or publishes Python wheels.
 - There is no multi-platform matrix for Python builds (Linux/macOS/Windows) or
   Python version coverage beyond 3.11 in CI.
+- `.github/workflows/python-wheels.yml` builds wheels for CPython 3.9–3.12 across
+  Linux, macOS, and Windows on pushes to `main`, `v*` tags, or manual dispatches. Tag runs with a
+  configured `PYPI_API_TOKEN` now publish all collected wheels to PyPI automatically.
 
 ## Goals
 - Automate building wheels (`maturin build`) for CPython 3.9–3.12 across all
@@ -44,7 +47,8 @@
   `x86_64-pc-windows-msvc` only?
 
 ## Next Actions
-- [ ] Draft GitHub Actions workflow implementing the build + artifact capture.
-- [ ] Decide on publish trigger semantics (manual vs. auto on tags).
-- [ ] Document packaging workflow in `barter-python/README.md` once automated
+- [x] Draft GitHub Actions workflow implementing the build + artifact capture.
+- [x] Decide on publish trigger semantics (manual vs. auto on tags).
+- [x] Document packaging workflow in `barter-python/README.md` once automated
       release flow is active.
+- [ ] Capture a release checklist once PyPI credentials are configured and a tagged publish is executed.

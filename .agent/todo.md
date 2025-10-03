@@ -28,7 +28,7 @@
 ## Later Opportunities
 - [x] Expand bindings for market stream events (2025-10-03)
 - [x] Add CLI example for Python package (2025-10-03)
-- [ ] Automate publishing of built Python wheels once credentials are available
+- [x] Automate publishing of built Python wheels once credentials are available (requires `PYPI_API_TOKEN` secret for release tags)
 
 ## Completed
 - [x] Expose module version constant to Python consumers.
