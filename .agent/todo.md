@@ -14,6 +14,18 @@
 - [ ] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
       building with the `extension-module` feature enabled.
 
+## Planned (2025-10-03)
+- [ ] Run `cargo test -p barter-python`
+- [ ] Run `pytest -q tests_py`
+- [ ] Expose account event constructors in Python bindings
+- [ ] Add coverage in tests for account event round trip
+- [ ] Document binding usage in README update
+
+## Later Opportunities
+- [ ] Expand bindings for market stream events
+- [ ] Add CLI example for Python package
+- [ ] Evaluate packaging automation
+
 ## Completed
 - [x] Expose module version constant to Python consumers.
 - [x] Expand `barter-python` bindings to cover engine configuration and system control.
