@@ -27,7 +27,7 @@
 - [x] Document binding usage in README update
 
 ## Upcoming (2025-10-03)
-- [ ] Expose risk manager configuration knobs to Python API (capture spec).
+- [ ] Expose risk manager configuration knobs to Python API (spec drafted 2025-10-03).
 - [ ] Surface portfolio analytics helpers (eg. Sharpe, Sortino calculators) for Python summaries.
 - [x] Provide combined test runner script (Rust + Python) for contributors. (2025-10-03)
 - [ ] Draft release cadence doc aligning Rust crate and Python wheel versioning.
