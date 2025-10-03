@@ -14,6 +14,12 @@ def test_shutdown_event_is_terminal() -> None:
     assert event.is_terminal()
 
 
+def test_version_matches_package_metadata() -> None:
+    from importlib import metadata
+
+    assert bp.__version__ == metadata.version("barter-python")
+
+
 def test_engine_event_roundtrip() -> None:
     event = bp.EngineEvent.trading_state(True)
     event_dict = event.to_dict()

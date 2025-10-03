@@ -219,6 +219,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();
     m.add("SHUTDOWN_EVENT", shutdown.into_py(py))?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 
     Ok(())
 }
