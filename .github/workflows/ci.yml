@@ -83,3 +83,36 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+
+  python-tests:
+    name: python integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Python tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install maturin pytest
+        working-directory: barter-python
+
+      - name: Run pytest integration suite
+        run: pytest -m integration --maxfail=1 tests_py
+        working-directory: barter-python
+        env:
+          BARTER_PYTHON_BUILD_RELEASE: "1"

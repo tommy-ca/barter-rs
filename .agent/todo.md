@@ -9,7 +9,7 @@
   - [x] Cover historic backtest summary scenario (`tests_py/test_integration_backtest.py`).
   - [x] Exercise command builder round-trip (`tests_py/test_integration_commands.py`).
   - [x] Capture failure surface behaviour (`tests_py/test_integration_failures.py`).
-- [ ] Wire integration test marker into CI workflow after maturin build.
+- [x] Wire integration test marker into CI workflow after maturin build.
 - [ ] Add tracing/log capture fixture to aid debugging slow tests.
 - [ ] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
       building with the `extension-module` feature enabled.
