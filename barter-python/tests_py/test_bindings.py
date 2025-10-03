@@ -108,6 +108,15 @@ def test_engine_event_market_reconnecting_builder() -> None:
     assert reconnecting == "kraken"
 
 
+def test_engine_event_account_reconnecting_builder() -> None:
+    event = bp.EngineEvent.account_reconnecting("binance_spot")
+
+    payload = event.to_dict()
+    reconnecting = payload["Account"]["Reconnecting"]
+
+    assert reconnecting == "binance_spot"
+
+
 def test_timed_f64_roundtrip() -> None:
     timestamp = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
     timed = bp.timed_f64(42.5, timestamp)

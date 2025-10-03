@@ -250,6 +250,15 @@ impl PyEngineEvent {
         })
     }
 
+    /// Construct an [`EngineEvent::Account`] signalling the account stream is reconnecting.
+    #[staticmethod]
+    pub fn account_reconnecting(exchange: &str) -> PyResult<Self> {
+        let exchange_id = parse_exchange_id(exchange)?;
+        Ok(Self {
+            inner: EngineEvent::Account(AccountStreamEvent::Reconnecting(exchange_id)),
+        })
+    }
+
     /// Construct an [`EngineEvent::Account`] with a balance snapshot update.
     #[staticmethod]
     #[pyo3(signature = (exchange, asset, total, free, time_exchange))]
@@ -481,6 +490,18 @@ mod tests {
         match event.inner {
             EngineEvent::Market(MarketStreamEvent::Reconnecting(exchange)) => {
                 assert_eq!(exchange, ExchangeId::Kraken);
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_account_reconnecting_constructor() {
+        let event = PyEngineEvent::account_reconnecting("binance_spot").unwrap();
+
+        match event.inner {
+            EngineEvent::Account(AccountStreamEvent::Reconnecting(exchange)) => {
+                assert_eq!(exchange, ExchangeId::BinanceSpot);
             }
             other => panic!("unexpected event variant: {other:?}"),
         }
