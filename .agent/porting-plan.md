@@ -25,7 +25,7 @@
 - [x] Prototype a dedicated `barter-python` crate with PyO3 and maturin config.
 - [x] Define data marshaling strategy for market events and commands across the FFI boundary. *(2025-10-02)*
 - [x] Draft a testing matrix covering core Engine flows invoked from Python. *(documented in `.agent/specs/python-integration-tests.md`, 2025-10-03)*
-- [ ] Expand Python packaging metadata plus tooling for wheel builds and integration tests. *(started 2025-10-03)*
+- [x] Expand Python packaging metadata plus tooling for wheel builds and integration tests. *(CLI entrypoint + mixed-project layout updated 2025-10-03)*
 
 ## Engine Command Surface (MVP)
 - **TradingState Update**: toggle live trading via `EngineEvent::TradingStateUpdate` with `TradingState::{Enabled, Disabled}`.

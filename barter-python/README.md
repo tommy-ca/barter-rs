@@ -53,7 +53,13 @@ handle.abort()
 print("Running after abort:", handle.is_running())
 PY
 
-# Run the example CLI to execute a historic backtest
+# Run the packaged CLI to execute a historic backtest
+barter-backtest \
+  --config ../barter/examples/config/system_config.json \
+  --market-data ../barter/examples/data/binance_spot_market_data_with_disconnect_events.json \
+  --pretty
+
+# Alternatively invoke the example script directly during development
 python examples/backtest_cli.py \
   --config ../barter/examples/config/system_config.json \
   --market-data ../barter/examples/data/binance_spot_market_data_with_disconnect_events.json \

@@ -5,6 +5,7 @@ Cargo.lock
 # Python
 __pycache__/
 *.pyc
+barter-python/python/barter_python/*.so
 
 # IDE
 .idea/

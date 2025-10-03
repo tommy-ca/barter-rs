@@ -37,10 +37,14 @@ test = [
     "pytest>=8.3",
 ]
 
+[project.scripts]
+barter-backtest = "barter_python_cli.backtest:main"
+
 [tool.maturin]
 bindings = "pyo3"
 module-name = "barter_python"
 features = ["extension-module"]
+python-source = "python"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
