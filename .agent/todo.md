@@ -14,7 +14,7 @@
 - [x] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
       building with the `extension-module` feature enabled. (2025-10-03)
 
-- [ ] Document new feature flag workflow in developer README once stabilised.
+- [x] Document new feature flag workflow in developer README once stabilised. (2025-10-03)
 
 ## Planned (2025-10-03)
 - [x] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*

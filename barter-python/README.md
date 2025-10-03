@@ -48,5 +48,6 @@ PY
 - Requires Python 3.9+
 - Install maturin: `pip install maturin`
 - Build: `maturin develop`
-- Test (Rust): `cargo test -p barter-python`
-- Test (Python): `pytest -q tests_py`
+- Rust tests that exercise the Python embedding layer: `cargo test -p barter-python --features python-tests`
+  - The `python-tests` feature enables the `extension-module` flag so `libpython` is linked only when needed.
+- Python tests (after `maturin develop`): `pytest -q tests_py`
