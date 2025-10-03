@@ -14,9 +14,12 @@ use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
 use barter::{EngineEvent, Timed};
 use barter_data::{
+    books::Level,
     event::{DataKind, MarketEvent},
     streams::consumer::MarketStreamEvent,
-    subscription::trade::PublicTrade,
+    subscription::{
+        book::OrderBookL1, candle::Candle, liquidation::Liquidation, trade::PublicTrade,
+    },
 };
 use barter_execution::{
     AccountEvent, AccountEventKind,
@@ -241,6 +244,158 @@ impl PyEngineEvent {
         })
     }
 
+    /// Construct an [`EngineEvent::Market`] wrapping a level one order book snapshot.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (exchange, instrument, last_update_time, best_bid=None, best_ask=None, time_exchange=None, time_received=None))]
+    pub fn market_order_book_l1(
+        exchange: &str,
+        instrument: usize,
+        last_update_time: DateTime<Utc>,
+        best_bid: Option<(f64, f64)>,
+        best_ask: Option<(f64, f64)>,
+        time_exchange: Option<DateTime<Utc>>,
+        time_received: Option<DateTime<Utc>>,
+    ) -> PyResult<Self> {
+        let exchange_id = parse_exchange_id(exchange)?;
+        let instrument_index = InstrumentIndex(instrument);
+
+        let best_bid = parse_order_book_level(best_bid, "best bid")?;
+        let best_ask = parse_order_book_level(best_ask, "best ask")?;
+
+        let l1 = OrderBookL1 {
+            last_update_time,
+            best_bid,
+            best_ask,
+        };
+
+        let time_exchange = time_exchange.unwrap_or(last_update_time);
+        let time_received = time_received.unwrap_or(time_exchange);
+
+        let event = MarketEvent {
+            time_exchange,
+            time_received,
+            exchange: exchange_id,
+            instrument: instrument_index,
+            kind: DataKind::OrderBookL1(l1),
+        };
+
+        Ok(Self {
+            inner: EngineEvent::Market(MarketStreamEvent::Item(event)),
+        })
+    }
+
+    /// Construct an [`EngineEvent::Market`] wrapping a candle update.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (exchange, instrument, time_exchange, close_time, open, high, low, close, volume, trade_count, time_received=None))]
+    pub fn market_candle(
+        exchange: &str,
+        instrument: usize,
+        time_exchange: DateTime<Utc>,
+        close_time: DateTime<Utc>,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+        trade_count: u64,
+        time_received: Option<DateTime<Utc>>,
+    ) -> PyResult<Self> {
+        if !volume.is_finite() || volume < 0.0 {
+            return Err(PyValueError::new_err(
+                "volume must be a non-negative, finite numeric value",
+            ));
+        }
+
+        if !high.is_finite() || !low.is_finite() || !open.is_finite() || !close.is_finite() {
+            return Err(PyValueError::new_err(
+                "candle prices must be finite numeric values",
+            ));
+        }
+
+        if low > high {
+            return Err(PyValueError::new_err(
+                "low price cannot be greater than high price",
+            ));
+        }
+
+        let exchange_id = parse_exchange_id(exchange)?;
+        let instrument_index = InstrumentIndex(instrument);
+        let time_received = time_received.unwrap_or(time_exchange);
+
+        let candle = Candle {
+            close_time,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            trade_count,
+        };
+
+        let event = MarketEvent {
+            time_exchange,
+            time_received,
+            exchange: exchange_id,
+            instrument: instrument_index,
+            kind: DataKind::Candle(candle),
+        };
+
+        Ok(Self {
+            inner: EngineEvent::Market(MarketStreamEvent::Item(event)),
+        })
+    }
+
+    /// Construct an [`EngineEvent::Market`] wrapping a liquidation event.
+    #[staticmethod]
+    #[pyo3(signature = (exchange, instrument, price, quantity, side, time_exchange, time_received=None))]
+    pub fn market_liquidation(
+        exchange: &str,
+        instrument: usize,
+        price: f64,
+        quantity: f64,
+        side: &str,
+        time_exchange: DateTime<Utc>,
+        time_received: Option<DateTime<Utc>>,
+    ) -> PyResult<Self> {
+        if !price.is_finite() || price <= 0.0 {
+            return Err(PyValueError::new_err(
+                "price must be a positive, finite numeric value",
+            ));
+        }
+
+        if !quantity.is_finite() || quantity <= 0.0 {
+            return Err(PyValueError::new_err(
+                "quantity must be a positive, finite numeric value",
+            ));
+        }
+
+        let exchange_id = parse_exchange_id(exchange)?;
+        let instrument_index = InstrumentIndex(instrument);
+        let side = parse_side(side)?;
+        let time_received = time_received.unwrap_or(time_exchange);
+
+        let liquidation = Liquidation {
+            side,
+            price,
+            quantity,
+            time: time_exchange,
+        };
+
+        let event = MarketEvent {
+            time_exchange,
+            time_received,
+            exchange: exchange_id,
+            instrument: instrument_index,
+            kind: DataKind::Liquidation(liquidation),
+        };
+
+        Ok(Self {
+            inner: EngineEvent::Market(MarketStreamEvent::Item(event)),
+        })
+    }
+
     /// Construct an [`EngineEvent::Market`] signalling the stream is reconnecting.
     #[staticmethod]
     pub fn market_reconnecting(exchange: &str) -> PyResult<Self> {
@@ -330,6 +485,30 @@ fn parse_exchange_id(value: &str) -> PyResult<ExchangeId> {
     })
 }
 
+fn parse_order_book_level(value: Option<(f64, f64)>, label: &str) -> PyResult<Option<Level>> {
+    match value {
+        None => Ok(None),
+        Some((price, amount)) => {
+            if !price.is_finite() || price <= 0.0 {
+                return Err(PyValueError::new_err(format!(
+                    "{label} price must be a positive, finite numeric value"
+                )));
+            }
+
+            if !amount.is_finite() || amount < 0.0 {
+                return Err(PyValueError::new_err(format!(
+                    "{label} amount must be a non-negative, finite numeric value"
+                )));
+            }
+
+            let price = parse_decimal(price, &format!("{label} price"))?;
+            let amount = parse_decimal(amount, &format!("{label} amount"))?;
+
+            Ok(Some(Level::new(price, amount)))
+        }
+    }
+}
+
 /// Convenience function returning a shutdown [`EngineEvent`].
 #[pyfunction]
 pub fn shutdown_event() -> PyEngineEvent {
@@ -381,6 +560,7 @@ mod tests {
     use barter_instrument::{Side, exchange::ExchangeId, instrument::InstrumentIndex};
     use chrono::{TimeDelta, TimeZone};
     use pyo3::{Python, types::PyDict};
+    use rust_decimal::prelude::ToPrimitive;
 
     #[test]
     fn engine_event_shutdown_is_terminal() {
@@ -475,6 +655,128 @@ mod tests {
                         assert_eq!(trade.price, 1.25);
                         assert_eq!(trade.amount, 3.5);
                         assert_eq!(trade.side, Side::Sell);
+                    }
+                    other => panic!("unexpected market data kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_market_order_book_l1_constructor() {
+        let last_update = Utc.with_ymd_and_hms(2025, 1, 2, 3, 4, 5).unwrap();
+        let time_exchange = last_update + TimeDelta::seconds(1);
+
+        let event = PyEngineEvent::market_order_book_l1(
+            "binance_spot",
+            7,
+            last_update,
+            Some((100.5, 2.0)),
+            Some((101.0, 1.5)),
+            Some(time_exchange),
+            None,
+        )
+        .unwrap();
+
+        match event.inner {
+            EngineEvent::Market(MarketStreamEvent::Item(item)) => {
+                assert_eq!(item.exchange, ExchangeId::BinanceSpot);
+                assert_eq!(item.instrument, InstrumentIndex(7));
+                assert_eq!(item.time_exchange, time_exchange);
+                assert_eq!(item.time_received, time_exchange);
+
+                match item.kind {
+                    DataKind::OrderBookL1(book) => {
+                        assert_eq!(book.last_update_time, last_update);
+
+                        let best_bid = book.best_bid.expect("best bid expected");
+                        assert!((best_bid.price.to_f64().unwrap() - 100.5).abs() < f64::EPSILON);
+                        assert!((best_bid.amount.to_f64().unwrap() - 2.0).abs() < f64::EPSILON);
+
+                        let best_ask = book.best_ask.expect("best ask expected");
+                        assert!((best_ask.price.to_f64().unwrap() - 101.0).abs() < f64::EPSILON);
+                        assert!((best_ask.amount.to_f64().unwrap() - 1.5).abs() < f64::EPSILON);
+                    }
+                    other => panic!("unexpected market data kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_market_candle_constructor() {
+        let time_exchange = Utc.with_ymd_and_hms(2025, 2, 3, 4, 5, 6).unwrap();
+        let close_time = time_exchange + TimeDelta::minutes(1);
+
+        let event = PyEngineEvent::market_candle(
+            "kraken",
+            4,
+            time_exchange,
+            close_time,
+            100.0,
+            110.0,
+            95.0,
+            105.0,
+            250.5,
+            42,
+            None,
+        )
+        .unwrap();
+
+        match event.inner {
+            EngineEvent::Market(MarketStreamEvent::Item(item)) => {
+                assert_eq!(item.exchange, ExchangeId::Kraken);
+                assert_eq!(item.instrument, InstrumentIndex(4));
+                assert_eq!(item.time_exchange, time_exchange);
+                assert_eq!(item.time_received, time_exchange);
+
+                match item.kind {
+                    DataKind::Candle(candle) => {
+                        assert_eq!(candle.close_time, close_time);
+                        assert_eq!(candle.open, 100.0);
+                        assert_eq!(candle.high, 110.0);
+                        assert_eq!(candle.low, 95.0);
+                        assert_eq!(candle.close, 105.0);
+                        assert_eq!(candle.volume, 250.5);
+                        assert_eq!(candle.trade_count, 42);
+                    }
+                    other => panic!("unexpected market data kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_market_liquidation_constructor() {
+        let time_exchange = Utc.with_ymd_and_hms(2025, 3, 4, 5, 6, 7).unwrap();
+
+        let event = PyEngineEvent::market_liquidation(
+            "mock",
+            2,
+            20550.25,
+            0.35,
+            "sell",
+            time_exchange,
+            None,
+        )
+        .unwrap();
+
+        match event.inner {
+            EngineEvent::Market(MarketStreamEvent::Item(item)) => {
+                assert_eq!(item.exchange, ExchangeId::Mock);
+                assert_eq!(item.instrument, InstrumentIndex(2));
+                assert_eq!(item.time_exchange, time_exchange);
+                assert_eq!(item.time_received, time_exchange);
+
+                match item.kind {
+                    DataKind::Liquidation(liquidation) => {
+                        assert_eq!(liquidation.side, Side::Sell);
+                        assert_eq!(liquidation.price, 20550.25);
+                        assert_eq!(liquidation.quantity, 0.35);
+                        assert_eq!(liquidation.time, time_exchange);
                     }
                     other => panic!("unexpected market data kind: {other:?}"),
                 }

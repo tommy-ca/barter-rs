@@ -99,6 +99,83 @@ def test_engine_event_market_trade_builder() -> None:
     assert trade["side"].lower() == "buy"
 
 
+def test_engine_event_market_order_book_l1_builder() -> None:
+    timestamp = dt.datetime(2025, 1, 2, 3, 4, 5, tzinfo=dt.timezone.utc)
+
+    event = bp.EngineEvent.market_order_book_l1(
+        "binance_spot",
+        7,
+        last_update_time=timestamp,
+        best_bid=(100.5, 2.0),
+        best_ask=(101.0, 1.5),
+    )
+
+    payload = event.to_dict()
+    market = payload["Market"]["Item"]
+    book = market["kind"]["OrderBookL1"]
+
+    assert book["last_update_time"] == timestamp.isoformat().replace("+00:00", "Z")
+
+    best_bid = book["best_bid"]
+    assert Decimal(best_bid["price"]) == Decimal("100.5")
+    assert Decimal(best_bid["amount"]) == Decimal("2")
+
+    best_ask = book["best_ask"]
+    assert Decimal(best_ask["price"]) == Decimal("101.0")
+    assert Decimal(best_ask["amount"]) == Decimal("1.5")
+
+
+def test_engine_event_market_candle_builder() -> None:
+    time_exchange = dt.datetime(2025, 2, 3, 4, 5, 6, tzinfo=dt.timezone.utc)
+    close_time = time_exchange + dt.timedelta(minutes=1)
+
+    event = bp.EngineEvent.market_candle(
+        "kraken",
+        4,
+        time_exchange=time_exchange,
+        close_time=close_time,
+        open=100.0,
+        high=110.0,
+        low=95.0,
+        close=105.0,
+        volume=250.5,
+        trade_count=42,
+    )
+
+    market = event.to_dict()["Market"]["Item"]
+    candle = market["kind"]["Candle"]
+
+    assert market["time_exchange"] == time_exchange.isoformat().replace("+00:00", "Z")
+    assert candle["close_time"] == close_time.isoformat().replace("+00:00", "Z")
+    assert candle["open"] == pytest.approx(100.0)
+    assert candle["high"] == pytest.approx(110.0)
+    assert candle["low"] == pytest.approx(95.0)
+    assert candle["close"] == pytest.approx(105.0)
+    assert candle["volume"] == pytest.approx(250.5)
+    assert candle["trade_count"] == 42
+
+
+def test_engine_event_market_liquidation_builder() -> None:
+    timestamp = dt.datetime(2025, 3, 4, 5, 6, 7, tzinfo=dt.timezone.utc)
+
+    event = bp.EngineEvent.market_liquidation(
+        "mock",
+        2,
+        price=20550.25,
+        quantity=0.35,
+        side="sell",
+        time_exchange=timestamp,
+    )
+
+    market = event.to_dict()["Market"]["Item"]
+    liquidation = market["kind"]["Liquidation"]
+
+    assert liquidation["price"] == pytest.approx(20550.25)
+    assert liquidation["quantity"] == pytest.approx(0.35)
+    assert liquidation["side"].lower() == "sell"
+    assert liquidation["time"] == timestamp.isoformat().replace("+00:00", "Z")
+
+
 def test_engine_event_market_reconnecting_builder() -> None:
     event = bp.EngineEvent.market_reconnecting("kraken")
 
