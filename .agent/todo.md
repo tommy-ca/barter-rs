@@ -4,7 +4,7 @@
 - [x] Update packaging metadata (wheel classifiers, maturin settings) once API settles.
 - [x] Plan integration tests covering live system lifecycle vs. backtest.
   - Captured in `.agent/specs/python-integration-tests.md` (2025-10-03).
-- [ ] Implement pytest integration suite per new spec.
+- [x] Implement pytest integration suite per new spec.
   - [x] Add live system lifecycle coverage (`tests_py/test_integration_live.py`).
   - [x] Cover historic backtest summary scenario (`tests_py/test_integration_backtest.py`).
   - [x] Exercise command builder round-trip (`tests_py/test_integration_commands.py`).
