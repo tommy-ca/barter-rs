@@ -3,6 +3,7 @@
 - [x] Ensure summary serialization returns rich Python objects.
 - [x] Update packaging metadata (wheel classifiers, maturin settings) once API settles.
 - [ ] Plan integration tests covering live system lifecycle vs. backtest.
+  - Added `SystemHandle.feed_events` coverage in Python suite (2025-10-03).
 
 ## Completed
 - [x] Expose module version constant to Python consumers.

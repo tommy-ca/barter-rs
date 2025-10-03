@@ -295,7 +295,7 @@ fn system_handle_shutdown_with_summary() {
             "instruments",
             "assets",
         ] {
-            assert!(summary.get_item(key).is_some());
+            assert!(summary.get_item(key).is_ok());
         }
 
         Ok(())

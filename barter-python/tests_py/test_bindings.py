@@ -117,6 +117,25 @@ def test_system_handle_lifecycle(example_paths: dict[str, Path]) -> None:
     assert not handle.is_running()
 
 
+def test_system_handle_feed_events(example_paths: dict[str, Path]) -> None:
+    config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    handle = bp.start_system(config, trading_enabled=False)
+
+    try:
+        assert handle.is_running()
+
+        events = [
+            bp.EngineEvent.trading_state(True),
+            bp.EngineEvent.trading_state(False),
+            bp.EngineEvent.cancel_orders(bp.InstrumentFilter.none()),
+        ]
+        handle.feed_events(events)
+    finally:
+        handle.shutdown()
+
+    assert not handle.is_running()
+
+
 def test_shutdown_with_summary(example_paths: dict[str, Path]) -> None:
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
     handle = bp.start_system(config)

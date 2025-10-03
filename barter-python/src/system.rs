@@ -103,6 +103,16 @@ impl PySystemHandle {
             .map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
+    /// Send multiple [`EngineEvent`] values to the system in order.
+    #[pyo3(signature = (events))]
+    pub fn feed_events(&self, py: Python<'_>, events: Vec<Py<PyEngineEvent>>) -> PyResult<()> {
+        for event in events {
+            let event_ref = event.borrow(py);
+            self.send_event(&event_ref)?;
+        }
+        Ok(())
+    }
+
     /// Send open order requests to the engine.
     #[pyo3(signature = (requests))]
     pub fn send_open_requests(
