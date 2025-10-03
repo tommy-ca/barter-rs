@@ -2,7 +2,6 @@
 
 use barter_python::barter_python;
 use pyo3::{
-    PyObject,
     prelude::*,
     types::{PyDict, PyList, PyModule},
 };
@@ -262,6 +261,42 @@ fn system_handle_command_helpers() {
 
         handle.call_method0("shutdown")?;
         assert!(!handle.call_method0("is_running")?.extract::<bool>()?);
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn system_handle_shutdown_with_summary() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let system_config_cls = module.getattr("SystemConfig")?;
+        let start_system = module.getattr("start_system")?;
+
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let base_path = std::path::Path::new(&manifest_dir).join("..");
+        let config_path = base_path
+            .join("barter")
+            .join("examples")
+            .join("config")
+            .join("system_config.json");
+
+        let config =
+            system_config_cls.call_method1("from_json", (config_path.display().to_string(),))?;
+        let handle = start_system.call1((config,))?;
+
+        let summary = handle.call_method1("shutdown_with_summary", (0.02_f64,))?;
+        for key in [
+            "time_engine_start",
+            "time_engine_end",
+            "instruments",
+            "assets",
+        ] {
+            assert!(summary.get_item(key).is_some());
+        }
 
         Ok(())
     })

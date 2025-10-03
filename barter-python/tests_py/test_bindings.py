@@ -90,6 +90,16 @@ def test_system_handle_lifecycle(example_paths: dict[str, Path]) -> None:
     assert not handle.is_running()
 
 
+def test_shutdown_with_summary(example_paths: dict[str, Path]) -> None:
+    config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    handle = bp.start_system(config)
+
+    summary = handle.shutdown_with_summary()
+
+    for key in ("time_engine_start", "time_engine_end", "instruments", "assets"):
+        assert key in summary
+
+
 def test_order_request_helpers() -> None:
     key = bp.OrderKey(0, 0, "strategy-alpha", "cid-123")
     open_request = bp.OrderRequestOpen(

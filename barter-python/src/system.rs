@@ -16,7 +16,7 @@ use barter::{
     },
     risk::DefaultRiskManager,
     statistic::{
-        summary::{asset::TearSheetAsset, instrument::TearSheet, TradingSummary},
+        summary::{TradingSummary, asset::TearSheetAsset, instrument::TearSheet},
         time::Daily,
     },
     strategy::DefaultStrategy,
@@ -169,6 +169,27 @@ impl PySystemHandle {
         }
     }
 
+    /// Shut down the system and return a trading summary.
+    #[pyo3(signature = (risk_free_return = 0.05))]
+    pub fn shutdown_with_summary(
+        &self,
+        py: Python<'_>,
+        risk_free_return: f64,
+    ) -> PyResult<PyObject> {
+        let system = self.take_system()?;
+        let runtime = Arc::clone(&self.runtime);
+
+        let (engine, _audit) = py
+            .allow_threads(|| runtime.block_on(system.shutdown()))
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+        let decimal_rfr = parse_risk_free_return(risk_free_return)?;
+        let mut generator = engine.trading_summary_generator(decimal_rfr);
+        let summary = generator.generate(Daily);
+
+        summary_to_py(py, summary)
+    }
+
     fn __repr__(&self) -> PyResult<String> {
         let running = self.lock_system()?.is_some();
         Ok(format!("SystemHandle(running={running})"))
@@ -267,13 +288,16 @@ pub fn run_historic_backtest(
         .block_on(system.shutdown_after_backtest())
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
-    let decimal_rfr = Decimal::from_f64(risk_free_return)
-        .ok_or_else(|| PyValueError::new_err("risk_free_return must be finite"))?;
+    let decimal_rfr = parse_risk_free_return(risk_free_return)?;
 
     let mut summary = engine.trading_summary_generator(decimal_rfr);
     let summary = summary.generate(Daily);
 
     summary_to_py(py, summary)
+}
+
+fn parse_risk_free_return(value: f64) -> PyResult<Decimal> {
+    Decimal::from_f64(value).ok_or_else(|| PyValueError::new_err("risk_free_return must be finite"))
 }
 
 fn load_historic_clock_and_market_stream(
