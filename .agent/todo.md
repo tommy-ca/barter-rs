@@ -13,6 +13,8 @@
 - [x] Add tracing/log capture fixture to aid debugging slow tests.
 - [x] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
       building with the `extension-module` feature enabled. (2025-10-03)
+- [x] Evaluate packaging automation
+  - Documented follow-ups in `.agent/specs/python-packaging-automation.md` (2025-10-03).
 
 - [x] Document new feature flag workflow in developer README once stabilised. (2025-10-03)
 
@@ -26,7 +28,7 @@
 ## Later Opportunities
 - [x] Expand bindings for market stream events (2025-10-03)
 - [x] Add CLI example for Python package (2025-10-03)
-- [ ] Evaluate packaging automation
+- [ ] Automate publishing of built Python wheels once credentials are available
 
 ## Completed
 - [x] Expose module version constant to Python consumers.
