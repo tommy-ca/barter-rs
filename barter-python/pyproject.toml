@@ -11,11 +11,26 @@ requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "barter-rs maintainers" }]
 classifiers = [
-    "Programming Language :: Python",
-    "Programming Language :: Rust",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Office/Business :: Financial :: Investment",
 ]
+keywords = ["trading", "algorithmic", "finance", "rust", "bindings"]
+
+[project.urls]
+Homepage = "https://github.com/barter-rs/barter-rs"
+Documentation = "https://docs.rs/barter/latest/barter/"
+Repository = "https://github.com/barter-rs/barter-rs"
 
 [project.optional-dependencies]
 test = [
