@@ -46,3 +46,6 @@ features = []
 minversion = "8.0"
 addopts = "-ra"
 testpaths = ["tests_py"]
+markers = [
+    "integration: end-to-end engine lifecycle scenarios",
+]

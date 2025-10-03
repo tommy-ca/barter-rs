@@ -5,6 +5,7 @@
 - [x] Plan integration tests covering live system lifecycle vs. backtest.
   - Captured in `.agent/specs/python-integration-tests.md` (2025-10-03).
 - [ ] Implement pytest integration suite per new spec.
+  - [x] Add live system lifecycle coverage (`tests_py/test_integration_live.py`).
 - [ ] Wire integration test marker into CI workflow after maturin build.
 - [ ] Add tracing/log capture fixture to aid debugging slow tests.
 - [ ] Resolve `cargo test -p barter-python` linker failure caused by missing libpython symbols when
