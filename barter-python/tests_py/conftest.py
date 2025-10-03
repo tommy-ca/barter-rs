@@ -59,9 +59,12 @@ def repo_root() -> Iterator[Path]:
 @pytest.fixture(scope="session")
 def example_paths(repo_root: Path) -> dict[str, Path]:
     examples = repo_root / "barter" / "examples"
+    test_data = repo_root / "barter-python" / "tests_py" / "data"
+
     return {
         "system_config": examples / "config" / "system_config.json",
-        "market_data": examples
+        "market_data": test_data / "synthetic_market_data.json",
+        "market_data_full": examples
         / "data"
         / "binance_spot_market_data_with_disconnect_events.json",
     }

@@ -1,0 +1,95 @@
+[
+  {
+    "Item": {
+      "Ok": {
+        "time_exchange": "2024-12-20T19:05:18.175Z",
+        "time_received": "2024-12-20T19:05:18.319581890Z",
+        "exchange": "binance_spot",
+        "instrument": 0,
+        "kind": {
+          "Trade": {
+            "id": "4314349047",
+            "price": 96962.51,
+            "amount": 0.00006,
+            "side": "Buy"
+          }
+        }
+      }
+    }
+  },
+  {
+    "Item": {
+      "Ok": {
+        "time_exchange": "2024-12-20T19:05:18.175Z",
+        "time_received": "2024-12-20T19:05:18.319602488Z",
+        "exchange": "binance_spot",
+        "instrument": 0,
+        "kind": {
+          "Trade": {
+            "id": "4314349048",
+            "price": 96962.51,
+            "amount": 0.00008,
+            "side": "Buy"
+          }
+        }
+      }
+    }
+  },
+  {
+    "Item": {
+      "Ok": {
+        "time_exchange": "2024-12-20T19:05:18.175Z",
+        "time_received": "2024-12-20T19:05:18.319608249Z",
+        "exchange": "binance_spot",
+        "instrument": 0,
+        "kind": {
+          "Trade": {
+            "id": "4314349049",
+            "price": 96962.51,
+            "amount": 0.00386,
+            "side": "Buy"
+          }
+        }
+      }
+    }
+  },
+  {
+    "Item": {
+      "Ok": {
+        "time_exchange": "2024-12-20T19:05:18.178Z",
+        "time_received": "2024-12-20T19:05:18.324130668Z",
+        "exchange": "binance_spot",
+        "instrument": 0,
+        "kind": {
+          "Trade": {
+            "id": "4314349050",
+            "price": 96962.51,
+            "amount": 0.00103,
+            "side": "Buy"
+          }
+        }
+      }
+    }
+  },
+  {
+    "Item": {
+      "Ok": {
+        "time_exchange": "2024-12-20T19:05:18.196Z",
+        "time_received": "2024-12-20T19:05:18.330787554Z",
+        "exchange": "binance_spot",
+        "instrument": 2,
+        "kind": {
+          "Trade": {
+            "id": "902042153",
+            "price": 190.85,
+            "amount": 0.053,
+            "side": "Buy"
+          }
+        }
+      }
+    }
+  },
+  {
+    "Reconnecting": "binance_spot"
+  }
+]
