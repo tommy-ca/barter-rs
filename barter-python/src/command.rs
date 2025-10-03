@@ -3,13 +3,15 @@ use barter_execution::order::request::{
     OrderRequestCancel, OrderRequestOpen, RequestCancel, RequestOpen,
 };
 use barter_execution::order::{
-    OrderKey, OrderKind, TimeInForce,
+    OrderKey, OrderKind, OrderSnapshot, TimeInForce,
     id::{ClientOrderId, OrderId, StrategyId},
+    state::{ActiveOrderState, Open, OpenInFlight, OrderState},
 };
 use barter_instrument::{
     Side, Underlying, asset::AssetIndex, exchange::ExchangeIndex, instrument::InstrumentIndex,
 };
 use barter_integration::collection::one_or_many::OneOrMany;
+use chrono::{DateTime, Utc};
 use pyo3::{Py, Python, exceptions::PyValueError, prelude::*};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
@@ -219,6 +221,100 @@ impl PyOrderRequestCancel {
             Some(id) => format!("OrderRequestCancel(order_id='{}')", id.0),
             None => "OrderRequestCancel(order_id=None)".to_string(),
         })
+    }
+}
+
+#[pyclass(module = "barter_python", name = "OrderSnapshot", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyOrderSnapshot {
+    pub(crate) inner: OrderSnapshot<ExchangeIndex, AssetIndex, InstrumentIndex>,
+}
+
+impl PyOrderSnapshot {
+    pub(crate) fn clone_inner(&self) -> OrderSnapshot<ExchangeIndex, AssetIndex, InstrumentIndex> {
+        self.inner.clone()
+    }
+}
+
+#[pymethods]
+impl PyOrderSnapshot {
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (request, order_id=None, time_exchange=None, filled_quantity=0.0))]
+    pub fn from_open_request(
+        request: &PyOrderRequestOpen,
+        order_id: Option<&str>,
+        time_exchange: Option<DateTime<Utc>>,
+        filled_quantity: f64,
+    ) -> PyResult<Self> {
+        let inner = request.clone_inner();
+
+        let mut order = OrderSnapshot {
+            key: inner.key,
+            side: inner.state.side,
+            price: inner.state.price,
+            quantity: inner.state.quantity,
+            kind: inner.state.kind,
+            time_in_force: inner.state.time_in_force,
+            state: OrderState::Active(ActiveOrderState::OpenInFlight(OpenInFlight)),
+        };
+
+        match (order_id, time_exchange) {
+            (Some(id), Some(time)) => {
+                let filled = parse_decimal(filled_quantity, "filled_quantity")?;
+
+                if filled.is_sign_negative() {
+                    return Err(PyValueError::new_err(
+                        "filled_quantity must be a non-negative numeric value",
+                    ));
+                }
+
+                if filled > order.quantity {
+                    return Err(PyValueError::new_err(
+                        "filled_quantity cannot exceed order quantity",
+                    ));
+                }
+
+                let order_id = OrderId::new(id);
+                let open = Open::new(order_id, time, filled);
+                order.state = OrderState::Active(ActiveOrderState::Open(open));
+            }
+            (Some(_), None) => {
+                return Err(PyValueError::new_err(
+                    "time_exchange is required when order_id is provided",
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(PyValueError::new_err(
+                    "order_id must be provided when time_exchange is set",
+                ));
+            }
+            (None, None) => {
+                if filled_quantity != 0.0 {
+                    return Err(PyValueError::new_err(
+                        "filled_quantity must be zero when order_id is not provided",
+                    ));
+                }
+            }
+        }
+
+        Ok(Self { inner: order })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let order = &self.inner;
+        let side = match order.side {
+            Side::Buy => "buy",
+            Side::Sell => "sell",
+        };
+
+        Ok(format!(
+            "OrderSnapshot(exchange={}, instrument={}, strategy='{}', side='{}')",
+            order.key.exchange.index(),
+            order.key.instrument.index(),
+            order.key.strategy.0,
+            side,
+        ))
     }
 }
 

@@ -72,6 +72,49 @@ Both `SystemHandle.shutdown_with_summary` and `run_historic_backtest` accept an 
 `interval` argument (`"daily"`, `"annual_252"`, or `"annual_365"`, case-insensitive) which controls
 how risk and return metrics are annualised in the generated trading summary.
 
+### Account Event Helpers
+
+Python connectors can construct account events without building raw dictionaries. For example,
+order snapshots and cancellation responses can be emitted using the dedicated helpers:
+
+```python
+import datetime as dt
+
+import barter_python as bp
+
+key = bp.OrderKey(1, 2, "strategy-alpha", "cid-123")
+open_request = bp.OrderRequestOpen(
+    key,
+    "buy",
+    price=105.25,
+    quantity=0.75,
+    kind="limit",
+    time_in_force="good_until_cancelled",
+    post_only=True,
+)
+
+snapshot = bp.OrderSnapshot.from_open_request(
+    open_request,
+    order_id="order-789",
+    time_exchange=dt.datetime(2025, 9, 10, 11, 12, 13, tzinfo=dt.timezone.utc),
+    filled_quantity=0.25,
+)
+
+order_event = bp.EngineEvent.account_order_snapshot(exchange=1, snapshot=snapshot)
+
+cancel_request = bp.OrderRequestCancel(key, "order-789")
+cancel_event = bp.EngineEvent.account_order_cancelled(
+    exchange=1,
+    request=cancel_request,
+    order_id="order-789",
+    time_exchange=dt.datetime(2025, 9, 10, 11, 13, 0, tzinfo=dt.timezone.utc),
+)
+```
+
+These helpers validate inputs (for example ensuring filled quantity never exceeds the requested
+order size) and return strongly typed `EngineEvent` instances that can be fed directly into a
+running system.
+
 ## Development
 
 - Requires Python 3.9+

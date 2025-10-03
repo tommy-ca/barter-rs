@@ -24,7 +24,11 @@ use barter_data::{
 use barter_execution::{
     AccountEvent, AccountEventKind,
     balance::{AssetBalance, Balance},
-    order::id::{OrderId, StrategyId},
+    order::{
+        id::{OrderId, StrategyId},
+        request::OrderResponseCancel,
+        state::Cancelled,
+    },
     trade::{AssetFees, Trade, TradeId},
 };
 use barter_instrument::{
@@ -35,8 +39,8 @@ use barter_instrument::{
 use barter_integration::{Terminal, snapshot::Snapshot};
 use chrono::{DateTime, Utc};
 use command::{
-    PyInstrumentFilter, PyOrderKey, PyOrderRequestCancel, PyOrderRequestOpen, clone_filter,
-    collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
+    PyInstrumentFilter, PyOrderKey, PyOrderRequestCancel, PyOrderRequestOpen, PyOrderSnapshot,
+    clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
 use config::PySystemConfig;
 use logging::init_tracing;
@@ -449,6 +453,69 @@ impl PyEngineEvent {
         })
     }
 
+    /// Construct an [`EngineEvent::Account`] with an order snapshot update.
+    #[staticmethod]
+    pub fn account_order_snapshot(exchange: usize, snapshot: &PyOrderSnapshot) -> PyResult<Self> {
+        let exchange_index = ExchangeIndex(exchange);
+        let order_snapshot = snapshot.clone_inner();
+
+        if order_snapshot.key.exchange != exchange_index {
+            return Err(PyValueError::new_err(
+                "snapshot key exchange does not match provided exchange index",
+            ));
+        }
+
+        let event = AccountEvent::new(
+            exchange_index,
+            AccountEventKind::OrderSnapshot(Snapshot::new(order_snapshot)),
+        );
+
+        Ok(Self {
+            inner: EngineEvent::Account(AccountStreamEvent::Item(event)),
+        })
+    }
+
+    /// Construct an [`EngineEvent::Account`] reporting a successful order cancellation.
+    #[staticmethod]
+    #[pyo3(signature = (exchange, request, order_id, time_exchange))]
+    pub fn account_order_cancelled(
+        exchange: usize,
+        request: &PyOrderRequestCancel,
+        order_id: &str,
+        time_exchange: DateTime<Utc>,
+    ) -> PyResult<Self> {
+        let exchange_index = ExchangeIndex(exchange);
+        let inner = request.clone_inner();
+
+        if inner.key.exchange != exchange_index {
+            return Err(PyValueError::new_err(
+                "cancel request key exchange does not match provided exchange index",
+            ));
+        }
+
+        let order_id = OrderId::new(order_id);
+
+        if let Some(existing) = &inner.state.id {
+            if existing != &order_id {
+                return Err(PyValueError::new_err(
+                    "order_id does not match the identifier on the cancel request",
+                ));
+            }
+        }
+
+        let cancelled = Cancelled::new(order_id.clone(), time_exchange);
+        let response = OrderResponseCancel {
+            key: inner.key,
+            state: Ok(cancelled),
+        };
+
+        let event = AccountEvent::new(exchange_index, AccountEventKind::OrderCancelled(response));
+
+        Ok(Self {
+            inner: EngineEvent::Account(AccountStreamEvent::Item(event)),
+        })
+    }
+
     /// Construct an [`EngineEvent::Account`] with a trade fill update.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
@@ -593,6 +660,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOrderKey>()?;
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;
+    m.add_class::<PyOrderSnapshot>()?;
     m.add_class::<PyInstrumentFilter>()?;
     m.add_class::<PyTradingSummary>()?;
     m.add_class::<PyInstrumentTearSheet>()?;
@@ -619,7 +687,11 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
     use barter_data::{event::DataKind, streams::consumer::MarketStreamEvent};
-    use barter_execution::order::id::{OrderId, StrategyId};
+    use barter_execution::order::{
+        OrderKind, TimeInForce,
+        id::{OrderId, StrategyId},
+        state::{ActiveOrderState, OrderState},
+    };
     use barter_execution::trade::TradeId;
     use barter_instrument::{Side, exchange::ExchangeId, instrument::InstrumentIndex};
     use chrono::{TimeDelta, TimeZone};
@@ -906,6 +978,134 @@ mod tests {
                         assert_eq!(trade.quantity.to_f64().unwrap(), 0.75);
                         assert_eq!(trade.time_exchange, time_exchange);
                         assert_eq!(trade.fees.fees.to_f64().unwrap(), 0.0015);
+                    }
+                    other => panic!("unexpected account event kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_account_order_snapshot_open() {
+        let key = PyOrderKey::new(1, 2, "strategy-alpha", Some("cid-1"));
+        let open_request = PyOrderRequestOpen::new(
+            &key,
+            "buy",
+            105.25,
+            0.75,
+            "limit",
+            Some("good_until_cancelled"),
+            Some(true),
+        )
+        .unwrap();
+        let time_exchange = Utc.with_ymd_and_hms(2025, 9, 10, 11, 12, 13).unwrap();
+
+        let snapshot = PyOrderSnapshot::from_open_request(
+            &open_request,
+            Some("order-789"),
+            Some(time_exchange),
+            0.25,
+        )
+        .unwrap();
+
+        let event = PyEngineEvent::account_order_snapshot(1, &snapshot).unwrap();
+
+        match event.inner {
+            EngineEvent::Account(AccountStreamEvent::Item(account_event)) => {
+                assert_eq!(account_event.exchange, ExchangeIndex(1));
+
+                match account_event.kind {
+                    AccountEventKind::OrderSnapshot(snapshot) => {
+                        let order = snapshot.value();
+                        assert_eq!(order.key.exchange, ExchangeIndex(1));
+                        assert_eq!(order.key.instrument, InstrumentIndex(2));
+                        assert_eq!(order.key.strategy, StrategyId::new("strategy-alpha"));
+                        assert_eq!(order.side, Side::Buy);
+                        assert_eq!(order.price.to_f64().unwrap(), 105.25);
+                        assert_eq!(order.quantity.to_f64().unwrap(), 0.75);
+                        assert_eq!(order.kind, OrderKind::Limit);
+                        assert_eq!(
+                            order.time_in_force,
+                            TimeInForce::GoodUntilCancelled { post_only: true }
+                        );
+
+                        match &order.state {
+                            OrderState::Active(ActiveOrderState::Open(open)) => {
+                                assert_eq!(open.id, OrderId::new("order-789"));
+                                assert_eq!(open.time_exchange, time_exchange);
+                                assert_eq!(open.filled_quantity.to_f64().unwrap(), 0.25);
+                            }
+                            other => panic!("unexpected order state: {other:?}"),
+                        }
+                    }
+                    other => panic!("unexpected account event kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_account_order_snapshot_open_inflight() {
+        let key = PyOrderKey::new(3, 4, "strategy-beta", Some("cid-2"));
+        let open_request =
+            PyOrderRequestOpen::new(&key, "sell", 250.0, 1.5, "limit", None, None).unwrap();
+
+        let snapshot = PyOrderSnapshot::from_open_request(&open_request, None, None, 0.0).unwrap();
+
+        let event = PyEngineEvent::account_order_snapshot(3, &snapshot).unwrap();
+
+        match event.inner {
+            EngineEvent::Account(AccountStreamEvent::Item(account_event)) => {
+                assert_eq!(account_event.exchange, ExchangeIndex(3));
+
+                match account_event.kind {
+                    AccountEventKind::OrderSnapshot(snapshot) => {
+                        let order = snapshot.value();
+                        assert_eq!(order.key.exchange, ExchangeIndex(3));
+                        assert_eq!(order.key.instrument, InstrumentIndex(4));
+                        assert_eq!(order.side, Side::Sell);
+
+                        match &order.state {
+                            OrderState::Active(ActiveOrderState::OpenInFlight(_)) => {}
+                            other => panic!("unexpected order state: {other:?}"),
+                        }
+                    }
+                    other => panic!("unexpected account event kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_account_order_cancelled_success() {
+        let key = PyOrderKey::new(2, 5, "strategy-gamma", Some("cid-3"));
+        let cancel_request = PyOrderRequestCancel::new(&key, Some("order-456"))
+            .expect("cancel request should build");
+        let time_exchange = Utc.with_ymd_and_hms(2025, 12, 1, 2, 3, 4).unwrap();
+
+        let event =
+            PyEngineEvent::account_order_cancelled(2, &cancel_request, "order-456", time_exchange)
+                .unwrap();
+
+        match event.inner {
+            EngineEvent::Account(AccountStreamEvent::Item(account_event)) => {
+                assert_eq!(account_event.exchange, ExchangeIndex(2));
+
+                match account_event.kind {
+                    AccountEventKind::OrderCancelled(response) => {
+                        assert_eq!(response.key.exchange, ExchangeIndex(2));
+                        assert_eq!(response.key.instrument, InstrumentIndex(5));
+
+                        match response.state {
+                            Ok(cancelled) => {
+                                assert_eq!(cancelled.id, OrderId::new("order-456"));
+                                assert_eq!(cancelled.time_exchange, time_exchange);
+                            }
+                            Err(err) => panic!("unexpected cancellation error: {err:?}"),
+                        }
                     }
                     other => panic!("unexpected account event kind: {other:?}"),
                 }

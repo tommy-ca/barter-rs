@@ -359,3 +359,89 @@ def test_order_request_helpers() -> None:
 
     assert not open_event.is_terminal()
     assert not cancel_event.is_terminal()
+
+
+def test_order_snapshot_open_helper() -> None:
+    timestamp = dt.datetime(2025, 9, 10, 11, 12, 13, tzinfo=dt.timezone.utc)
+    key = bp.OrderKey(1, 2, "strategy-alpha", "cid-1")
+    open_request = bp.OrderRequestOpen(
+        key,
+        "buy",
+        105.25,
+        0.75,
+        kind="limit",
+        time_in_force="good_until_cancelled",
+        post_only=True,
+    )
+
+    snapshot = bp.OrderSnapshot.from_open_request(
+        open_request,
+        order_id="order-789",
+        time_exchange=timestamp,
+        filled_quantity=0.25,
+    )
+
+    event = bp.EngineEvent.account_order_snapshot(exchange=1, snapshot=snapshot)
+
+    account_item = event.to_dict()["Account"]["Item"]
+    order_snapshot = account_item["kind"]["OrderSnapshot"]
+
+    assert account_item["exchange"] == 1
+    assert order_snapshot["key"]["exchange"] == 1
+    assert order_snapshot["key"]["instrument"] == 2
+    assert order_snapshot["key"]["strategy"] == "strategy-alpha"
+    assert order_snapshot["side"].lower() == "buy"
+    assert Decimal(order_snapshot["price"]).quantize(Decimal("0.01")) == Decimal("105.25")
+    assert Decimal(order_snapshot["quantity"]).quantize(Decimal("0.01")) == Decimal("0.75")
+    assert order_snapshot["kind"] == "Limit"
+    assert order_snapshot["time_in_force"]["GoodUntilCancelled"]["post_only"] is True
+
+    active_state = order_snapshot["state"]["Active"]["Open"]
+    assert active_state["id"] == "order-789"
+    assert active_state["time_exchange"] == timestamp.isoformat().replace("+00:00", "Z")
+    assert Decimal(active_state["filled_quantity"]) == Decimal("0.25")
+
+
+def test_order_snapshot_open_inflight_helper() -> None:
+    key = bp.OrderKey(3, 4, "strategy-beta", "cid-2")
+    open_request = bp.OrderRequestOpen(
+        key,
+        "sell",
+        250.0,
+        1.5,
+        kind="limit",
+    )
+
+    snapshot = bp.OrderSnapshot.from_open_request(open_request)
+
+    event = bp.EngineEvent.account_order_snapshot(exchange=3, snapshot=snapshot)
+
+    order_snapshot = event.to_dict()["Account"]["Item"]["kind"]["OrderSnapshot"]
+
+    assert order_snapshot["key"]["exchange"] == 3
+    assert order_snapshot["key"]["instrument"] == 4
+    assert order_snapshot["side"].lower() == "sell"
+    assert "OpenInFlight" in order_snapshot["state"]["Active"]
+
+
+def test_account_order_cancelled_helper() -> None:
+    timestamp = dt.datetime(2025, 12, 1, 2, 3, 4, tzinfo=dt.timezone.utc)
+    key = bp.OrderKey(2, 5, "strategy-gamma", "cid-3")
+    cancel_request = bp.OrderRequestCancel(key, "order-456")
+
+    event = bp.EngineEvent.account_order_cancelled(
+        exchange=2,
+        request=cancel_request,
+        order_id="order-456",
+        time_exchange=timestamp,
+    )
+
+    cancelled = event.to_dict()["Account"]["Item"]["kind"]["OrderCancelled"]
+
+    assert cancelled["key"]["exchange"] == 2
+    assert cancelled["key"]["instrument"] == 5
+    assert cancelled["state"]["Ok"]["id"] == "order-456"
+    assert (
+        cancelled["state"]["Ok"]["time_exchange"]
+        == timestamp.isoformat().replace("+00:00", "Z")
+    )
