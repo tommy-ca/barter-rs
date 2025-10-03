@@ -5,7 +5,8 @@
 2. Outline desired Python API surface and prioritise components for the initial release.
 3. Implement Rust-to-Python wrapper modules and supporting ergonomics.
 4. Integrate packaging, build scripts, and CI wiring to publish Python artifacts.
-5. Add essential unit & end-to-end tests alongside updated documentation.
+5. Add essential unit & end-to-end tests alongside updated documentation (spec captured at
+   `.agent/specs/python-integration-tests.md`).
 
 ## Notes
 - Maintain commit discipline with atomic changes (commit & push each step).

@@ -2,8 +2,11 @@
 - [x] Finalize `shutdown_with_summary` bindings (Rust + Python tests + docs).
 - [x] Ensure summary serialization returns rich Python objects.
 - [x] Update packaging metadata (wheel classifiers, maturin settings) once API settles.
-- [ ] Plan integration tests covering live system lifecycle vs. backtest.
-  - Added `SystemHandle.feed_events` coverage in Python suite (2025-10-03).
+- [x] Plan integration tests covering live system lifecycle vs. backtest.
+  - Captured in `.agent/specs/python-integration-tests.md` (2025-10-03).
+- [ ] Implement pytest integration suite per new spec.
+- [ ] Wire integration test marker into CI workflow after maturin build.
+- [ ] Add tracing/log capture fixture to aid debugging slow tests.
 
 ## Completed
 - [x] Expose module version constant to Python consumers.
