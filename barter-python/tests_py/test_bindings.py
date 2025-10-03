@@ -14,6 +14,16 @@ def test_shutdown_event_is_terminal() -> None:
     assert event.is_terminal()
 
 
+def test_init_tracing_returns_bool() -> None:
+    result = bp.init_tracing(filter="barter_python=info")
+    assert isinstance(result, bool)
+
+
+def test_init_tracing_invalid_filter_raises() -> None:
+    with pytest.raises(ValueError):
+        bp.init_tracing(filter="invalid[filter")
+
+
 def test_version_matches_package_metadata() -> None:
     from importlib import metadata
 

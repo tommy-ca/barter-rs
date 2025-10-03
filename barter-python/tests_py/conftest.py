@@ -11,7 +11,7 @@ import importlib
 import os
 import subprocess
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 import pytest
 
@@ -65,3 +65,35 @@ def example_paths(repo_root: Path) -> dict[str, Path]:
         / "data"
         / "binance_spot_market_data_with_disconnect_events.json",
     }
+
+
+@pytest.fixture(scope="session", autouse=True)
+def configure_tracing_logs() -> Iterator[None]:
+    """Initialise the global tracing subscriber for Rust logs."""
+
+    import barter_python as bp
+
+    filter_spec = os.environ.get("BARTER_PYTHON_LOG_FILTER")
+    if filter_spec is None:
+        filter_spec = os.environ.get("RUST_LOG", "barter_python=info,barter=warn")
+    else:
+        os.environ.setdefault("RUST_LOG", filter_spec)
+
+    bp.init_tracing(filter=filter_spec, ansi=False)
+    yield
+
+
+@pytest.fixture
+def tracing_log_capture(
+    capfd: pytest.CaptureFixture[str],
+) -> Callable[[], str]:
+    """Return a callable that drains captured stdout and stderr for tracing logs."""
+
+    # Clear any buffered output prior to the test body executing.
+    capfd.readouterr()
+
+    def read_logs() -> str:
+        captured = capfd.readouterr()
+        return f"{captured.out}{captured.err}"
+
+    return read_logs

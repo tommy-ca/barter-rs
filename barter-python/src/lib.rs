@@ -6,6 +6,7 @@
 
 mod command;
 mod config;
+mod logging;
 mod summary;
 mod system;
 
@@ -24,6 +25,7 @@ use command::{
     collect_cancel_requests, collect_open_requests, parse_decimal,
 };
 use config::PySystemConfig;
+use logging::init_tracing;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use summary::{
     PyAssetTearSheet, PyBalance, PyDrawdown, PyInstrumentTearSheet, PyMeanDrawdown,
@@ -250,6 +252,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDrawdown>()?;
     m.add_class::<PyMeanDrawdown>()?;
     m.add_class::<PyBalance>()?;
+    m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;

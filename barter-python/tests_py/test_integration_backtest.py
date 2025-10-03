@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from typing import Callable
 
 import pytest
 
@@ -9,7 +10,10 @@ import barter_python as bp
 
 
 @pytest.mark.integration
-def test_historic_backtest_summary(example_paths: dict[str, Path]) -> None:
+def test_historic_backtest_summary(
+    example_paths: dict[str, Path],
+    tracing_log_capture: Callable[[], str],
+) -> None:
     """Ensure historic backtests produce deterministic trading summaries."""
 
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
@@ -51,3 +55,6 @@ def test_historic_backtest_summary(example_paths: dict[str, Path]) -> None:
     instrument_dict = summary_dict["instruments"][instrument_name]
     assert instrument_dict["pnl"] == 0
     assert instrument_dict["pnl_return"]["value"] == Decimal("0")
+
+    logs = tracing_log_capture()
+    assert "sending historical event to Engine" in logs
