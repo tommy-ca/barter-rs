@@ -15,7 +15,10 @@ use barter::{
         },
     },
     risk::DefaultRiskManager,
-    statistic::{summary::TradingSummary, time::Daily},
+    statistic::{
+        summary::{asset::TearSheetAsset, instrument::TearSheet, TradingSummary},
+        time::Daily,
+    },
     strategy::DefaultStrategy,
     system::{
         System,
@@ -31,11 +34,14 @@ use barter_data::{
 };
 use barter_instrument::{index::IndexedInstruments, instrument::InstrumentIndex};
 use barter_integration::channel::Tx;
+use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, stream};
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyModule};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use serde::Serialize;
 use std::{
+    collections::BTreeMap,
     fs::File,
     io::Read,
     path::Path,
@@ -314,9 +320,48 @@ fn load_historic_clock_and_market_stream(
     Ok((clock, stream))
 }
 
+#[derive(Serialize)]
+struct PyTradingSummary<Interval> {
+    time_engine_start: DateTime<Utc>,
+    time_engine_end: DateTime<Utc>,
+    instruments: BTreeMap<String, TearSheet<Interval>>,
+    assets: BTreeMap<String, TearSheetAsset>,
+}
+
 fn summary_to_py(py: Python<'_>, summary: TradingSummary<Daily>) -> PyResult<PyObject> {
-    let json =
-        serde_json::to_string(&summary).map_err(|err| PyValueError::new_err(err.to_string()))?;
+    let TradingSummary {
+        time_engine_start,
+        time_engine_end,
+        instruments,
+        assets,
+    } = summary;
+
+    let instruments = instruments
+        .into_iter()
+        .map(|(instrument, tear_sheet)| (instrument.to_string(), tear_sheet))
+        .collect::<BTreeMap<_, _>>();
+
+    let assets = assets
+        .into_iter()
+        .map(|(exchange_asset, tear_sheet)| {
+            let key = format!(
+                "{}:{}",
+                exchange_asset.exchange.as_str(),
+                exchange_asset.asset.as_ref()
+            );
+            (key, tear_sheet)
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let serializable = PyTradingSummary {
+        time_engine_start,
+        time_engine_end,
+        instruments,
+        assets,
+    };
+
+    let json = serde_json::to_string(&serializable)
+        .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
     let json_module = PyModule::import_bound(py, "json")?;
     let loads = json_module.getattr("loads")?;
