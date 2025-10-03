@@ -1,6 +1,6 @@
 # Python Integration Test Specification
 
-**Last Updated:** 2025-10-03
+**Last Updated:** 2025-10-03 (integration scenarios implemented)
 
 ## Goals
 - Exercise end-to-end trading flows through the Python bindings without mocks.
@@ -54,6 +54,7 @@
   diagnosis.
 
 ## Next Steps
-- Implement `pytest` markers and fixtures mirroring the above scenarios.
-- Add CI job invoking `pytest -m integration --maxfail=1` post wheel build.
-- Evaluate need for synthetic market data fixture with shorter event stream to improve runtime.
+- [x] Implement `pytest` markers and fixtures mirroring the above scenarios.
+  - Implemented on 2025-10-03 via `tests_py/test_integration_*.py` and `pyproject.toml` marker.
+- [ ] Add CI job invoking `pytest -m integration --maxfail=1` post wheel build.
+- [ ] Evaluate need for synthetic market data fixture with shorter event stream to improve runtime.
