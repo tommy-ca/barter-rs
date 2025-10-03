@@ -58,4 +58,5 @@
   - Implemented on 2025-10-03 via `tests_py/test_integration_*.py` and `pyproject.toml` marker.
 - [x] Add CI job invoking `pytest -m integration --maxfail=1` post wheel build.
   - Added 2025-10-03 as the `python-tests` job in `.github/workflows/ci.yml` running against `barter-python`.
-- [ ] Evaluate need for synthetic market data fixture with shorter event stream to improve runtime.
+- [x] Evaluate need for synthetic market data fixture with shorter event stream to improve runtime.
+  - Added `tests_py/data/synthetic_market_data.json` and updated `example_paths` fixture on 2025-10-03.
