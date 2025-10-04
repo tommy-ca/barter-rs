@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 
+use crate::command::parse_decimal;
 use barter_data::{
     streams::builder::dynamic::DynamicStreams,
     subscription::{SubKind, Subscription},
@@ -8,11 +9,16 @@ use barter_instrument::{
     exchange::ExchangeId,
     instrument::{
         InstrumentIndex,
-        market_data::{MarketDataInstrument, kind::MarketDataInstrumentKind},
+        kind::option::{OptionExercise, OptionKind},
+        market_data::{
+            MarketDataInstrument,
+            kind::{MarketDataFutureContract, MarketDataInstrumentKind, MarketDataOptionContract},
+        },
     },
 };
 use barter_integration::subscription::SubscriptionId;
-use pyo3::prelude::*;
+use chrono::{DateTime, Utc};
+use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyDict};
 
 /// Wrapper around [`ExchangeId`] for Python exposure.
 #[pyclass(module = "barter_python", name = "ExchangeId", eq)]
@@ -197,21 +203,11 @@ impl PySubscription {
         base: &str,
         quote: &str,
         kind: &PySubKind,
-        instrument_kind: Option<&str>,
+        instrument_kind: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let instrument_kind = match instrument_kind {
-            Some("spot") | None => MarketDataInstrumentKind::Spot,
-            Some("perpetual") => MarketDataInstrumentKind::Perpetual,
-            Some(kind) => {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "Invalid instrument_kind '{}'. Currently only 'spot' and 'perpetual' are supported",
-                    kind
-                )));
-            }
-        };
+        let instrument_kind = parse_market_data_instrument_kind(instrument_kind)?;
 
         let instrument = MarketDataInstrument::from((base, quote, instrument_kind));
-
         let subscription = Subscription::new(exchange.inner, instrument, kind.inner);
 
         Ok(Self {
@@ -255,6 +251,136 @@ impl PySubscription {
     fn __repr__(&self) -> String {
         format!("{:?}", self.inner)
     }
+}
+
+fn parse_market_data_instrument_kind(
+    kind: Option<Bound<'_, PyAny>>,
+) -> PyResult<MarketDataInstrumentKind> {
+    match kind {
+        None => Ok(MarketDataInstrumentKind::Spot),
+        Some(value) => {
+            if let Ok(kind_str) = value.extract::<&str>() {
+                match kind_str.to_ascii_lowercase().as_str() {
+                    "spot" => Ok(MarketDataInstrumentKind::Spot),
+                    "perpetual" => Ok(MarketDataInstrumentKind::Perpetual),
+                    other => Err(PyValueError::new_err(format!(
+                        "Invalid instrument_kind '{}'. Use 'spot', 'perpetual', or a mapping with type",
+                        other
+                    ))),
+                }
+            } else if let Ok(mapping) = value.downcast::<PyDict>() {
+                parse_instrument_kind_mapping(mapping)
+            } else {
+                Err(PyValueError::new_err(
+                    "Invalid instrument_kind. Provide 'spot', 'perpetual', or a mapping with 'type'",
+                ))
+            }
+        }
+    }
+}
+
+fn parse_instrument_kind_mapping(dict: &Bound<'_, PyDict>) -> PyResult<MarketDataInstrumentKind> {
+    let type_binding = get_required(dict, "type")?;
+    let kind_value = type_binding
+        .extract::<&str>()
+        .map_err(|_| PyValueError::new_err("instrument_kind 'type' must be a string"))?;
+
+    match kind_value.to_ascii_lowercase().as_str() {
+        "future" => parse_future_kind(dict),
+        "option" => parse_option_kind(dict),
+        other => Err(PyValueError::new_err(format!(
+            "Unsupported instrument_kind type '{}'. Expected 'future' or 'option'",
+            other
+        ))),
+    }
+}
+
+fn parse_future_kind(dict: &Bound<'_, PyDict>) -> PyResult<MarketDataInstrumentKind> {
+    let expiry_any = get_required(dict, "expiry")?;
+    let expiry = parse_datetime_field(expiry_any, "expiry")?;
+
+    Ok(MarketDataInstrumentKind::Future(MarketDataFutureContract {
+        expiry,
+    }))
+}
+
+fn parse_option_kind(dict: &Bound<'_, PyDict>) -> PyResult<MarketDataInstrumentKind> {
+    let option_kind = parse_option_kind_field(get_required(dict, "kind")?)?;
+    let exercise = parse_option_exercise_field(get_required(dict, "exercise")?)?;
+    let expiry = parse_datetime_field(get_required(dict, "expiry")?, "expiry")?;
+    let strike_any = get_required(dict, "strike")?;
+
+    let strike_float = strike_any
+        .extract::<f64>()
+        .or_else(|_| strike_any.extract::<i64>().map(|value| value as f64))
+        .map_err(|_| PyValueError::new_err("instrument_kind option 'strike' must be numeric"))?;
+    let strike = parse_decimal(strike_float, "strike")?;
+
+    Ok(MarketDataInstrumentKind::Option(MarketDataOptionContract {
+        kind: option_kind,
+        exercise,
+        expiry,
+        strike,
+    }))
+}
+
+fn parse_option_kind_field(value: Bound<'_, PyAny>) -> PyResult<OptionKind> {
+    let kind = value
+        .extract::<&str>()
+        .map_err(|_| PyValueError::new_err("instrument_kind option 'kind' must be a string"))?
+        .to_ascii_lowercase();
+
+    match kind.as_str() {
+        "call" => Ok(OptionKind::Call),
+        "put" => Ok(OptionKind::Put),
+        other => Err(PyValueError::new_err(format!(
+            "Unsupported option kind '{}'. Expected 'call' or 'put'",
+            other
+        ))),
+    }
+}
+
+fn parse_option_exercise_field(value: Bound<'_, PyAny>) -> PyResult<OptionExercise> {
+    let exercise = value
+        .extract::<&str>()
+        .map_err(|_| PyValueError::new_err("instrument_kind option 'exercise' must be a string"))?
+        .to_ascii_lowercase();
+
+    match exercise.as_str() {
+        "american" => Ok(OptionExercise::American),
+        "bermudan" => Ok(OptionExercise::Bermudan),
+        "european" => Ok(OptionExercise::European),
+        other => Err(PyValueError::new_err(format!(
+            "Unsupported option exercise '{}'. Expected 'american', 'bermudan', or 'european'",
+            other
+        ))),
+    }
+}
+
+fn parse_datetime_field(value: Bound<'_, PyAny>, field: &str) -> PyResult<DateTime<Utc>> {
+    if let Ok(datetime) = value.extract::<DateTime<Utc>>() {
+        return Ok(datetime);
+    }
+
+    if let Ok(text) = value.extract::<String>() {
+        DateTime::parse_from_rfc3339(&text)
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|err| PyValueError::new_err(format!("Invalid {} '{}': {}", field, text, err)))
+    } else {
+        Err(PyValueError::new_err(format!(
+            "Invalid {} value. Expected datetime or ISO8601 string",
+            field
+        )))
+    }
+}
+
+fn get_required<'py>(dict: &Bound<'py, PyDict>, field: &str) -> PyResult<Bound<'py, PyAny>> {
+    dict.get_item(field)?.ok_or_else(|| {
+        PyValueError::new_err(format!(
+            "instrument_kind mapping missing required '{}' field",
+            field
+        ))
+    })
 }
 
 /// Wrapper around [`SubscriptionId`] for Python exposure.

@@ -586,6 +586,32 @@ def test_subscription_creation() -> None:
     )
     assert sub_candles.kind == bp.SubKind.CANDLES
 
+    future_expiry = dt.datetime(2025, 6, 1, tzinfo=dt.timezone.utc)
+    sub_future = bp.Subscription(
+        bp.ExchangeId.BINANCE_FUTURES_USD,
+        "btc",
+        "usdt",
+        bp.SubKind.PUBLIC_TRADES,
+        {"type": "future", "expiry": future_expiry},
+    )
+    assert "future_2025-06-01-UTC" in sub_future.instrument
+
+    option_expiry = dt.datetime(2025, 7, 1, tzinfo=dt.timezone.utc)
+    sub_option = bp.Subscription(
+        bp.ExchangeId.BINANCE_SPOT,
+        "btc",
+        "usdt",
+        bp.SubKind.PUBLIC_TRADES,
+        {
+            "type": "option",
+            "kind": "call",
+            "exercise": "european",
+            "expiry": option_expiry,
+            "strike": 25000.0,
+        },
+    )
+    assert "option_call_european_2025-07-01-UTC" in sub_option.instrument
+
 
 def test_dynamic_streams_placeholder() -> None:
     streams = bp.DynamicStreams()
