@@ -181,6 +181,53 @@ def close_open_positions_with_market_orders(
     return ([], open_requests)
 
 
+class OnDisconnectStrategy(Protocol):
+    """Strategy interface for handling exchange disconnections."""
+
+    def on_disconnect(self, exchange_id: str) -> None:
+        """Handle actions when an exchange disconnects.
+
+        Args:
+            exchange_id: The exchange that disconnected
+        """
+        ...
+
+
+class OnTradingDisabledStrategy(Protocol):
+    """Strategy interface for handling trading state changes to disabled."""
+
+    def on_trading_disabled(self) -> None:
+        """Handle actions when trading is disabled."""
+        ...
+
+
+def cancel_all_orders_on_disconnect(exchange_id: str) -> list[OrderRequestCancel]:
+    """Simple strategy: cancel all orders when an exchange disconnects.
+
+    Args:
+        exchange_id: The exchange that disconnected
+
+    Returns:
+        List of cancel requests for all orders on the exchange
+    """
+    # This is a simplified implementation - in practice, this would need
+    # access to the current order state to generate specific cancel requests
+    # For now, return empty list as a placeholder
+    return []
+
+
+def close_all_positions_on_trading_disabled() -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    """Simple strategy: close all positions when trading is disabled.
+
+    Returns:
+        Tuple of (cancel_requests, open_requests) to close all positions
+    """
+    # This is a simplified implementation - in practice, this would need
+    # access to the current position state
+    # For now, return empty lists as placeholders
+    return ([], [])
+
+
 def build_ioc_market_order_to_close_position(
     exchange: ExchangeIndex,
     position: Position,

@@ -7,6 +7,8 @@ from barter_python.strategy import (
     InstrumentState,
     Position,
     build_ioc_market_order_to_close_position,
+    cancel_all_orders_on_disconnect,
+    close_all_positions_on_trading_disabled,
     close_open_positions_with_market_orders,
 )
 
@@ -154,3 +156,22 @@ class TestClosePositionsStrategy:
         open_requests = list(open_requests)
         assert len(open_requests) == 1
         assert open_requests[0].key.cid.value == "custom-0"
+
+
+class TestDisconnectStrategies:
+    def test_cancel_all_orders_on_disconnect(self):
+        """Test canceling all orders on disconnect."""
+        cancel_requests = cancel_all_orders_on_disconnect("binance_spot")
+
+        # Currently returns empty list as placeholder
+        assert cancel_requests == []
+
+
+class TestTradingDisabledStrategies:
+    def test_close_all_positions_on_trading_disabled(self):
+        """Test closing all positions when trading is disabled."""
+        cancel_requests, open_requests = close_all_positions_on_trading_disabled()
+
+        # Currently returns empty lists as placeholders
+        assert cancel_requests == []
+        assert open_requests == []
