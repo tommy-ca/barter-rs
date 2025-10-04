@@ -4,7 +4,7 @@ import barter_python as bp
 
 
 def _load_config() -> bp.SystemConfig:
-    return bp.SystemConfig.from_json("barter/examples/config/system_config.json")
+    return bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
 
 
 def test_risk_limits_round_trip(tmp_path):
