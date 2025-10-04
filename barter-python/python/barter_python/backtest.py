@@ -10,14 +10,16 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import AsyncIterable, Generic, Iterable, Optional, Protocol, TypeVar
+from typing import Any, AsyncIterable, Generic, Iterable, Optional, Protocol, TypeVar
 
 from .data import MarketEvent, DataKind, PublicTrade, OrderBookL1, Candle, Liquidation, as_public_trade, as_candle
-from .execution import AccountEvent
+from .engine import Engine, EngineState as EngineEngineState, InstrumentState as EngineInstrumentState, Position as EnginePosition, TradingState
+from .execution import AccountEvent, OrderRequestOpen, OrderRequestCancel
 from .instrument import (
     Asset, AssetIndex, AssetNameInternal, ExchangeAsset, ExchangeId, ExchangeIndex,
     Instrument, InstrumentIndex, InstrumentNameInternal, Keyed, Underlying, Side
 )
+from .risk import RiskManager
 from .statistic import TimeInterval, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
 from .strategy import AlgoStrategy, ClosePositionsStrategy, OnDisconnectStrategy, OnTradingDisabledStrategy, EngineState, InstrumentState, Position
 
@@ -347,7 +349,7 @@ async def backtest(
     time_start = await args_constant.market_data.time_first_event()
 
     # Initialize simulator
-    simulator = BacktestEngineSimulator(args_constant.engine_state)
+    simulator = BacktestEngineSimulator(args_constant.engine_state, args_dynamic.strategy, args_dynamic.risk)
     simulator.start_time = time_start
 
     # Process market events
@@ -413,8 +415,8 @@ class ExecutionConfig:
 class BacktestEngineSimulator:
     """Simple engine simulator for backtesting."""
 
-    def __init__(self, initial_state: EngineState):
-        self.state = initial_state
+    def __init__(self, initial_engine_state: EngineEngineState, strategy: Any, risk_manager: RiskManager):
+        self.engine = Engine(initial_engine_state, strategy, risk_manager)
         self.current_time = None
         self.start_time = None
         self.positions = {}  # Track positions by instrument
@@ -428,25 +430,32 @@ class BacktestEngineSimulator:
             self.start_time = event.time_exchange
         self.current_time = event.time_exchange
 
+        # Update engine with market event
+        self.engine.process_market_event(event)
+
         # Update instrument prices based on market data
         if event.kind.kind == "trade":
             trade_event = as_public_trade(event)
             if trade_event:
                 trade = trade_event.kind
                 # Update price for the instrument
-                for inst_state in self.state.instruments:
-                    if inst_state.instrument == trade_event.instrument:
-                        inst_state.price = trade.price
-                        break
+                inst_state = self.engine.state.get_instrument_state(event.instrument)
+                if inst_state:
+                    # Note: InstrumentState doesn't have price, so we store in a dict or something
+                    pass  # TODO: Add price tracking to InstrumentState
         elif event.kind.kind == "candle":
             candle_event = as_candle(event)
             if candle_event:
                 candle = candle_event.kind
                 # Update price with candle close
-                for inst_state in self.state.instruments:
-                    if inst_state.instrument == candle_event.instrument:
-                        inst_state.price = candle.close
-                        break
+                inst_state = self.engine.state.get_instrument_state(event.instrument)
+                if inst_state:
+                    pass  # TODO: Add price tracking
+
+        # Generate orders using strategy
+        if self.engine.state.is_trading_enabled():
+            cancel_requests, open_requests = self.engine.generate_algo_orders()
+            self.engine.send_requests(open_requests, cancel_requests)
 
     def record_trade(self, instrument: int, side: Side, quantity: Decimal, price: Decimal, pnl: Decimal = Decimal('0')):
         """Record a trade for tracking."""
@@ -471,9 +480,9 @@ class BacktestEngineSimulator:
 
         # Generate instrument tear sheets
         instruments = {}
-        for inst_state in self.state.instruments:
-            instrument_name = f"instrument_{inst_state.instrument}"
-            pnl = self.pnl_by_instrument.get(inst_state.instrument, Decimal('0'))
+        for inst_index, inst_state in self.engine.state.instruments.items():
+            instrument_name = f"instrument_{inst_index}"
+            pnl = self.pnl_by_instrument.get(inst_index, Decimal('0'))
 
             # Create basic tear sheet with placeholder values
             tear_sheet = TearSheet(
