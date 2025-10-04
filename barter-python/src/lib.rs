@@ -8,6 +8,7 @@ mod analytics;
 mod command;
 mod config;
 mod data;
+mod instrument;
 mod logging;
 mod summary;
 mod system;
@@ -63,6 +64,7 @@ use summary::{
     PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
 use system::{PySystemHandle, run_historic_backtest, start_system};
+use instrument::PyAsset;
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]
@@ -791,6 +793,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubscription>()?;
     m.add_class::<PySubscriptionId>()?;
     m.add_class::<PyDynamicStreams>()?;
+    m.add_class::<PyAsset>()?;
     m.add_class::<PyBacktestSummary>()?;
     m.add_class::<PyMultiBacktestSummary>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;

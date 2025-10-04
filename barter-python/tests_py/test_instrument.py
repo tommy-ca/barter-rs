@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import barter_python as bp
 from barter_python.instrument import (
     Asset,
     AssetNameExchange,
@@ -445,3 +446,20 @@ class TestInstrument:
         )
         assert i1 == i2
         assert i1 != i3
+
+
+class TestPyAsset:
+    def test_creation(self):
+        asset = bp.Asset("btc", "XBT")
+        assert asset.name_internal == "btc"
+        assert asset.name_exchange == "XBT"
+
+    def test_from_exchange_name(self):
+        asset = bp.Asset.from_exchange_name("XBT")
+        assert asset.name_internal == "xbt"
+        assert asset.name_exchange == "XBT"
+
+    def test_str_repr(self):
+        asset = bp.Asset("btc", "XBT")
+        assert str(asset) == "Asset(name_internal='btc', name_exchange='XBT')"
+        assert "Asset(" in repr(asset)

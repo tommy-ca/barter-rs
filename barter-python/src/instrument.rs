@@ -1,0 +1,55 @@
+use barter_instrument::asset::Asset;
+use pyo3::prelude::*;
+
+/// Wrapper around [`Asset`] for Python exposure.
+#[pyclass(module = "barter_python", name = "Asset", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyAsset {
+    inner: Asset,
+}
+
+#[pymethods]
+impl PyAsset {
+    /// Create a new [`Asset`].
+    #[new]
+    #[pyo3(signature = (name_internal, name_exchange))]
+    fn new(name_internal: &str, name_exchange: &str) -> Self {
+        Self {
+            inner: Asset::new(name_internal, name_exchange),
+        }
+    }
+
+    /// Create a new [`Asset`] from exchange name only.
+    #[staticmethod]
+    fn from_exchange_name(name_exchange: &str) -> Self {
+        Self {
+            inner: Asset::new_from_exchange(name_exchange),
+        }
+    }
+
+    /// Get the internal name.
+    #[getter]
+    fn name_internal(&self) -> &str {
+        self.inner.name_internal.name()
+    }
+
+    /// Get the exchange name.
+    #[getter]
+    fn name_exchange(&self) -> &str {
+        self.inner.name_exchange.name()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        format!(
+            "Asset(name_internal='{}', name_exchange='{}')",
+            self.name_internal(),
+            self.name_exchange()
+        )
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("Asset(name_internal='{}', name_exchange='{}')", self.name_internal(), self.name_exchange()))
+    }
+}
