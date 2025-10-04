@@ -7,6 +7,8 @@ from typing import Callable
 import pytest
 
 import barter_python as bp
+from barter_python.backtest import MarketDataInMemory, BacktestArgsConstant, BacktestArgsDynamic
+from barter_python.statistic import Daily
 
 
 @pytest.mark.integration
@@ -80,3 +82,30 @@ def test_historic_backtest_summary(
 
     logs = tracing_log_capture()
     assert "sending historical event to Engine" in logs
+
+
+@pytest.mark.asyncio
+async def test_market_data_in_memory_from_json(example_paths: dict[str, Path]) -> None:
+    """Test loading market data from JSON file."""
+    market_data_path = example_paths["market_data"]
+    market_data = MarketDataInMemory.from_json_file(market_data_path)
+
+    assert len(market_data.events) > 0
+
+    first_time = await market_data.time_first_event()
+    assert isinstance(first_time, bp.datetime)
+
+    # Test streaming
+    events = []
+    async for event in market_data.stream():
+        events.append(event)
+
+    assert len(events) == len(market_data.events)
+    assert events[0].time_exchange == first_time
+
+
+@pytest.mark.asyncio
+async def test_backtest_basic() -> None:
+    """Test basic backtest functionality with minimal setup."""
+    # This is a placeholder test - full implementation would require more setup
+    pass
