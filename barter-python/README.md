@@ -331,6 +331,34 @@ print(btc_trades.instrument)  # btc_usdt_spot
 the foundational types for subscription creation, with stream initialization planned for a future
 release.
 
+### OrderBook Analysis
+
+The bindings provide utilities for analyzing order book data, including mid-price calculations and
+order book construction:
+
+```python
+import barter_python as bp
+
+# Create an order book from bid/ask levels
+bids = [(100.0, 1.0), (99.5, 2.0)]  # (price, amount) tuples
+asks = [(100.5, 1.5), (101.0, 1.0)]
+book = bp.OrderBook(sequence=123, bids=bids, asks=asks)
+
+# Calculate mid-price (average of best bid/ask)
+mid_price = book.mid_price()  # "100.25"
+
+# Calculate volume-weighted mid-price
+vw_mid_price = book.volume_weighted_mid_price()  # Considers order sizes
+
+# Access raw levels (sorted bids descending, asks ascending)
+bids = book.bids()  # [('100', '1'), ('99.5', '2')]
+asks = book.asks()  # [('100.5', '1.5'), ('101', '1')]
+
+# Standalone calculation functions
+mid = bp.calculate_mid_price(100.0, 101.0)  # "100.5"
+vw_mid = bp.calculate_volume_weighted_mid_price(100.0, 2.0, 101.0, 1.0)  # "100.333..."
+```
+
 ## Development
 
 - Requires Python 3.9+
