@@ -30,7 +30,8 @@
 - [x] Expose risk manager configuration knobs to Python API (implemented 2025-10-04; see tests in `barter-python/tests_py/test_risk_config.py`).
 - [x] Surface portfolio analytics helpers (eg. Sharpe, Sortino calculators) for Python summaries. (2025-10-04)
 - [x] Provide combined test runner script (Rust + Python) for contributors. (2025-10-03)
-- [ ] Draft release cadence doc aligning Rust crate and Python wheel versioning.
+- [x] Draft release cadence doc aligning Rust crate and Python wheel versioning. (2025-10-04)
+- [ ] Add "Release Notes" aggregation section to `barter-python/README.md` post cadence adoption.
 
 ## Later Opportunities
 - [x] Expand bindings for market stream events (2025-10-03)
