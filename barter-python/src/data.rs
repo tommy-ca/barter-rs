@@ -29,16 +29,64 @@ pub struct PyExchangeId {
 
 #[pymethods]
 impl PyExchangeId {
+    /// Other / unknown exchange.
+    #[classattr]
+    const OTHER: Self = Self {
+        inner: ExchangeId::Other,
+    };
+
+    /// Simulated exchange environment.
+    #[classattr]
+    const SIMULATED: Self = Self {
+        inner: ExchangeId::Simulated,
+    };
+
+    /// Mock exchange implementation.
+    #[classattr]
+    const MOCK: Self = Self {
+        inner: ExchangeId::Mock,
+    };
+
+    /// Binance coin-margined futures exchange.
+    #[classattr]
+    const BINANCE_FUTURES_COIN: Self = Self {
+        inner: ExchangeId::BinanceFuturesCoin,
+    };
+
     /// Binance Spot exchange.
     #[classattr]
     const BINANCE_SPOT: Self = Self {
         inner: ExchangeId::BinanceSpot,
     };
 
-    /// Binance Futures USD exchange.
+    /// Binance USD-margined futures exchange.
     #[classattr]
     const BINANCE_FUTURES_USD: Self = Self {
         inner: ExchangeId::BinanceFuturesUsd,
+    };
+
+    /// Binance Options venue.
+    #[classattr]
+    const BINANCE_OPTIONS: Self = Self {
+        inner: ExchangeId::BinanceOptions,
+    };
+
+    /// Binance Portfolio Margin venue.
+    #[classattr]
+    const BINANCE_PORTFOLIO_MARGIN: Self = Self {
+        inner: ExchangeId::BinancePortfolioMargin,
+    };
+
+    /// Binance US exchange.
+    #[classattr]
+    const BINANCE_US: Self = Self {
+        inner: ExchangeId::BinanceUs,
+    };
+
+    /// Bitazza exchange.
+    #[classattr]
+    const BITAZZA: Self = Self {
+        inner: ExchangeId::Bitazza,
     };
 
     /// Bitfinex exchange.
@@ -47,10 +95,58 @@ impl PyExchangeId {
         inner: ExchangeId::Bitfinex,
     };
 
+    /// Bitflyer exchange.
+    #[classattr]
+    const BITFLYER: Self = Self {
+        inner: ExchangeId::Bitflyer,
+    };
+
+    /// Bitget exchange.
+    #[classattr]
+    const BITGET: Self = Self {
+        inner: ExchangeId::Bitget,
+    };
+
+    /// Bitmart spot exchange.
+    #[classattr]
+    const BITMART: Self = Self {
+        inner: ExchangeId::Bitmart,
+    };
+
+    /// Bitmart USD-margined futures exchange.
+    #[classattr]
+    const BITMART_FUTURES_USD: Self = Self {
+        inner: ExchangeId::BitmartFuturesUsd,
+    };
+
     /// BitMEX exchange.
     #[classattr]
     const BITMEX: Self = Self {
         inner: ExchangeId::Bitmex,
+    };
+
+    /// Bitso exchange.
+    #[classattr]
+    const BITSO: Self = Self {
+        inner: ExchangeId::Bitso,
+    };
+
+    /// Bitstamp exchange.
+    #[classattr]
+    const BITSTAMP: Self = Self {
+        inner: ExchangeId::Bitstamp,
+    };
+
+    /// Bitvavo exchange.
+    #[classattr]
+    const BITVAVO: Self = Self {
+        inner: ExchangeId::Bitvavo,
+    };
+
+    /// Bithumb exchange.
+    #[classattr]
+    const BITHUMB: Self = Self {
+        inner: ExchangeId::Bithumb,
     };
 
     /// Bybit Spot exchange.
@@ -65,10 +161,40 @@ impl PyExchangeId {
         inner: ExchangeId::BybitPerpetualsUsd,
     };
 
+    /// CEX.io exchange.
+    #[classattr]
+    const CEXIO: Self = Self {
+        inner: ExchangeId::Cexio,
+    };
+
     /// Coinbase exchange.
     #[classattr]
     const COINBASE: Self = Self {
         inner: ExchangeId::Coinbase,
+    };
+
+    /// Coinbase International exchange.
+    #[classattr]
+    const COINBASE_INTERNATIONAL: Self = Self {
+        inner: ExchangeId::CoinbaseInternational,
+    };
+
+    /// Crypto.com exchange.
+    #[classattr]
+    const CRYPTOCOM: Self = Self {
+        inner: ExchangeId::Cryptocom,
+    };
+
+    /// Deribit exchange.
+    #[classattr]
+    const DERIBIT: Self = Self {
+        inner: ExchangeId::Deribit,
+    };
+
+    /// Gate.io Futures BTC exchange.
+    #[classattr]
+    const GATEIO_FUTURES_BTC: Self = Self {
+        inner: ExchangeId::GateioFuturesBtc,
     };
 
     /// Gate.io Spot exchange.
@@ -81,12 +207,6 @@ impl PyExchangeId {
     #[classattr]
     const GATEIO_FUTURES_USD: Self = Self {
         inner: ExchangeId::GateioFuturesUsd,
-    };
-
-    /// Gate.io Futures BTC exchange.
-    #[classattr]
-    const GATEIO_FUTURES_BTC: Self = Self {
-        inner: ExchangeId::GateioFuturesBtc,
     };
 
     /// Gate.io Perpetuals USD exchange.
@@ -107,16 +227,58 @@ impl PyExchangeId {
         inner: ExchangeId::GateioOptions,
     };
 
+    /// Gemini exchange.
+    #[classattr]
+    const GEMINI: Self = Self {
+        inner: ExchangeId::Gemini,
+    };
+
+    /// HitBTC exchange.
+    #[classattr]
+    const HITBTC: Self = Self {
+        inner: ExchangeId::Hitbtc,
+    };
+
     /// Kraken exchange.
     #[classattr]
     const KRAKEN: Self = Self {
         inner: ExchangeId::Kraken,
     };
 
+    /// HTX (Huobi) exchange.
+    #[classattr]
+    const HTX: Self = Self {
+        inner: ExchangeId::Htx,
+    };
+
+    /// Kucoin exchange.
+    #[classattr]
+    const KUCOIN: Self = Self {
+        inner: ExchangeId::Kucoin,
+    };
+
+    /// Liquid exchange.
+    #[classattr]
+    const LIQUID: Self = Self {
+        inner: ExchangeId::Liquid,
+    };
+
+    /// MEXC exchange.
+    #[classattr]
+    const MEXC: Self = Self {
+        inner: ExchangeId::Mexc,
+    };
+
     /// OKX exchange.
     #[classattr]
     const OKX: Self = Self {
         inner: ExchangeId::Okx,
+    };
+
+    /// Poloniex exchange.
+    #[classattr]
+    const POLONIEX: Self = Self {
+        inner: ExchangeId::Poloniex,
     };
 
     /// Return the string representation.

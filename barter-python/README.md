@@ -311,9 +311,10 @@ underlying Barter data streaming infrastructure:
 ```python
 import barter_python as bp
 
-# Available exchanges
-print(bp.ExchangeId.BINANCE_SPOT)  # BinanceSpot
-print(bp.ExchangeId.COINBASE)      # Coinbase
+# Available exchanges (all ExchangeId variants are exposed)
+print(bp.ExchangeId.BINANCE_SPOT)   # BinanceSpot
+print(bp.ExchangeId.COINBASE)       # Coinbase
+print(bp.ExchangeId.OTHER)          # Other
 
 # Available subscription kinds
 print(bp.SubKind.PUBLIC_TRADES)    # PublicTrades

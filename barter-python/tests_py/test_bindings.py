@@ -550,9 +550,29 @@ def test_calculate_win_rate() -> None:
 
 
 def test_exchange_id_constants() -> None:
+    assert str(bp.ExchangeId.OTHER) == "Other"
+    assert str(bp.ExchangeId.SIMULATED) == "Simulated"
+    assert str(bp.ExchangeId.MOCK) == "Mock"
+    assert str(bp.ExchangeId.BINANCE_FUTURES_COIN) == "BinanceFuturesCoin"
     assert str(bp.ExchangeId.BINANCE_SPOT) == "BinanceSpot"
+    assert str(bp.ExchangeId.BINANCE_US) == "BinanceUs"
     assert str(bp.ExchangeId.COINBASE) == "Coinbase"
+    assert str(bp.ExchangeId.COINBASE_INTERNATIONAL) == "CoinbaseInternational"
+    assert str(bp.ExchangeId.CRYPTOCOM) == "Cryptocom"
+    assert str(bp.ExchangeId.BYBIT_PERPETUALS_USD) == "BybitPerpetualsUsd"
+    assert str(bp.ExchangeId.BYBIT_SPOT) == "BybitSpot"
+    assert str(bp.ExchangeId.GATEIO_FUTURES_USD) == "GateioFuturesUsd"
+    assert str(bp.ExchangeId.GATEIO_PERPETUALS_USD) == "GateioPerpetualsUsd"
+    assert str(bp.ExchangeId.GATEIO_PERPETUALS_BTC) == "GateioPerpetualsBtc"
+    assert str(bp.ExchangeId.GATEIO_OPTIONS) == "GateioOptions"
+    assert str(bp.ExchangeId.GEMINI) == "Gemini"
+    assert str(bp.ExchangeId.HITBTC) == "Hitbtc"
+    assert str(bp.ExchangeId.HTX) == "Htx"
     assert str(bp.ExchangeId.KRAKEN) == "Kraken"
+    assert str(bp.ExchangeId.KUCOIN) == "Kucoin"
+    assert str(bp.ExchangeId.MEXC) == "Mexc"
+    assert str(bp.ExchangeId.OKX) == "Okx"
+    assert str(bp.ExchangeId.POLONIEX) == "Poloniex"
 
 
 def test_sub_kind_constants() -> None:

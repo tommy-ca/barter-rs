@@ -37,12 +37,30 @@ class TestSide:
 
 class TestExchangeId:
     def test_exchange_id_enum_values(self):
+        assert ExchangeId.OTHER.value == "other"
+        assert ExchangeId.SIMULATED.value == "simulated"
+        assert ExchangeId.MOCK.value == "mock"
+        assert ExchangeId.BINANCE_FUTURES_COIN.value == "binance_futures_coin"
         assert ExchangeId.BINANCE_SPOT.value == "binance_spot"
+        assert ExchangeId.BINANCE_US.value == "binance_us"
+        assert ExchangeId.BITMART_FUTURES_USD.value == "bitmart_futures_usd"
+        assert ExchangeId.BYBIT_PERPETUALS_USD.value == "bybit_perpetuals_usd"
+        assert ExchangeId.COINBASE_INTERNATIONAL.value == "coinbase_international"
+        assert ExchangeId.CRYPTOCOM.value == "cryptocom"
+        assert ExchangeId.GATEIO_PERPETUALS_USD.value == "gateio_perpetuals_usd"
+        assert ExchangeId.GATEIO_PERPETUALS_BTC.value == "gateio_perpetuals_btc"
+        assert ExchangeId.GATEIO_OPTIONS.value == "gateio_options"
         assert ExchangeId.KRAKEN.value == "kraken"
         assert ExchangeId.HTX.value == "htx"
+        assert ExchangeId.KUCOIN.value == "kucoin"
+        assert ExchangeId.MEXC.value == "mexc"
+        assert ExchangeId.POLONIEX.value == "poloniex"
 
     def test_exchange_id_str(self):
         assert str(ExchangeId.BINANCE_SPOT) == "binance_spot"
+        assert str(ExchangeId.OTHER) == "other"
+        assert str(ExchangeId.COINBASE_INTERNATIONAL) == "coinbase_international"
+        assert str(ExchangeId.GATEIO_OPTIONS) == "gateio_options"
 
 
 class TestAssetNameInternal:
