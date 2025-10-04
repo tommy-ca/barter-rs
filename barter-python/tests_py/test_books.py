@@ -1,6 +1,7 @@
 """Tests for OrderBook bindings."""
 
 import pytest
+
 import barter_python as bp
 
 

@@ -18,12 +18,7 @@ impl PyMetric {
     /// Create a new [`Metric`].
     #[new]
     #[pyo3(signature = (name, time, tags, fields))]
-    pub fn new(
-        name: String,
-        time: u64,
-        tags: Vec<PyTag>,
-        fields: Vec<PyField>,
-    ) -> PyResult<Self> {
+    pub fn new(name: String, time: u64, tags: Vec<PyTag>, fields: Vec<PyField>) -> PyResult<Self> {
         Ok(Self {
             name,
             time,
@@ -164,31 +159,41 @@ impl PyValue {
     /// Create a float [`Value`].
     #[staticmethod]
     pub fn float(value: f64) -> Self {
-        Self { inner: Value::Float(value) }
+        Self {
+            inner: Value::Float(value),
+        }
     }
 
     /// Create an int [`Value`].
     #[staticmethod]
     pub fn int(value: i64) -> Self {
-        Self { inner: Value::Int(value) }
+        Self {
+            inner: Value::Int(value),
+        }
     }
 
     /// Create a uint [`Value`].
     #[staticmethod]
     pub fn uint(value: u64) -> Self {
-        Self { inner: Value::UInt(value) }
+        Self {
+            inner: Value::UInt(value),
+        }
     }
 
     /// Create a bool [`Value`].
     #[staticmethod]
     pub fn bool(value: bool) -> Self {
-        Self { inner: Value::Bool(value) }
+        Self {
+            inner: Value::Bool(value),
+        }
     }
 
     /// Create a string [`Value`].
     #[staticmethod]
     pub fn string(value: String) -> Self {
-        Self { inner: Value::String(value) }
+        Self {
+            inner: Value::String(value),
+        }
     }
 
     /// Check if this is a float value.
@@ -220,7 +225,9 @@ impl PyValue {
     pub fn as_float(&self) -> PyResult<f64> {
         match &self.inner {
             Value::Float(v) => Ok(*v),
-            _ => Err(pyo3::exceptions::PyTypeError::new_err("Value is not a float")),
+            _ => Err(pyo3::exceptions::PyTypeError::new_err(
+                "Value is not a float",
+            )),
         }
     }
 
@@ -228,7 +235,9 @@ impl PyValue {
     pub fn as_int(&self) -> PyResult<i64> {
         match &self.inner {
             Value::Int(v) => Ok(*v),
-            _ => Err(pyo3::exceptions::PyTypeError::new_err("Value is not an int")),
+            _ => Err(pyo3::exceptions::PyTypeError::new_err(
+                "Value is not an int",
+            )),
         }
     }
 
@@ -236,7 +245,9 @@ impl PyValue {
     pub fn as_uint(&self) -> PyResult<u64> {
         match &self.inner {
             Value::UInt(v) => Ok(*v),
-            _ => Err(pyo3::exceptions::PyTypeError::new_err("Value is not a uint")),
+            _ => Err(pyo3::exceptions::PyTypeError::new_err(
+                "Value is not a uint",
+            )),
         }
     }
 
@@ -244,7 +255,9 @@ impl PyValue {
     pub fn as_bool(&self) -> PyResult<bool> {
         match &self.inner {
             Value::Bool(v) => Ok(*v),
-            _ => Err(pyo3::exceptions::PyTypeError::new_err("Value is not a bool")),
+            _ => Err(pyo3::exceptions::PyTypeError::new_err(
+                "Value is not a bool",
+            )),
         }
     }
 
@@ -252,7 +265,9 @@ impl PyValue {
     pub fn as_string(&self) -> PyResult<&str> {
         match &self.inner {
             Value::String(v) => Ok(v),
-            _ => Err(pyo3::exceptions::PyTypeError::new_err("Value is not a string")),
+            _ => Err(pyo3::exceptions::PyTypeError::new_err(
+                "Value is not a string",
+            )),
         }
     }
 

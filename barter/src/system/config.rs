@@ -122,7 +122,9 @@ impl RiskLimits {
             value: &Option<Decimal>,
             field: &'static str,
         ) -> Result<(), RiskLimitsError> {
-            if let Some(value) = value && value <= &Decimal::ZERO {
+            if let Some(value) = value
+                && value <= &Decimal::ZERO
+            {
                 return Err(RiskLimitsError::NonPositive {
                     field,
                     value: *value,

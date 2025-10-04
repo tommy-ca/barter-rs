@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, rust_2024_compatibility)]
-#![allow(unsafe_op_in_unsafe_fn, clippy::useless_conversion, clippy::needless_borrow)]
+#![allow(
+    unsafe_op_in_unsafe_fn,
+    clippy::useless_conversion,
+    clippy::needless_borrow
+)]
 
 //! Python bindings for the Barter trading engine.
 
@@ -18,12 +22,11 @@ mod system;
 use analytics::{
     calculate_calmar_ratio, calculate_max_drawdown, calculate_mean_drawdown,
     calculate_profit_factor, calculate_rate_of_return, calculate_sharpe_ratio,
-    calculate_sortino_ratio, calculate_win_rate, generate_drawdown_series,
-    welford_calculate_mean, welford_calculate_recurrence_relation_m,
-    welford_calculate_sample_variance, welford_calculate_population_variance,
+    calculate_sortino_ratio, calculate_win_rate, generate_drawdown_series, welford_calculate_mean,
+    welford_calculate_population_variance, welford_calculate_recurrence_relation_m,
+    welford_calculate_sample_variance,
 };
-use books::{calculate_mid_price, calculate_volume_weighted_mid_price, PyLevel, PyOrderBook};
-
+use books::{PyLevel, PyOrderBook, calculate_mid_price, calculate_volume_weighted_mid_price};
 
 use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
@@ -33,7 +36,10 @@ use barter_data::{
     event::{DataKind, MarketEvent},
     streams::consumer::MarketStreamEvent,
     subscription::{
-        book::{OrderBookEvent, OrderBookL1}, candle::Candle, liquidation::Liquidation, trade::PublicTrade,
+        book::{OrderBookEvent, OrderBookL1},
+        candle::Candle,
+        liquidation::Liquidation,
+        trade::PublicTrade,
     },
 };
 use barter_execution::{
@@ -58,8 +64,13 @@ use command::{
     clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
 use config::PySystemConfig;
-use data::{PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId, init_dynamic_streams};
+use data::{
+    PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId,
+    init_dynamic_streams,
+};
+use instrument::{PyAsset, PyAssetIndex, PySide};
 use logging::{init_json_logging_py, init_tracing};
+use metric::{PyField, PyMetric, PyTag, PyValue};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use serde_json::Value as JsonValue;
 use summary::{
@@ -67,8 +78,6 @@ use summary::{
     PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
 use system::{PySystemHandle, run_historic_backtest, start_system};
-use instrument::{PyAsset, PyAssetIndex, PySide};
-use metric::{PyField, PyMetric, PyTag, PyValue};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]
@@ -601,7 +610,9 @@ impl PyEngineEvent {
 
         let order_id = OrderId::new(order_id);
 
-        if let Some(existing) = &inner.state.id && existing != &order_id {
+        if let Some(existing) = &inner.state.id
+            && existing != &order_id
+        {
             return Err(PyValueError::new_err(
                 "order_id does not match the identifier on the cancel request",
             ));
@@ -825,7 +836,10 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calculate_max_drawdown, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_mean_drawdown, m)?)?;
     m.add_function(wrap_pyfunction!(welford_calculate_mean, m)?)?;
-    m.add_function(wrap_pyfunction!(welford_calculate_recurrence_relation_m, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        welford_calculate_recurrence_relation_m,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(welford_calculate_sample_variance, m)?)?;
     m.add_function(wrap_pyfunction!(welford_calculate_population_variance, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_mid_price, m)?)?;
@@ -1108,9 +1122,15 @@ mod tests {
                         assert_eq!(order_book.bids().levels().len(), 2);
                         assert_eq!(order_book.asks().levels().len(), 2);
                         // Bids should be sorted descending
-                        assert!(order_book.bids().levels()[0].price > order_book.bids().levels()[1].price);
+                        assert!(
+                            order_book.bids().levels()[0].price
+                                > order_book.bids().levels()[1].price
+                        );
                         // Asks should be sorted ascending
-                        assert!(order_book.asks().levels()[0].price < order_book.asks().levels()[1].price);
+                        assert!(
+                            order_book.asks().levels()[0].price
+                                < order_book.asks().levels()[1].price
+                        );
                     }
                     other => panic!("unexpected market data kind: {other:?}"),
                 }
@@ -1150,9 +1170,15 @@ mod tests {
                         assert_eq!(order_book.bids().levels().len(), 2);
                         assert_eq!(order_book.asks().levels().len(), 2);
                         // Bids should be sorted descending
-                        assert!(order_book.bids().levels()[0].price > order_book.bids().levels()[1].price);
+                        assert!(
+                            order_book.bids().levels()[0].price
+                                > order_book.bids().levels()[1].price
+                        );
                         // Asks should be sorted ascending
-                        assert!(order_book.asks().levels()[0].price < order_book.asks().levels()[1].price);
+                        assert!(
+                            order_book.asks().levels()[0].price
+                                < order_book.asks().levels()[1].price
+                        );
                     }
                     other => panic!("unexpected market data kind: {other:?}"),
                 }
@@ -1403,7 +1429,13 @@ mod tests {
     fn metric_construction_and_accessors() {
         let tag = PyTag::new("key".to_string(), "value".to_string());
         let field = PyField::new("field_key".to_string(), PyValue::float(42.5));
-        let metric = PyMetric::new("test_metric".to_string(), 1234567890, vec![tag], vec![field]).unwrap();
+        let metric = PyMetric::new(
+            "test_metric".to_string(),
+            1234567890,
+            vec![tag],
+            vec![field],
+        )
+        .unwrap();
 
         assert_eq!(metric.name(), "test_metric");
         assert_eq!(metric.time(), 1234567890);

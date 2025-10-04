@@ -1,6 +1,8 @@
 #![allow(unused_imports)]
 
-use barter_data::books::{mid_price, volume_weighted_mid_price, Level, OrderBook, OrderBookSide, Bids, Asks};
+use barter_data::books::{
+    Asks, Bids, Level, OrderBook, OrderBookSide, mid_price, volume_weighted_mid_price,
+};
 use pyo3::prelude::*;
 use rust_decimal::{Decimal, prelude::FromPrimitive};
 
@@ -29,10 +31,12 @@ impl PyLevel {
             ));
         }
 
-        let price = rust_decimal::Decimal::from_f64(price)
-            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("price must be a finite numeric value"))?;
-        let amount = rust_decimal::Decimal::from_f64(amount)
-            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("amount must be a finite numeric value"))?;
+        let price = rust_decimal::Decimal::from_f64(price).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err("price must be a finite numeric value")
+        })?;
+        let amount = rust_decimal::Decimal::from_f64(amount).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err("amount must be a finite numeric value")
+        })?;
 
         Ok(Self {
             inner: Level::new(price, amount),
@@ -58,7 +62,6 @@ impl PyLevel {
         ))
     }
 }
-
 
 /// Wrapper around [`OrderBook`] for Python exposure.
 #[pyclass(module = "barter_python", name = "OrderBook", unsendable)]
@@ -91,10 +94,12 @@ impl PyOrderBook {
                         "bid amount must be non-negative and finite",
                     ));
                 }
-                let price = rust_decimal::Decimal::from_f64(p)
-                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("bid price must be finite"))?;
-                let amount = rust_decimal::Decimal::from_f64(a)
-                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("bid amount must be finite"))?;
+                let price = rust_decimal::Decimal::from_f64(p).ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("bid price must be finite")
+                })?;
+                let amount = rust_decimal::Decimal::from_f64(a).ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("bid amount must be finite")
+                })?;
                 Ok(Level::new(price, amount))
             })
             .collect::<PyResult<Vec<_>>>()?;
@@ -112,10 +117,12 @@ impl PyOrderBook {
                         "ask amount must be non-negative and finite",
                     ));
                 }
-                let price = rust_decimal::Decimal::from_f64(p)
-                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("ask price must be finite"))?;
-                let amount = rust_decimal::Decimal::from_f64(a)
-                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("ask amount must be finite"))?;
+                let price = rust_decimal::Decimal::from_f64(p).ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("ask price must be finite")
+                })?;
+                let amount = rust_decimal::Decimal::from_f64(a).ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("ask amount must be finite")
+                })?;
                 Ok(Level::new(price, amount))
             })
             .collect::<PyResult<Vec<_>>>()?;
@@ -139,12 +146,22 @@ impl PyOrderBook {
 
     /// Get the bids as list of (price, amount) tuples.
     fn bids(&self) -> Vec<(String, String)> {
-        self.inner.bids().levels().iter().map(|l| (l.price.to_string(), l.amount.to_string())).collect()
+        self.inner
+            .bids()
+            .levels()
+            .iter()
+            .map(|l| (l.price.to_string(), l.amount.to_string()))
+            .collect()
     }
 
     /// Get the asks as list of (price, amount) tuples.
     fn asks(&self) -> Vec<(String, String)> {
-        self.inner.asks().levels().iter().map(|l| (l.price.to_string(), l.amount.to_string())).collect()
+        self.inner
+            .asks()
+            .levels()
+            .iter()
+            .map(|l| (l.price.to_string(), l.amount.to_string()))
+            .collect()
     }
 
     /// Calculate the mid-price.
@@ -180,7 +197,12 @@ pub fn calculate_mid_price(best_bid_price: f64, best_ask_price: f64) -> PyResult
 
 /// Calculate the volume weighted mid-price from best bid and ask levels.
 #[pyfunction]
-pub fn calculate_volume_weighted_mid_price(best_bid_price: f64, best_bid_amount: f64, best_ask_price: f64, best_ask_amount: f64) -> PyResult<String> {
+pub fn calculate_volume_weighted_mid_price(
+    best_bid_price: f64,
+    best_bid_amount: f64,
+    best_ask_price: f64,
+    best_ask_amount: f64,
+) -> PyResult<String> {
     let bid_price = rust_decimal::Decimal::from_f64(best_bid_price)
         .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("best_bid_price must be finite"))?;
     let bid_amount = rust_decimal::Decimal::from_f64(best_bid_amount)

@@ -1,3 +1,4 @@
+use barter::backtest::summary::{BacktestSummary, MultiBacktestSummary};
 use barter::statistic::{
     metric::{
         calmar::CalmarRatio,
@@ -9,7 +10,6 @@ use barter::statistic::{
     summary::{TradingSummary, asset::TearSheetAsset, instrument::TearSheet},
     time::TimeInterval,
 };
-use barter::backtest::summary::{BacktestSummary, MultiBacktestSummary};
 use barter_execution::balance::Balance;
 use chrono::{DateTime, Utc};
 use pyo3::{
@@ -722,10 +722,15 @@ impl PyBacktestSummary {
     fn dictionary(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new_bound(py);
         dict.set_item("id", &self.id)?;
-        dict.set_item("risk_free_return", decimal_to_py(py, self.risk_free_return)?)?;
+        dict.set_item(
+            "risk_free_return",
+            decimal_to_py(py, self.risk_free_return)?,
+        )?;
         dict.set_item(
             "trading_summary",
-            self.trading_summary.clone_ref(py).call_method0(py, "to_dict")?,
+            self.trading_summary
+                .clone_ref(py)
+                .call_method0(py, "to_dict")?,
         )?;
         Ok(dict.into())
     }

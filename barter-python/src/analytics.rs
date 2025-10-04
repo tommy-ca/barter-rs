@@ -501,7 +501,8 @@ pub fn welford_calculate_mean(
     let next_value_decimal = parse_decimal(next_value, "next_value")?;
     let count_decimal = parse_decimal(count, "count")?;
 
-    let result = welford_online::calculate_mean(prev_mean_decimal, next_value_decimal, count_decimal);
+    let result =
+        welford_online::calculate_mean(prev_mean_decimal, next_value_decimal, count_decimal);
     decimal_to_py(py, result)
 }
 

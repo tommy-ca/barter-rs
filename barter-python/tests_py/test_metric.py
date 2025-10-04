@@ -1,6 +1,7 @@
 """Tests for metric bindings."""
 
 import pytest
+
 from barter_python import Field, Metric, Tag, Value
 
 

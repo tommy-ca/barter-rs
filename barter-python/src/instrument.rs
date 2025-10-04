@@ -1,4 +1,7 @@
-use barter_instrument::{asset::{Asset, AssetIndex}, Side};
+use barter_instrument::{
+    Side,
+    asset::{Asset, AssetIndex},
+};
 use pyo3::prelude::*;
 
 /// Wrapper around [`Asset`] for Python exposure.
@@ -50,7 +53,11 @@ impl PyAsset {
 
     /// Return the debug representation.
     fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("Asset(name_internal='{}', name_exchange='{}')", self.name_internal(), self.name_exchange()))
+        Ok(format!(
+            "Asset(name_internal='{}', name_exchange='{}')",
+            self.name_internal(),
+            self.name_exchange()
+        ))
     }
 }
 
@@ -65,15 +72,11 @@ pub struct PySide {
 impl PySide {
     /// Buy side.
     #[classattr]
-    const BUY: Self = Self {
-        inner: Side::Buy,
-    };
+    const BUY: Self = Self { inner: Side::Buy };
 
     /// Sell side.
     #[classattr]
-    const SELL: Self = Self {
-        inner: Side::Sell,
-    };
+    const SELL: Self = Self { inner: Side::Sell };
 
     /// Return the string representation.
     fn __str__(&self) -> String {

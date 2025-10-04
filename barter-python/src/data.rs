@@ -4,7 +4,6 @@ use barter_data::{
     streams::builder::dynamic::DynamicStreams,
     subscription::{SubKind, Subscription},
 };
-use barter_integration::subscription::SubscriptionId;
 use barter_instrument::{
     exchange::ExchangeId,
     instrument::{
@@ -12,6 +11,7 @@ use barter_instrument::{
         market_data::{MarketDataInstrument, kind::MarketDataInstrumentKind},
     },
 };
+use barter_integration::subscription::SubscriptionId;
 use pyo3::prelude::*;
 
 /// Wrapper around [`ExchangeId`] for Python exposure.

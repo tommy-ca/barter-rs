@@ -18,10 +18,7 @@ use barter::{
     logging::init_logging,
     risk::DefaultRiskManager,
     statistic::{summary::instrument::TearSheetGenerator, time::Daily},
-    strategy::{
-        DefaultStrategy,
-        algo::AlgoStrategy,
-    },
+    strategy::{DefaultStrategy, algo::AlgoStrategy},
     system::{
         builder::{AuditMode, EngineFeedMode, SystemArgs, SystemBuilder},
         config::SystemConfig,
@@ -40,9 +37,7 @@ use barter_execution::{
     },
 };
 use barter_instrument::{
-    exchange::ExchangeIndex,
-    index::IndexedInstruments,
-    instrument::InstrumentIndex,
+    exchange::ExchangeIndex, index::IndexedInstruments, instrument::InstrumentIndex,
 };
 use barter_integration::Terminal;
 use chrono::{DateTime, Utc};
