@@ -753,3 +753,104 @@ class MarketDataInstrument:
 
     def __hash__(self) -> int:
         return hash((self.base, self.quote, self.kind))
+
+
+class ExchangeIndex:
+    """Index for an exchange in IndexedInstruments."""
+
+    def __init__(self, index: int) -> None:
+        self._index = index
+
+    @property
+    def index(self) -> int:
+        return self._index
+
+    @classmethod
+    def new(cls, index: int) -> ExchangeIndex:
+        return cls(index)
+
+    def __repr__(self) -> str:
+        return f"ExchangeIndex({self._index})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ExchangeIndex):
+            return NotImplemented
+        return self._index == other._index
+
+    def __hash__(self) -> int:
+        return hash(self._index)
+
+
+class AssetIndex:
+    """Index for an asset in IndexedInstruments."""
+
+    def __init__(self, index: int) -> None:
+        self._index = index
+
+    @property
+    def index(self) -> int:
+        return self._index
+
+    @classmethod
+    def new(cls, index: int) -> AssetIndex:
+        return cls(index)
+
+    def __repr__(self) -> str:
+        return f"AssetIndex({self._index})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AssetIndex):
+            return NotImplemented
+        return self._index == other._index
+
+    def __hash__(self) -> int:
+        return hash(self._index)
+
+
+class InstrumentIndex:
+    """Index for an instrument in IndexedInstruments."""
+
+    def __init__(self, index: int) -> None:
+        self._index = index
+
+    @property
+    def index(self) -> int:
+        return self._index
+
+    @classmethod
+    def new(cls, index: int) -> InstrumentIndex:
+        return cls(index)
+
+    def __repr__(self) -> str:
+        return f"InstrumentIndex({self._index})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, InstrumentIndex):
+            return NotImplemented
+        return self._index == other._index
+
+    def __hash__(self) -> int:
+        return hash(self._index)
+
+
+class ExchangeAsset:
+    """Asset associated with a specific exchange."""
+
+    def __init__(self, exchange: ExchangeId, asset: Asset) -> None:
+        self.exchange = exchange
+        self.asset = asset
+
+    @classmethod
+    def new(cls, exchange: ExchangeId, asset: Asset) -> ExchangeAsset:
+        return cls(exchange, asset)
+
+    def __repr__(self) -> str:
+        return f"ExchangeAsset(exchange={self.exchange!r}, asset={self.asset!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ExchangeAsset):
+            return NotImplemented
+        return self.exchange == other.exchange and self.asset == other.asset
+
+    def __hash__(self) -> int:
+        return hash((self.exchange, self.asset))

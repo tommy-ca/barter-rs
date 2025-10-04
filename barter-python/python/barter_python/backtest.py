@@ -6,7 +6,7 @@ import asyncio
 import json
 import time
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -14,9 +14,12 @@ from typing import AsyncIterable, Generic, Iterable, Protocol, TypeVar
 
 from .data import MarketEvent, DataKind, PublicTrade, OrderBookL1, Candle, Liquidation, as_public_trade, as_candle
 from .execution import AccountEvent
+from .instrument import (
+    Asset, AssetIndex, AssetNameInternal, ExchangeAsset, ExchangeId, ExchangeIndex,
+    Instrument, InstrumentIndex, InstrumentNameInternal, Keyed, Underlying
+)
 from .statistic import TimeInterval
 from .strategy import AlgoStrategy, ClosePositionsStrategy, OnDisconnectStrategy, OnTradingDisabledStrategy, EngineState, InstrumentState, Position
-from . import TradingSummary
 
 # Type variables for generic backtest interfaces
 MarketEventKind = TypeVar("MarketEventKind")
@@ -27,11 +30,22 @@ Risk = TypeVar("Risk")
 SummaryInterval = TypeVar("SummaryInterval", bound=TimeInterval)
 
 
+@dataclass(frozen=True)
+class TradingSummary(Generic[SummaryInterval]):
+    """Placeholder for TradingSummary - to be implemented with full statistics."""
+
+    time_engine_start: datetime
+    time_engine_end: datetime
+    instrument_tear_sheets: list = field(default_factory=list)
+    asset_tear_sheets: list = field(default_factory=list)
+    portfolio_tear_sheet: object = None
+
+
 class BacktestMarketData(Protocol[MarketEventKind]):
     """Protocol for market data sources used in backtests."""
 
     @abstractmethod
-    async def stream(self) -> AsyncIterable[MarketEvent[int, DataKind]]:
+    def stream(self) -> AsyncIterable[MarketEvent[int, DataKind]]:
         """Return an async iterable of market events for the backtest."""
         ...
 
@@ -127,10 +141,12 @@ class MarketDataInMemory:
 
         return cls(_time_first_event=first_time, events=events)  # type: ignore
 
-    async def stream(self) -> AsyncIterable[MarketEvent[int, DataKind]]:
+    def stream(self) -> AsyncIterable[MarketEvent[int, DataKind]]:
         """Return an async iterable of market events."""
-        for event in self.events:
-            yield event
+        async def _gen():
+            for event in self.events:
+                yield event
+        return _gen()
 
     async def time_first_event(self) -> datetime:
         """Return the timestamp of the first market event."""
@@ -205,7 +221,7 @@ async def run_backtests(
 
     total_duration = time.time() - start_time
 
-    return MultiBacktestSummary.new(total_duration, summaries)
+    return MultiBacktestSummary(total_duration, summaries)
 
 
 async def backtest(
@@ -221,22 +237,20 @@ async def backtest(
     Returns:
         Summary of the backtest results
     """
-    # Initialize engine simulator
-    simulator = BacktestEngineSimulator(args_constant.engine_state)
-
     # Track start time
     time_start = await args_constant.market_data.time_first_event()
+
+    # Initialize simulator
+    simulator = BacktestEngineSimulator(args_constant.engine_state)
+    simulator.start_time = time_start
 
     # Process market events
     async for market_event in args_constant.market_data.stream():
         # Update engine state with market data
         await simulator.process_market_event(market_event)
 
-        # Generate orders using strategy
-        # cancel_requests, open_requests = args_dynamic.strategy.generate_algo_orders(simulator.state)
-
-        # Process orders and account events
-        # This would update positions, balances, etc.
+        # TODO: Generate orders using strategy
+        # TODO: Process orders and account events
 
     # Generate trading summary
     trading_summary = simulator.get_trading_summary(args_dynamic.risk_free_return, args_constant.summary_interval)
@@ -248,36 +262,38 @@ async def backtest(
     )
 
 
-# Placeholder types for backtest configuration
+# Simplified IndexedInstruments for backtest use
 class IndexedInstruments:
-    """Indexed collection of exchanges, assets, and instruments for efficient lookup."""
+    """Indexed collection of instruments for backtest."""
 
-    def __init__(self, exchanges=None, assets=None, instruments=None):
-        self._exchanges = exchanges or []
-        self._assets = assets or []
-        self._instruments = instruments or []
+    def __init__(self, instruments: list[Instrument[Asset]]):
+        self._instruments = instruments
 
     @classmethod
-    def new(cls, instruments):
+    def new(cls, instruments: list[Instrument[Asset]]) -> IndexedInstruments:
         """Create IndexedInstruments from a list of instruments."""
-        # Simple implementation - in practice this would do proper indexing
-        return cls(instruments=instruments)
+        return cls(instruments)
 
-    def exchanges(self):
-        return self._exchanges
-
-    def assets(self):
-        return self._assets
-
-    def instruments(self):
+    def instruments(self) -> list[Instrument[Asset]]:
+        """Return the instruments."""
         return self._instruments
 
+
+class MockExecutionConfig:
+    """Configuration for mock execution."""
+
+    def __init__(self, initial_balances=None):
+        self.initial_balances = initial_balances or {}
 
 class ExecutionConfig:
     """Configuration for execution links."""
 
-    def __init__(self, mock_config=None):
+    def __init__(self, mock_config: MockExecutionConfig):
         self.mock_config = mock_config
+
+    @classmethod
+    def mock(cls, mock_config: MockExecutionConfig) -> ExecutionConfig:
+        return cls(mock_config)
 
 
 class BacktestEngineSimulator:
