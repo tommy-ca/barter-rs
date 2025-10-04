@@ -21,7 +21,6 @@ from .instrument import (
 )
 from .risk import RiskManager
 from .statistic import TimeInterval, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
-from .strategy import EngineState
 
 # Type variables for generic backtest interfaces
 MarketEventKind = TypeVar("MarketEventKind")
