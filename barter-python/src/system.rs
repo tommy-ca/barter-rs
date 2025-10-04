@@ -1,6 +1,6 @@
 use crate::{
     PyEngineEvent,
-    command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen},
+    command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen, parse_decimal},
     config::PySystemConfig,
     summary::{PyTradingSummary, summary_to_py},
 };
@@ -30,10 +30,17 @@ use barter_data::{
         reconnect::{Event, stream::ReconnectingStream},
     },
 };
-use barter_instrument::{index::IndexedInstruments, instrument::InstrumentIndex};
+use barter_execution::balance::Balance;
+use barter_instrument::{
+    Keyed,
+    asset::{ExchangeAsset, name::AssetNameInternal},
+    exchange::ExchangeId,
+    index::IndexedInstruments,
+    instrument::InstrumentIndex,
+};
 use barter_integration::channel::Tx;
 use futures::{Stream, StreamExt, stream};
-use pyo3::{exceptions::PyValueError, prelude::*};
+use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyDict};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 use std::{
@@ -218,14 +225,21 @@ impl PySystemHandle {
 
 /// Start a live or paper trading system using the provided configuration.
 #[pyfunction]
-#[pyo3(signature = (config, *, trading_enabled = true))]
-pub fn start_system(config: &PySystemConfig, trading_enabled: bool) -> PyResult<PySystemHandle> {
+#[pyo3(signature = (config, *, trading_enabled = true, initial_balances = None))]
+pub fn start_system(
+    py: Python<'_>,
+    config: &PySystemConfig,
+    trading_enabled: bool,
+    initial_balances: Option<PyObject>,
+) -> PyResult<PySystemHandle> {
     let runtime = Arc::new(
         RuntimeBuilder::new_multi_thread()
             .enable_all()
             .build()
             .map_err(|err| PyValueError::new_err(err.to_string()))?,
     );
+
+    let seeded_balances = parse_initial_balances(py, initial_balances)?;
 
     let mut config_inner = config.clone_inner();
     let instruments = IndexedInstruments::new(config_inner.instruments.drain(..));
@@ -252,6 +266,7 @@ pub fn start_system(config: &PySystemConfig, trading_enabled: bool) -> PyResult<
         .engine_feed_mode(EngineFeedMode::Stream)
         .audit_mode(AuditMode::Disabled)
         .trading_state(trading_state)
+        .balances(seeded_balances)
         .build::<EngineEvent, _>()
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
@@ -264,16 +279,19 @@ pub fn start_system(config: &PySystemConfig, trading_enabled: bool) -> PyResult<
 
 /// Run a historic backtest using a [`SystemConfig`] and market data events encoded as JSON.
 #[pyfunction]
-#[pyo3(signature = (config, market_data_path, risk_free_return = 0.05, interval = None))]
+#[pyo3(signature = (config, market_data_path, risk_free_return = 0.05, interval = None, initial_balances = None))]
 pub fn run_historic_backtest(
     py: Python<'_>,
     config: &PySystemConfig,
     market_data_path: &str,
     risk_free_return: f64,
     interval: Option<&str>,
+    initial_balances: Option<PyObject>,
 ) -> PyResult<Py<PyTradingSummary>> {
     let (clock, market_stream) =
         load_historic_clock_and_market_stream(Path::new(market_data_path))?;
+
+    let seeded_balances = parse_initial_balances(py, initial_balances)?;
 
     let mut config_inner = config.clone_inner();
     let instruments = IndexedInstruments::new(config_inner.instruments.drain(..));
@@ -298,6 +316,7 @@ pub fn run_historic_backtest(
         .engine_feed_mode(EngineFeedMode::Stream)
         .audit_mode(AuditMode::Disabled)
         .trading_state(TradingState::Enabled)
+        .balances(seeded_balances)
         .build::<EngineEvent, _>()
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
@@ -353,6 +372,115 @@ enum SummaryInterval {
     Daily,
     Annual252,
     Annual365,
+}
+
+fn parse_initial_balances(
+    py: Python<'_>,
+    values: Option<PyObject>,
+) -> PyResult<Vec<Keyed<ExchangeAsset<AssetNameInternal>, Balance>>> {
+    let Some(values) = values else {
+        return Ok(Vec::new());
+    };
+
+    let values = values.bind(py);
+
+    if values.is_none() {
+        return Ok(Vec::new());
+    }
+
+    let items: Vec<PyObject> = values.extract()?;
+    let mut results = Vec::with_capacity(items.len());
+
+    for (index, item) in items.into_iter().enumerate() {
+        let mapping = item.bind(py).downcast::<PyDict>().map_err(|_| {
+            PyValueError::new_err(format!("initial_balances[{index}] must be a mapping"))
+        })?;
+
+        let entry = parse_initial_balance_entry(index, &mapping)?;
+        results.push(entry);
+    }
+
+    Ok(results)
+}
+
+fn parse_initial_balance_entry(
+    index: usize,
+    mapping: &Bound<'_, PyDict>,
+) -> PyResult<Keyed<ExchangeAsset<AssetNameInternal>, Balance>> {
+    let exchange_value = mapping.get_item("exchange")?.ok_or_else(|| {
+        PyValueError::new_err(format!(
+            "initial_balances[{index}] missing 'exchange' field"
+        ))
+    })?;
+
+    let exchange_label: String = exchange_value.extract().map_err(|_| {
+        PyValueError::new_err(format!(
+            "initial_balances[{index}].exchange must be a string"
+        ))
+    })?;
+    let exchange = parse_exchange_identifier(index, &exchange_label)?;
+
+    let asset_value = mapping.get_item("asset")?.ok_or_else(|| {
+        PyValueError::new_err(format!("initial_balances[{index}] missing 'asset' field"))
+    })?;
+
+    let asset_label: String = asset_value.extract().map_err(|_| {
+        PyValueError::new_err(format!("initial_balances[{index}].asset must be a string"))
+    })?;
+
+    let total_value = mapping.get_item("total")?.ok_or_else(|| {
+        PyValueError::new_err(format!("initial_balances[{index}] missing 'total' field"))
+    })?;
+
+    let total_label = format!("initial_balances[{index}].total");
+    let total = parse_decimal(
+        total_value
+            .extract::<f64>()
+            .map_err(|_| PyValueError::new_err(format!("{} must be numeric", total_label)))?,
+        &total_label,
+    )?;
+
+    let free = match mapping.get_item("free")? {
+        Some(value) => {
+            let free_label = format!("initial_balances[{index}].free");
+            parse_decimal(
+                value.extract::<f64>().map_err(|_| {
+                    PyValueError::new_err(format!("{} must be numeric", free_label))
+                })?,
+                &free_label,
+            )?
+        }
+        None => total,
+    };
+
+    if free > total {
+        return Err(PyValueError::new_err(format!(
+            "initial_balances[{index}] free balance cannot exceed total"
+        )));
+    }
+
+    let asset = AssetNameInternal::from(asset_label.as_str());
+    let balance = Balance::new(total, free);
+
+    Ok(Keyed::new(ExchangeAsset::new(exchange, asset), balance))
+}
+
+fn parse_exchange_identifier(index: usize, raw: &str) -> PyResult<ExchangeId> {
+    let normalized = raw.trim();
+    if normalized.is_empty() {
+        return Err(PyValueError::new_err(format!(
+            "initial_balances[{index}].exchange must not be empty"
+        )));
+    }
+
+    let normalized = normalized.to_ascii_lowercase();
+    let quoted = format!("\"{}\"", normalized);
+
+    serde_json::from_str::<ExchangeId>(&quoted).map_err(|_| {
+        PyValueError::new_err(format!(
+            "initial_balances[{index}].exchange '{raw}' is not a recognised exchange"
+        ))
+    })
 }
 
 fn load_historic_clock_and_market_stream(

@@ -42,6 +42,24 @@ summary_dict = summary.to_dict()
 print(summary_dict["instruments"][first_name]["pnl"])
 PY
 
+# Seed initial balances when starting from Python
+python - <<'PY'
+import barter_python as bp
+
+config = bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
+handle = bp.start_system(
+    config,
+    trading_enabled=False,
+    initial_balances=[
+        {"exchange": "binance_spot", "asset": "usdt", "total": 4321.5, "free": 2100.25},
+    ],
+)
+summary = handle.shutdown_with_summary()
+
+assets = summary.assets
+print(assets["binance_spot:usdt"].balance_end.total)
+PY
+
 # Calculate portfolio analytics directly from summary inputs
 python - <<'PY'
 import barter_python as bp
@@ -85,6 +103,11 @@ python examples/backtest_cli.py \
 Both `SystemHandle.shutdown_with_summary` and `run_historic_backtest` accept an optional
 `interval` argument (`"daily"`, `"annual_252"`, or `"annual_365"`, case-insensitive) which controls
 how risk and return metrics are annualised in the generated trading summary.
+
+`start_system` and `run_historic_backtest` also accept an `initial_balances` keyword. Provide an
+iterable of mapping objects with `exchange`, `asset`, `total`, and optional `free` fields (using the
+snake_case `ExchangeId` names such as `binance_spot`) to seed the engine's account balances before
+execution. When omitted, balances default to the data loaded from the system configuration.
 
 ### Risk Configuration
 

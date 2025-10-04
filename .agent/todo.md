@@ -58,4 +58,4 @@
 - [x] Refresh package metadata (version bump + release notes) once analytics helpers land. (2025-10-04)
 
 ## Upcoming (2025-10-04)
-- [ ] Allow seeding initial balances when starting systems or running historic backtests from Python bindings.
+- [x] Allow seeding initial balances when starting systems or running historic backtests from Python bindings. (2025-10-04)
