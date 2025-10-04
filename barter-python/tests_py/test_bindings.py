@@ -445,3 +445,43 @@ def test_account_order_cancelled_helper() -> None:
         cancelled["state"]["Ok"]["time_exchange"]
         == timestamp.isoformat().replace("+00:00", "Z")
     )
+
+
+def test_calculate_rate_of_return() -> None:
+    metric = bp.calculate_rate_of_return(mean_return=0.01, interval="daily")
+
+    assert metric.interval == "Daily"
+    assert metric.value == Decimal("0.01")
+
+    # Test scaling to annual
+    annual = bp.calculate_rate_of_return(
+        mean_return=0.01, interval="daily", target_interval="annual_365"
+    )
+
+    assert annual.interval == "Annual(365)"
+    # Approximate annualization: (1 + 0.01)^365 - 1 ≈ 3.651757
+    assert annual.value > Decimal("3.6")
+    assert annual.value < Decimal("3.7")
+
+
+def test_calculate_profit_factor() -> None:
+    factor = bp.calculate_profit_factor(profits_gross_abs=100.0, losses_gross_abs=50.0)
+
+    assert factor is not None
+    assert factor == Decimal("2.0")
+
+    # No losses (returns MAX)
+    no_losses = bp.calculate_profit_factor(profits_gross_abs=100.0, losses_gross_abs=0.0)
+    assert no_losses is not None
+    assert str(no_losses) == "79228162514264337593543950335"  # Decimal::MAX
+
+
+def test_calculate_win_rate() -> None:
+    rate = bp.calculate_win_rate(wins=7, total=10)
+
+    assert rate is not None
+    assert rate == Decimal("0.7")
+
+    # No trades
+    no_trades = bp.calculate_win_rate(wins=0, total=0)
+    assert no_trades is None
