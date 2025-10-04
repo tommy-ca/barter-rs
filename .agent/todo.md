@@ -56,10 +56,11 @@
       `calculate_max_drawdown`, `calculate_mean_drawdown`) in Python bindings
       (2025-10-04).
 
-## Completed (2025-10-04)
+ ## Completed (2025-10-04)
 - [x] Expose Python helpers for profit factor and win rate calculations (bindings + pytest coverage). (2025-10-04)
 - [x] Add `calculate_rate_of_return` with optional target interval scaling (bindings + pytest coverage). (2025-10-04)
 - [x] Refresh package metadata (version bump + release notes) once analytics helpers land. (2025-10-04)
+- [x] Complete pure Python port of barter-statistic module with comprehensive tests (77 tests covering all metrics, drawdown analytics, and time intervals). (2025-10-04)
 
  ## Completed (2025-10-04)
 - [x] Allow seeding initial balances when starting systems or running historic backtests from Python bindings. (2025-10-04)
