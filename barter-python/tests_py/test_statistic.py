@@ -9,6 +9,7 @@ from barter_python.statistic import (
     CalmarRatio,
     Daily,
     ProfitFactor,
+    RateOfReturn,
     SharpeRatio,
     SortinoRatio,
     TimeDeltaInterval,
@@ -386,3 +387,70 @@ class TestWinRate:
         result = WinRate.calculate(Decimal('6'), Decimal('10'))
         assert result is not None
         assert result.value == Decimal('0.6')
+
+
+class TestRateOfReturn:
+    def test_calculate_normal_case(self):
+        mean_return = Decimal('0.0025')  # 0.25%
+        time_period = Daily()
+
+        actual = RateOfReturn.calculate(mean_return, time_period)
+
+        assert actual.value == Decimal('0.0025')
+        assert actual.interval == time_period
+
+    def test_calculate_zero(self):
+        mean_return = Decimal('0.0')
+        time_period = Daily()
+
+        actual = RateOfReturn.calculate(mean_return, time_period)
+
+        assert actual.value == Decimal('0.0')
+        assert actual.interval == time_period
+
+    def test_calculate_negative(self):
+        mean_return = Decimal('-0.0025')  # -0.25%
+        time_period = Daily()
+
+        actual = RateOfReturn.calculate(mean_return, time_period)
+
+        assert actual.value == Decimal('-0.0025')
+        assert actual.interval == time_period
+
+    def test_scale_daily_to_annual(self):
+        # For returns, we use linear scaling (multiply by 252) not square root scaling
+        daily = RateOfReturn(
+            value=Decimal('0.01'),  # 1% daily return
+            interval=Daily(),
+        )
+
+        actual = daily.scale(Annual252())
+
+        expected_value = Decimal('2.52')  # Should be 252% annual return
+        assert actual.value == expected_value
+        assert isinstance(actual.interval, Annual252)
+
+    def test_scale_zero(self):
+        # Zero returns should remain zero when scaled
+        daily = RateOfReturn(
+            value=Decimal('0.0'),
+            interval=Daily(),
+        )
+
+        actual = daily.scale(Annual252())
+
+        assert actual.value == Decimal('0.0')
+        assert isinstance(actual.interval, Annual252)
+
+    def test_scale_negative(self):
+        # Negative returns should scale linearly while maintaining sign
+        daily = RateOfReturn(
+            value=Decimal('-0.01'),  # -1% daily return
+            interval=Daily(),
+        )
+
+        actual = daily.scale(Annual252())
+
+        expected_value = Decimal('-2.52')  # Should be -252% annual return
+        assert actual.value == expected_value
+        assert isinstance(actual.interval, Annual252)

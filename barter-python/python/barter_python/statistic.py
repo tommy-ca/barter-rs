@@ -288,3 +288,40 @@ class WinRate:
         else:
             value = abs(wins) / abs(total)
             return cls(value=value)
+
+
+@dataclass(frozen=True)
+class RateOfReturn(Generic[IntervalT]):
+    """Rate of Return value over a specific time interval.
+
+    Rate of Return measures the percentage change in value over a time period.
+    Unlike risk-adjusted metrics, returns scale linearly with time.
+    """
+
+    value: Decimal
+    interval: IntervalT
+
+    @classmethod
+    def calculate(cls, mean_return: Decimal, returns_period: IntervalT) -> RateOfReturn[IntervalT]:
+        """Calculate the RateOfReturn over the provided time interval."""
+        return cls(value=mean_return, interval=returns_period)
+
+    def scale(self, target: TimeInterval) -> RateOfReturn[TimeInterval]:
+        """Scale the RateOfReturn from current interval to target interval.
+
+        Unlike risk metrics which use square root scaling, RateOfReturn scales linearly
+        with time.
+
+        For example, a 1% daily return scales to approximately 252% annual return (not √252%).
+
+        This assumes simple interest rather than compound interest.
+        """
+        # Determine scale factor: linear scaling of Self Intervals in Target Intervals
+        target_secs = Decimal(str(target.interval.total_seconds()))
+        current_secs = Decimal(str(self.interval.interval.total_seconds()))
+
+        scale = target_secs / current_secs
+
+        new_value = self.value * scale
+
+        return RateOfReturn(value=new_value, interval=target)
