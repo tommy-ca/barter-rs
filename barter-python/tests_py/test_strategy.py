@@ -1,4 +1,6 @@
-"""Unit tests for pure Python strategy implementations."""
+"""Unit tests for strategy helpers leveraging Rust bindings."""
+
+import pytest
 
 from barter_python.execution import ClientOrderId, OrderKind, StrategyId, TimeInForce
 from barter_python.instrument import Side
@@ -67,6 +69,21 @@ class TestClosePositionsStrategy:
         assert str(request.state.price) == "29500.0"
         assert str(request.state.quantity) == "50.0"
 
+    def test_build_ioc_market_order_negative_quantity(self):
+        """Negative quantity inputs should raise ValueError."""
+        position = Position(
+            instrument=1, side=Side.BUY, quantity_abs=-1.0, entry_price=50000.0
+        )
+        strategy_id = StrategyId.new("test-strategy")
+
+        with pytest.raises(ValueError):
+            build_ioc_market_order_to_close_position(
+                exchange=0,
+                position=position,
+                strategy_id=strategy_id,
+                price=51000.0,
+            )
+
     def test_close_open_positions_with_market_orders(self):
         """Test closing multiple open positions with market orders."""
         strategy_id = StrategyId.new("close-strategy")
@@ -90,12 +107,6 @@ class TestClosePositionsStrategy:
                 exchange=0,
                 position=None,  # No position
                 price=40000.0,
-            ),
-            InstrumentState(
-                instrument=3,
-                exchange=0,
-                position=Position(3, Side.BUY, 25.0, 20000.0),
-                price=None,  # No price
             ),
         ]
 
@@ -165,6 +176,42 @@ class TestClosePositionsStrategy:
         open_requests = list(open_requests)
         assert len(open_requests) == 1
         assert open_requests[0].key.cid.value == "custom-0"
+
+    def test_close_open_positions_missing_price_raises(self):
+        """Missing market price should raise a ValueError."""
+        strategy_id = StrategyId.new("close-strategy")
+
+        instruments = [
+            InstrumentState(
+                instrument=0,
+                exchange=0,
+                position=Position(0, Side.BUY, 100.0, 50000.0),
+                price=None,
+            ),
+        ]
+
+        state = EngineState(instruments)
+
+        with pytest.raises(ValueError):
+            close_open_positions_with_market_orders(strategy_id, state)
+
+    def test_close_open_positions_negative_quantity_raises(self):
+        """Negative position quantities should raise a ValueError."""
+        strategy_id = StrategyId.new("close-strategy")
+
+        instruments = [
+            InstrumentState(
+                instrument=0,
+                exchange=0,
+                position=Position(0, Side.BUY, -10.0, 50000.0),
+                price=51000.0,
+            ),
+        ]
+
+        state = EngineState(instruments)
+
+        with pytest.raises(ValueError):
+            close_open_positions_with_market_orders(strategy_id, state)
 
 
 class TestDisconnectStrategies:

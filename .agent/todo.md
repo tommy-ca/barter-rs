@@ -27,10 +27,10 @@
   - [x] Extend pytest coverage for Snapshot round-trips.
 - [x] Implement Python engine account event processing to update balances, orders, and positions from execution events. (2025-10-04)
 - [x] Add pytest coverage for account event handling (snapshot, balance updates, order cancellations, trades). (2025-10-04)
-- [ ] Replace Python close-position helpers with Rust-backed bindings (spec: `.agent/specs/python-strategy-bindings.md`).
-  - [ ] Add pytest coverage for Rust-backed close position helpers.
-  - [ ] Implement PyO3 strategy bindings and wire through Python package.
-  - [ ] Validate ergonomics & docs for strategy helpers post binding switch.
+- [x] Replace Python close-position helpers with Rust-backed bindings (spec: `.agent/specs/python-strategy-bindings.md`).
+  - [x] Add pytest coverage for Rust-backed close position helpers.
+  - [x] Implement PyO3 strategy bindings and wire through Python package.
+  - [x] Validate ergonomics & docs for strategy helpers post binding switch.
 
 ## Planned (2025-10-03)
 - [x] Update top-level README with Python quickstart guidance. (2025-10-04)

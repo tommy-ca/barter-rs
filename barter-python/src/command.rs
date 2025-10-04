@@ -43,7 +43,7 @@ impl PyOrderKey {
         self.inner.clone()
     }
 
-    fn from_parts(
+    pub(crate) fn from_parts(
         exchange: ExchangeIndex,
         instrument: InstrumentIndex,
         strategy: StrategyId,
@@ -85,15 +85,27 @@ impl PyOrderKey {
 
     /// Construct an [`OrderKey`] from wrapper indices.
     #[staticmethod]
-    #[pyo3(name = "from_indices", signature = (exchange, instrument, strategy, cid=None))]
+    #[pyo3(
+        name = "from_indices",
+        signature = (exchange, instrument, strategy, cid=None, client_order_id=None)
+    )]
     pub fn from_indices(
         exchange: &PyExchangeIndex,
         instrument: &PyInstrumentIndex,
         strategy: &Bound<'_, PyAny>,
         cid: Option<&Bound<'_, PyAny>>,
+        client_order_id: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        if cid.is_some() && client_order_id.is_some() {
+            return Err(PyValueError::new_err(
+                "provide either cid or client_order_id, not both",
+            ));
+        }
+
+        let cid_arg = client_order_id.or(cid);
+
         let strategy_id = coerce_strategy_id(strategy)?;
-        let client_order_id = coerce_client_order_id(cid)?;
+        let client_order_id = coerce_client_order_id(cid_arg)?;
 
         Ok(Self::from_parts(
             exchange.inner(),

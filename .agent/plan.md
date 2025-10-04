@@ -13,10 +13,10 @@
 
 ## Current Focus (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.
-  - [ ] Finalise spec requirements under `.agent/specs/python-strategy-bindings.md`.
-  - [ ] Add pytest coverage asserting parity with existing helpers and error handling.
-  - [ ] Implement PyO3 bindings and update Python module exports.
-  - [ ] Verify ergonomics through strategy integration tests and docs refresh.
+  - [x] Finalise spec requirements under `.agent/specs/python-strategy-bindings.md`.
+  - [x] Add pytest coverage asserting parity with existing helpers and error handling.
+  - [x] Implement PyO3 bindings and update Python module exports.
+  - [x] Verify ergonomics through strategy integration tests and docs refresh.
 
 ## Notes
 - Use `.agent/specs/` to capture crate-specific requirements.

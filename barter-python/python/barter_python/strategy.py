@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from decimal import Decimal
 from typing import Callable, Protocol, TypeVar
 
 from .execution import (
@@ -16,6 +17,9 @@ from .execution import (
     TimeInForce,
 )
 from .instrument import Side
+from .barter_python import (
+    build_ioc_market_order_to_close_position as _build_ioc_market_order_to_close_position,
+)
 
 # Type aliases for common key types
 ExchangeIndex = int
@@ -167,6 +171,61 @@ class EngineState:
                 yield instrument
 
 
+_SIDE_BY_VALUE = {
+    "buy": Side.BUY,
+    "sell": Side.SELL,
+}
+
+_ORDER_KIND_BY_VALUE = {
+    "market": OrderKind.MARKET,
+    "limit": OrderKind.LIMIT,
+}
+
+_TIME_IN_FORCE_BY_VALUE = {
+    "good_until_cancelled": TimeInForce.GOOD_UNTIL_CANCELLED,
+    "good_until_end_of_day": TimeInForce.GOOD_UNTIL_END_OF_DAY,
+    "fill_or_kill": TimeInForce.FILL_OR_KILL,
+    "immediate_or_cancel": TimeInForce.IMMEDIATE_OR_CANCEL,
+}
+
+
+def _coerce_client_order_id(value: ClientOrderId | str) -> ClientOrderId:
+    if isinstance(value, ClientOrderId):
+        return value
+    return ClientOrderId.new(str(value))
+
+
+def _convert_binding_request(
+    exchange: ExchangeIndex,
+    instrument: InstrumentIndex,
+    strategy_id: StrategyId,
+    client_order_id: ClientOrderId,
+    price: float,
+    quantity: float,
+    binding_request,
+) -> OrderRequestOpen:
+    side = _SIDE_BY_VALUE[binding_request.side]
+    order_kind = _ORDER_KIND_BY_VALUE[binding_request.kind]
+    time_in_force = _TIME_IN_FORCE_BY_VALUE[binding_request.time_in_force]
+
+    key = OrderKey(
+        exchange,
+        instrument,
+        strategy=strategy_id,
+        cid=client_order_id,
+    )
+
+    state = RequestOpen(
+        side=side,
+        price=Decimal(str(price)),
+        quantity=Decimal(str(quantity)),
+        kind=order_kind,
+        time_in_force=time_in_force,
+    )
+
+    return OrderRequestOpen(key, state)
+
+
 def close_open_positions_with_market_orders(
     strategy_id: StrategyId,
     state: EngineState,
@@ -190,36 +249,37 @@ def close_open_positions_with_market_orders(
     Returns:
         Tuple of (cancel_requests, open_requests)
     """
-    if gen_cid is None:
+    cancel_requests: list[OrderRequestCancel] = []
+    open_requests: list[OrderRequestOpen] = []
 
-        def default_gen_cid(inst_state: InstrumentState) -> ClientOrderId:
-            return ClientOrderId.new(f"close-{inst_state.instrument}")
-
-        gen_cid = default_gen_cid
-
-    open_requests = []
     for inst_state in state.instruments_iter(filter):
-        # Only generate orders if there is a Position and we have market data
-        if inst_state.position is None or inst_state.price is None:
+        position = inst_state.position
+        if position is None:
             continue
 
-        assert inst_state.position is not None
-        assert inst_state.price is not None
-        inst = inst_state
+        if position.quantity_abs <= 0:
+            raise ValueError("position quantity must be positive")
 
-        def get_cid():  # noqa: B023
-            return gen_cid(inst) if gen_cid else ClientOrderId("close_position")
+        price = inst_state.price
+        if price is None:
+            raise ValueError("instrument price is required to close positions")
 
-        request = build_ioc_market_order_to_close_position(
+        cid_input: ClientOrderId | str | None
+        if gen_cid is None:
+            cid_input = None
+        else:
+            cid_input = gen_cid(inst_state)
+
+        order = build_ioc_market_order_to_close_position(
             inst_state.exchange,
-            inst_state.position,
+            position,
             strategy_id,
-            inst_state.price,
-            get_cid,
+            price,
+            gen_cid=cid_input,
         )
-        open_requests.append(request)
+        open_requests.append(order)
 
-    return ([], open_requests)
+    return cancel_requests, open_requests
 
 
 class DefaultStrategy:
@@ -316,7 +376,7 @@ def build_ioc_market_order_to_close_position(
     position: Position,
     strategy_id: StrategyId,
     price: float,
-    gen_cid: Callable[[], ClientOrderId],
+    gen_cid: Callable[[], ClientOrderId] | ClientOrderId | str | None = None,
 ) -> OrderRequestOpen[ExchangeIndex, InstrumentIndex]:
     """Build an equal but opposite Side ImmediateOrCancel Market order that neutralises the provided Position.
 
@@ -332,22 +392,31 @@ def build_ioc_market_order_to_close_position(
     Returns:
         Order request to close the position
     """
-    from decimal import Decimal
+    if callable(gen_cid):
+        cid_value = gen_cid()
+    elif gen_cid is None:
+        cid_value = ClientOrderId.new(f"close-{position.instrument}")
+    else:
+        cid_value = gen_cid
 
-    side = Side.SELL if position.side == Side.BUY else Side.BUY
+    client_order_id = _coerce_client_order_id(cid_value)
 
-    return OrderRequestOpen(
-        key=OrderKey(
-            exchange=exchange,
-            instrument=position.instrument,
-            strategy=strategy_id,
-            cid=gen_cid(),
-        ),
-        state=RequestOpen(
-            side=side,
-            price=Decimal(str(price)),
-            quantity=Decimal(str(position.quantity_abs)),
-            kind=OrderKind.MARKET,
-            time_in_force=TimeInForce.IMMEDIATE_OR_CANCEL,
-        ),
+    binding_request = _build_ioc_market_order_to_close_position(
+        exchange,
+        position.instrument,
+        position.side.value,
+        position.quantity_abs,
+        strategy_id,
+        price,
+        client_order_id,
+    )
+
+    return _convert_binding_request(
+        exchange,
+        position.instrument,
+        strategy_id,
+        client_order_id,
+        price,
+        position.quantity_abs,
+        binding_request,
     )

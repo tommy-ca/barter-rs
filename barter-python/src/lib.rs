@@ -21,6 +21,7 @@ mod integration;
 mod logging;
 mod metric;
 mod risk;
+mod strategy;
 mod summary;
 mod system;
 
@@ -83,6 +84,7 @@ use metric::{PyField, PyMetric, PyTag, PyValue};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use risk::{calculate_abs_percent_difference, calculate_delta, calculate_quote_notional};
 use serde_json::Value as JsonValue;
+use strategy::build_ioc_market_order_to_close_position;
 use summary::{
     PyAssetTearSheet, PyBacktestSummary, PyBalance, PyDrawdown, PyInstrumentTearSheet,
     PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
@@ -881,6 +883,10 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calculate_delta, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_mid_price, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_volume_weighted_mid_price, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        build_ioc_market_order_to_close_position,
+        m
+    )?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();
@@ -896,11 +902,15 @@ mod tests {
     use barter_data::{event::DataKind, streams::consumer::MarketStreamEvent};
     use barter_execution::order::{
         OrderKind, TimeInForce,
-        id::{OrderId, StrategyId},
+        id::{ClientOrderId, OrderId, StrategyId},
         state::{ActiveOrderState, OrderState},
     };
     use barter_execution::trade::TradeId;
-    use barter_instrument::{Side, exchange::ExchangeId, instrument::InstrumentIndex};
+    use barter_instrument::{
+        Side,
+        exchange::{ExchangeId, ExchangeIndex},
+        instrument::InstrumentIndex,
+    };
     use chrono::{TimeDelta, TimeZone};
     use pyo3::{Python, types::PyDict};
     use rust_decimal::prelude::ToPrimitive;
@@ -1291,7 +1301,12 @@ mod tests {
 
     #[test]
     fn engine_event_account_order_snapshot_open() {
-        let key = PyOrderKey::new(1, 2, "strategy-alpha", Some("cid-1"));
+        let key = PyOrderKey::from_parts(
+            ExchangeIndex(1),
+            InstrumentIndex(2),
+            StrategyId::new("strategy-alpha"),
+            ClientOrderId::new("cid-1"),
+        );
         let open_request = PyOrderRequestOpen::new(
             &key,
             "buy",
@@ -1351,7 +1366,12 @@ mod tests {
 
     #[test]
     fn engine_event_account_order_snapshot_open_inflight() {
-        let key = PyOrderKey::new(3, 4, "strategy-beta", Some("cid-2"));
+        let key = PyOrderKey::from_parts(
+            ExchangeIndex(3),
+            InstrumentIndex(4),
+            StrategyId::new("strategy-beta"),
+            ClientOrderId::new("cid-2"),
+        );
         let open_request =
             PyOrderRequestOpen::new(&key, "sell", 250.0, 1.5, "limit", None, None).unwrap();
 
@@ -1384,7 +1404,12 @@ mod tests {
 
     #[test]
     fn engine_event_account_order_cancelled_success() {
-        let key = PyOrderKey::new(2, 5, "strategy-gamma", Some("cid-3"));
+        let key = PyOrderKey::from_parts(
+            ExchangeIndex(2),
+            InstrumentIndex(5),
+            StrategyId::new("strategy-gamma"),
+            ClientOrderId::new("cid-3"),
+        );
         let cancel_request = PyOrderRequestCancel::new(&key, Some("order-456"))
             .expect("cancel request should build");
         let time_exchange = Utc.with_ymd_and_hms(2025, 12, 1, 2, 3, 4).unwrap();
