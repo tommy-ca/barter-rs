@@ -190,6 +190,12 @@ running system.
 Track the highlights from each coordinated Rust and Python release here. Align the entries with the
 cadence defined in `.agent/specs/release-cadence.md` so both ecosystems stay in sync.
 
+### 0.1.1 — 2025-10-04
+
+- Added `calculate_profit_factor` and `calculate_win_rate` helpers mirroring trading summary values.
+- Added `calculate_rate_of_return` with optional interval scaling support.
+- Expanded pytest coverage for portfolio analytics edge cases and custom intervals.
+
 ### 0.1.0 — 2025-10-04
 
 - Initial PyO3-based bindings for the Barter engine alongside CLI backtest helper.
