@@ -1,7 +1,7 @@
 """Unit tests for the backtest module."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from barter_python import backtest
@@ -191,3 +191,263 @@ class TestExecutionConfig:
         mock_config = backtest.MockExecutionConfig()
         config = backtest.ExecutionConfig.mock(mock_config)
         assert config.mock_config == mock_config
+
+
+class TestBalance:
+    """Test Balance structure."""
+
+    def test_creation(self):
+        """Test creating a Balance."""
+        balance = backtest.Balance(total=Decimal('1000'), free=Decimal('800'))
+        assert balance.total == Decimal('1000')
+        assert balance.free == Decimal('800')
+        assert balance.used == Decimal('200')
+
+
+class TestAssetBalance:
+    """Test AssetBalance structure."""
+
+    def test_creation(self):
+        """Test creating an AssetBalance."""
+        balance = backtest.Balance(total=Decimal('1000'), free=Decimal('800'))
+        asset_balance = backtest.AssetBalance(
+            asset="BTC",
+            balance=balance,
+            time_exchange=datetime(2023, 1, 1, 12, 0, 0)
+        )
+        assert asset_balance.asset == "BTC"
+        assert asset_balance.balance == balance
+        assert asset_balance.time_exchange == datetime(2023, 1, 1, 12, 0, 0)
+
+
+class TestDrawdown:
+    """Test Drawdown structure."""
+
+    def test_creation(self):
+        """Test creating a Drawdown."""
+        start_time = datetime(2023, 1, 1, 12, 0, 0)
+        end_time = datetime(2023, 1, 1, 13, 0, 0)
+        drawdown = backtest.Drawdown(
+            value=Decimal('-0.05'),
+            time_start=start_time,
+            time_end=end_time
+        )
+        assert drawdown.value == Decimal('-0.05')
+        assert drawdown.time_start == start_time
+        assert drawdown.time_end == end_time
+        assert drawdown.duration == timedelta(hours=1)
+
+
+class TestMeanDrawdown:
+    """Test MeanDrawdown structure."""
+
+    def test_creation(self):
+        """Test creating a MeanDrawdown."""
+        mean_drawdown = backtest.MeanDrawdown(
+            mean_drawdown=Decimal('-0.03'),
+            mean_drawdown_ms=3600000  # 1 hour in milliseconds
+        )
+        assert mean_drawdown.mean_drawdown == Decimal('-0.03')
+        assert mean_drawdown.mean_drawdown_ms == 3600000
+
+
+class TestMaxDrawdown:
+    """Test MaxDrawdown structure."""
+
+    def test_creation(self):
+        """Test creating a MaxDrawdown."""
+        drawdown = backtest.Drawdown(
+            value=Decimal('-0.1'),
+            time_start=datetime(2023, 1, 1, 10, 0, 0),
+            time_end=datetime(2023, 1, 1, 11, 0, 0)
+        )
+        max_drawdown = backtest.MaxDrawdown(drawdown)
+        assert max_drawdown.drawdown == drawdown
+
+
+class TestRange:
+    """Test Range structure."""
+
+    def test_creation(self):
+        """Test creating a Range."""
+        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
+        assert range_obj.min == Decimal('0')
+        assert range_obj.max == Decimal('100')
+
+
+class TestDispersion:
+    """Test Dispersion structure."""
+
+    def test_creation(self):
+        """Test creating a Dispersion."""
+        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
+        dispersion = backtest.Dispersion(
+            range=range_obj,
+            recurrence_relation_m=Decimal('50'),
+            variance=Decimal('25'),
+            std_dev=Decimal('5')
+        )
+        assert dispersion.range == range_obj
+        assert dispersion.recurrence_relation_m == Decimal('50')
+        assert dispersion.variance == Decimal('25')
+        assert dispersion.std_dev == Decimal('5')
+
+
+class TestDataSetSummary:
+    """Test DataSetSummary structure."""
+
+    def test_creation(self):
+        """Test creating a DataSetSummary."""
+        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
+        dispersion = backtest.Dispersion(
+            range=range_obj,
+            recurrence_relation_m=Decimal('50'),
+            variance=Decimal('25'),
+            std_dev=Decimal('5')
+        )
+        summary = backtest.DataSetSummary(
+            count=Decimal('10'),
+            sum=Decimal('500'),
+            mean=Decimal('50'),
+            dispersion=dispersion
+        )
+        assert summary.count == Decimal('10')
+        assert summary.sum == Decimal('500')
+        assert summary.mean == Decimal('50')
+        assert summary.dispersion == dispersion
+
+
+class TestPnLReturns:
+    """Test PnLReturns structure."""
+
+    def test_creation(self):
+        """Test creating PnLReturns."""
+        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
+        dispersion = backtest.Dispersion(
+            range=range_obj,
+            recurrence_relation_m=Decimal('50'),
+            variance=Decimal('25'),
+            std_dev=Decimal('5')
+        )
+        total_summary = backtest.DataSetSummary(
+            count=Decimal('10'),
+            sum=Decimal('500'),
+            mean=Decimal('50'),
+            dispersion=dispersion
+        )
+        losses_summary = backtest.DataSetSummary(
+            count=Decimal('3'),
+            sum=Decimal('-100'),
+            mean=Decimal('-33.33'),
+            dispersion=dispersion
+        )
+        pnl_returns = backtest.PnLReturns(
+            pnl_raw=Decimal('400'),
+            total=total_summary,
+            losses=losses_summary
+        )
+        assert pnl_returns.pnl_raw == Decimal('400')
+        assert pnl_returns.total == total_summary
+        assert pnl_returns.losses == losses_summary
+
+
+class TestTearSheet:
+    """Test TearSheet structure."""
+
+    def test_creation(self):
+        """Test creating a TearSheet."""
+        from barter_python.statistic import Annual365, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
+
+        interval = Annual365()
+        tear_sheet = backtest.TearSheet(
+            pnl=Decimal('100'),
+            pnl_return=RateOfReturn.calculate(Decimal('0.1'), interval),
+            sharpe_ratio=SharpeRatio.calculate(Decimal('0.02'), Decimal('0.1'), Decimal('0.05'), interval),
+            sortino_ratio=SortinoRatio.calculate(Decimal('0.02'), Decimal('0.1'), Decimal('0.03'), interval),
+            calmar_ratio=CalmarRatio.calculate(Decimal('0.02'), Decimal('0.1'), Decimal('0.02'), interval),
+            pnl_drawdown=None,
+            pnl_drawdown_mean=None,
+            pnl_drawdown_max=None,
+            win_rate=WinRate.calculate(Decimal('7'), Decimal('10')),
+            profit_factor=ProfitFactor.calculate(Decimal('200'), Decimal('100'))
+        )
+        assert tear_sheet.pnl == Decimal('100')
+        assert tear_sheet.pnl_drawdown is None
+        assert tear_sheet.pnl_drawdown_mean is None
+        assert tear_sheet.pnl_drawdown_max is None
+        assert tear_sheet.win_rate is not None
+        assert tear_sheet.profit_factor is not None
+
+
+class TestTearSheetAsset:
+    """Test TearSheetAsset structure."""
+
+    def test_creation(self):
+        """Test creating a TearSheetAsset."""
+        balance = backtest.Balance(total=Decimal('1000'), free=Decimal('900'))
+        asset_balance = backtest.AssetBalance(
+            asset="USDT",
+            balance=balance,
+            time_exchange=datetime(2023, 1, 1, 12, 0, 0)
+        )
+        drawdown = backtest.Drawdown(
+            value=Decimal('-0.02'),
+            time_start=datetime(2023, 1, 1, 10, 0, 0),
+            time_end=datetime(2023, 1, 1, 11, 0, 0)
+        )
+        mean_drawdown = backtest.MeanDrawdown(
+            mean_drawdown=Decimal('-0.015'),
+            mean_drawdown_ms=1800000
+        )
+        max_drawdown = backtest.MaxDrawdown(drawdown)
+
+        tear_sheet = backtest.TearSheetAsset(
+            balance_end=asset_balance,
+            drawdown=drawdown,
+            drawdown_mean=mean_drawdown,
+            drawdown_max=max_drawdown
+        )
+        assert tear_sheet.balance_end == asset_balance
+        assert tear_sheet.drawdown == drawdown
+        assert tear_sheet.drawdown_mean == mean_drawdown
+        assert tear_sheet.drawdown_max == max_drawdown
+
+
+class TestTradingSummary:
+    """Test TradingSummary structure."""
+
+    def test_creation(self):
+        """Test creating a TradingSummary."""
+        from barter_python.statistic import Annual365, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
+
+        start_time = datetime(2023, 1, 1, 9, 0, 0)
+        end_time = datetime(2023, 1, 1, 17, 0, 0)
+        interval = Annual365()
+
+        # Create a tear sheet
+        tear_sheet = backtest.TearSheet(
+            pnl=Decimal('50'),
+            pnl_return=RateOfReturn.calculate(Decimal('0.05'), interval),
+            sharpe_ratio=SharpeRatio.calculate(Decimal('0.02'), Decimal('0.05'), Decimal('0.03'), interval),
+            sortino_ratio=SortinoRatio.calculate(Decimal('0.02'), Decimal('0.05'), Decimal('0.02'), interval),
+            calmar_ratio=CalmarRatio.calculate(Decimal('0.02'), Decimal('0.05'), Decimal('0.01'), interval),
+            pnl_drawdown=None,
+            pnl_drawdown_mean=None,
+            pnl_drawdown_max=None,
+            win_rate=WinRate.calculate(Decimal('6'), Decimal('10')),
+            profit_factor=ProfitFactor.calculate(Decimal('150'), Decimal('100'))
+        )
+
+        summary = backtest.TradingSummary(
+            time_engine_start=start_time,
+            time_engine_end=end_time,
+            instruments={"instrument_0": tear_sheet},
+            assets={}
+        )
+
+        assert summary.time_engine_start == start_time
+        assert summary.time_engine_end == end_time
+        assert len(summary.instruments) == 1
+        assert "instrument_0" in summary.instruments
+        assert len(summary.assets) == 0
+        assert summary.trading_duration == timedelta(hours=8)
