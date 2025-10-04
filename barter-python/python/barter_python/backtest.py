@@ -58,12 +58,18 @@ class MarketDataInMemory:
         first_time = None
 
         for event_data in data:
-            # Parse the market event from JSON
-            time_exchange = datetime.fromisoformat(event_data['time_exchange'])
-            time_received = datetime.fromisoformat(event_data['time_received'])
-            exchange = event_data['exchange']
-            instrument = event_data['instrument']
-            kind_data = event_data['kind']
+            # Parse the market event from JSON - handle the Item/Ok wrapper
+            if 'Item' in event_data and 'Ok' in event_data['Item']:
+                inner_data = event_data['Item']['Ok']
+            else:
+                # Skip non-Item/Ok events (like Reconnecting)
+                continue
+
+            time_exchange = datetime.fromisoformat(inner_data['time_exchange'])
+            time_received = datetime.fromisoformat(inner_data['time_received'])
+            exchange = inner_data['exchange']
+            instrument = inner_data['instrument']
+            kind_data = inner_data['kind']
 
             # Parse the data kind
             if 'Trade' in kind_data:
@@ -222,8 +228,7 @@ async def backtest(
     time_start = await args_constant.market_data.time_first_event()
 
     # Process market events
-    market_stream = await args_constant.market_data.stream()
-    async for market_event in market_stream:
+    async for market_event in args_constant.market_data.stream():
         # Update engine state with market data
         await simulator.process_market_event(market_event)
 

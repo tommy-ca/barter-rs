@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Callable
@@ -93,7 +94,7 @@ async def test_market_data_in_memory_from_json(example_paths: dict[str, Path]) -
     assert len(market_data.events) > 0
 
     first_time = await market_data.time_first_event()
-    assert isinstance(first_time, bp.datetime)
+    assert isinstance(first_time, datetime)
 
     # Test streaming
     events = []
