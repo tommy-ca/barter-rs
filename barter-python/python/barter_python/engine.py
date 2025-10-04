@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Generic, Optional, Protocol, TypeVar
 
-from .data import MarketEvent
+from .data import MarketEvent, DataKind, OrderBookL1, Candle, as_public_trade, as_candle
 from .execution import (
     AssetBalance,
     Balance,
     ClientOrderId,
     InstrumentAccountSnapshot,
+    Open,
     Order,
+    OrderId,
     OrderKey,
     OrderRequestCancel,
     OrderRequestOpen,
@@ -22,7 +25,24 @@ from .execution import (
 )
 from .instrument import Asset, ExchangeId, Instrument, InstrumentIndex
 from .risk import RiskManager
-from .strategy import AlgoStrategy, ClosePositionsStrategy
+from .strategy import AlgoStrategy, ClosePositionsStrategy, InstrumentFilter
+
+
+class AllInstrumentsFilter:
+    """Filter that matches all instruments."""
+
+    def matches(self, exchange, instrument) -> bool:
+        return True
+
+
+class ExchangeFilter:
+    """Filter that matches instruments on a specific exchange."""
+
+    def __init__(self, exchange: int):
+        self.exchange = exchange
+
+    def matches(self, exchange, instrument) -> bool:
+        return exchange == self.exchange
 
 # Type variables for generic engine interfaces
 ExchangeKey = TypeVar("ExchangeKey")
@@ -54,8 +74,10 @@ class InstrumentMarketData(Protocol):
 class DefaultInstrumentMarketData:
     """Default implementation of instrument market data."""
 
-    # TODO: Add market data fields (order book, recent trades, etc.)
-    pass
+    last_price: Optional[Decimal] = None
+    last_update_time: Optional[datetime] = None
+    order_book_l1: Optional[OrderBookL1] = None
+    recent_candle: Optional[Candle] = None
 
 
 @dataclass(frozen=True)
@@ -161,7 +183,7 @@ class ClosePositions(Generic[State]):
 
     strategy: ClosePositionsStrategy
     state: State
-    instrument_filter: Optional[Any] = None  # TODO: Define proper filter
+    instrument_filter: Optional[InstrumentFilter] = None
 
     def execute(self, engine_state: EngineState) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate orders to close positions."""
@@ -186,12 +208,22 @@ class SendRequests:
 class CancelOrders:
     """Action to cancel orders."""
 
-    instrument_filter: Optional[object] = None  # TODO: Define proper filter
+    instrument_filter: Optional[InstrumentFilter] = None  # TODO: Define proper filter
 
     def execute(self, engine_state: EngineState) -> list[OrderRequestCancel]:
         """Generate cancel requests for orders matching the filter."""
-        # TODO: Implement order cancellation logic
-        return []
+        cancel_requests = []
+        for inst_state in engine_state.instruments.values():
+            if self.instrument_filter is None or self.instrument_filter.matches(inst_state.exchange, inst_state.instrument):
+                for order_key, order in inst_state.orders.items():
+                    # Get order ID if available
+                    order_id = None
+                    if order.state.is_active() and hasattr(order.state.state, 'id'):
+                        order_id = order.state.state.id
+                    # Create cancel request for this order
+                    cancel_request = OrderRequestCancel(key=order_key, state=order_id)
+                    cancel_requests.append(cancel_request)
+        return cancel_requests
 
 
 class Engine(Generic[State]):
@@ -212,8 +244,46 @@ class Engine(Generic[State]):
         # Update instrument market data
         if event.instrument in self.state.instruments:
             inst_state = self.state.instruments[event.instrument]
-            # TODO: Update market data from event
-            self.state.update_instrument_state(event.instrument, inst_state)
+            market_data = inst_state.market_data
+
+            # Update market data based on event kind
+            if event.kind.kind == "trade":
+                trade_event = as_public_trade(event)
+                if trade_event:
+                    market_data = DefaultInstrumentMarketData(
+                        last_price=Decimal(str(trade_event.kind.price)),
+                        last_update_time=event.time_exchange,
+                        order_book_l1=market_data.order_book_l1,
+                        recent_candle=market_data.recent_candle,
+                    )
+            elif event.kind.kind == "candle":
+                candle_event = as_candle(event)
+                if candle_event:
+                    market_data = DefaultInstrumentMarketData(
+                        last_price=Decimal(str(candle_event.kind.close)),
+                        last_update_time=event.time_exchange,
+                        order_book_l1=market_data.order_book_l1,
+                        recent_candle=candle_event.kind,
+                    )
+            elif event.kind.kind == "order_book_l1":
+                # Note: as_order_book_l1 is not defined, but we can access directly
+                if event.kind.data and isinstance(event.kind.data, OrderBookL1):
+                    market_data = DefaultInstrumentMarketData(
+                        last_price=market_data.last_price,
+                        last_update_time=event.time_exchange,
+                        order_book_l1=event.kind.data,
+                        recent_candle=market_data.recent_candle,
+                    )
+
+            # Update the instrument state with new market data
+            updated_inst_state = InstrumentState(
+                instrument=inst_state.instrument,
+                exchange=inst_state.exchange,
+                position=inst_state.position,
+                market_data=market_data,
+                orders=inst_state.orders,
+            )
+            self.state.update_instrument_state(event.instrument, updated_inst_state)
 
     def process_account_event(self, event: object) -> None:  # TODO: Define AccountEvent
         """Process an account event and update engine state."""
@@ -225,7 +295,7 @@ class Engine(Generic[State]):
         action = GenerateAlgoOrders(self.strategy, self.state)
         return action.execute(self.state)
 
-    def close_positions(self, instrument_filter: Optional[object] = None) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    def close_positions(self, instrument_filter: Optional[InstrumentFilter] = None) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate orders to close positions."""
         if hasattr(self.strategy, 'close_positions_requests'):
             action = ClosePositions(self.strategy, self.state, instrument_filter)
@@ -239,16 +309,19 @@ class Engine(Generic[State]):
     ) -> None:
         """Send order requests after risk checking."""
         # Apply risk management
-        approved_requests = []
-        for request in open_requests:
-            if self.risk_manager.check(request, self.state):
-                approved_requests.append(request)
+        approved_cancels, approved_opens, _, _ = self.risk_manager.check(
+            self.state, cancel_requests, open_requests
+        )
+
+        # Extract the approved items
+        approved_cancel_requests = [approved.item for approved in approved_cancels]
+        approved_open_requests = [approved.item for approved in approved_opens]
 
         # Send approved requests
-        action = SendRequests(approved_requests, cancel_requests)
+        action = SendRequests(approved_open_requests, approved_cancel_requests)  # type: ignore
         action.execute(self.state)
 
-    def cancel_orders(self, instrument_filter: Optional[object] = None) -> None:
+    def cancel_orders(self, instrument_filter: Optional[InstrumentFilter] = None) -> None:
         """Cancel orders matching the filter."""
         action = CancelOrders(instrument_filter)
         cancel_requests = action.execute(self.state)

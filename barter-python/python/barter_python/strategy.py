@@ -72,7 +72,7 @@ class ClosePositionsStrategy(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
     def close_positions_requests(
         self,
         state: State,
-        filter: InstrumentFilter[ExchangeKey, AssetKey, InstrumentKey],
+        filter: Optional[InstrumentFilter[ExchangeKey, AssetKey, InstrumentKey]] = None,
     ) -> tuple[
         Iterable[OrderRequestCancel[ExchangeKey, InstrumentKey]],
         Iterable[OrderRequestOpen[ExchangeKey, InstrumentKey]],
