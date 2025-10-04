@@ -21,6 +21,7 @@ use barter::{
     system::{
         System,
         builder::{AuditMode, EngineFeedMode, SystemArgs, SystemBuilder},
+        config::ExecutionConfig,
     },
 };
 use barter_data::{
@@ -242,6 +243,16 @@ pub fn start_system(
     let seeded_balances = parse_initial_balances(py, initial_balances)?;
 
     let mut config_inner = config.clone_inner();
+
+    // Clear initial balances from executions to allow seeded balances to take precedence
+    if !seeded_balances.is_empty() {
+        for execution in &mut config_inner.executions {
+            if let ExecutionConfig::Mock(mock) = execution {
+                mock.initial_state.balances.clear();
+            }
+        }
+    }
+
     let instruments = IndexedInstruments::new(config_inner.instruments.drain(..));
     let market_stream = stream::pending::<MarketStreamEvent<InstrumentIndex, DataKind>>();
 
@@ -294,6 +305,15 @@ pub fn run_historic_backtest(
     let seeded_balances = parse_initial_balances(py, initial_balances)?;
 
     let mut config_inner = config.clone_inner();
+
+    // Clear initial balances from executions to allow seeded balances to take precedence
+    if !seeded_balances.is_empty() {
+        for execution in &mut config_inner.executions {
+            if let ExecutionConfig::Mock(mock) = execution {
+                mock.initial_state.balances.clear();
+            }
+        }
+    }
     let instruments = IndexedInstruments::new(config_inner.instruments.drain(..));
 
     let args = SystemArgs::new(
