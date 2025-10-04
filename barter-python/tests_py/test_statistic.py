@@ -1,6 +1,6 @@
 """Unit tests for pure Python statistic module."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from barter_python.statistic import (
@@ -8,12 +8,19 @@ from barter_python.statistic import (
     Annual365,
     CalmarRatio,
     Daily,
+    Drawdown,
+    MaxDrawdown,
+    MeanDrawdown,
     ProfitFactor,
     RateOfReturn,
     SharpeRatio,
     SortinoRatio,
     TimeDeltaInterval,
     WinRate,
+    build_drawdown_series,
+    calculate_max_drawdown,
+    calculate_mean_drawdown,
+    generate_drawdown_series,
 )
 
 
@@ -454,3 +461,207 @@ class TestRateOfReturn:
         expected_value = Decimal('-2.52')  # Should be -252% annual return
         assert actual.value == expected_value
         assert isinstance(actual.interval, Annual252)
+
+
+class TestDrawdown:
+    def test_creation(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        end = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        drawdown = Drawdown(
+            value=Decimal('-0.1'),
+            time_start=start,
+            time_end=end,
+        )
+        assert drawdown.value == Decimal('-0.1')
+        assert drawdown.time_start == start
+        assert drawdown.time_end == end
+        assert drawdown.duration == timedelta(days=1)
+
+    def test_equality(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        end = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        d1 = Drawdown(Decimal('-0.1'), start, end)
+        d2 = Drawdown(Decimal('-0.1'), start, end)
+        d3 = Drawdown(Decimal('-0.2'), start, end)
+        assert d1 == d2
+        assert d1 != d3
+
+
+class TestMaxDrawdown:
+    def test_creation(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        end = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        drawdown = Drawdown(Decimal('-0.1'), start, end)
+        max_dd = MaxDrawdown(drawdown)
+        assert max_dd.drawdown == drawdown
+
+
+class TestMeanDrawdown:
+    def test_creation(self):
+        mean_dd = MeanDrawdown(
+            mean_drawdown=Decimal('-0.05'),
+            mean_drawdown_ms=Decimal('86400000'),  # 1 day in ms
+        )
+        assert mean_dd.mean_drawdown == Decimal('-0.05')
+        assert mean_dd.mean_drawdown_ms == Decimal('86400000')
+
+
+class TestBuildDrawdownSeries:
+    def test_empty_points(self):
+        result = build_drawdown_series([])
+        assert result == []
+
+    def test_single_point(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [(start, Decimal('100'))]
+        result = build_drawdown_series(points)
+        assert result == []
+
+    def test_no_drawdown(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, Decimal('100')),
+            (start + timedelta(days=1), Decimal('110')),
+            (start + timedelta(days=2), Decimal('120')),
+        ]
+        result = build_drawdown_series(points)
+        assert result == []
+
+    def test_single_drawdown(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, Decimal('100')),
+            (start + timedelta(days=1), Decimal('110')),
+            (start + timedelta(days=2), Decimal('90')),
+            (start + timedelta(days=3), Decimal('120')),
+        ]
+        result = build_drawdown_series(points)
+        assert len(result) == 1
+        assert result[0].value == Decimal('0.1818181818181818181818181818')  # (110-90)/110
+        assert result[0].time_start == start + timedelta(days=1)
+        assert result[0].time_end == start + timedelta(days=3)
+
+    def test_multiple_drawdowns(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, Decimal('100')),
+            (start + timedelta(days=1), Decimal('110')),
+            (start + timedelta(days=2), Decimal('90')),
+            (start + timedelta(days=3), Decimal('120')),
+            (start + timedelta(days=4), Decimal('105')),
+            (start + timedelta(days=5), Decimal('95')),
+            (start + timedelta(days=6), Decimal('130')),
+        ]
+        result = build_drawdown_series(points)
+        assert len(result) == 2
+        # First drawdown: from 110 to 90, recovered at 120
+        assert result[0].value == Decimal('0.1818181818181818181818181818')
+        # Second drawdown: from 120 to 95, recovered at 130
+        assert result[1].value == Decimal('0.2083333333333333333333333333')  # (120-95)/120
+
+
+class TestGenerateDrawdownSeries:
+    def test_with_floats(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), 110.0),
+            (start + timedelta(days=2), 90.0),
+            (start + timedelta(days=3), 120.0),
+        ]
+        result = generate_drawdown_series(points)
+        assert len(result) == 1
+        assert result[0].value == Decimal('0.1818181818181818181818181818')
+
+    def test_filters_invalid_values(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), float('nan')),
+            (start + timedelta(days=2), 110.0),
+        ]
+        result = generate_drawdown_series(points)
+        assert result == []
+
+
+class TestCalculateMaxDrawdown:
+    def test_no_drawdowns(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), 110.0),
+            (start + timedelta(days=2), 120.0),
+        ]
+        result = calculate_max_drawdown(points)
+        assert result is None
+
+    def test_single_drawdown(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), 110.0),
+            (start + timedelta(days=2), 90.0),
+            (start + timedelta(days=3), 120.0),
+        ]
+        result = calculate_max_drawdown(points)
+        assert result is not None
+        assert result.drawdown.value == Decimal('0.1818181818181818181818181818')
+
+    def test_multiple_drawdowns(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), 110.0),
+            (start + timedelta(days=2), 90.0),  # drawdown of ~0.1818
+            (start + timedelta(days=3), 120.0),
+            (start + timedelta(days=4), 105.0),
+            (start + timedelta(days=5), 95.0),  # drawdown of ~0.2083
+            (start + timedelta(days=6), 130.0),
+        ]
+        result = calculate_max_drawdown(points)
+        assert result is not None
+        # Should return the larger drawdown (second one)
+        assert result.drawdown.value == Decimal('0.2083333333333333333333333333')
+
+
+class TestCalculateMeanDrawdown:
+    def test_no_drawdowns(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), 110.0),
+            (start + timedelta(days=2), 120.0),
+        ]
+        result = calculate_mean_drawdown(points)
+        assert result is None
+
+    def test_single_drawdown(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), 110.0),
+            (start + timedelta(days=2), 90.0),
+            (start + timedelta(days=3), 120.0),
+        ]
+        result = calculate_mean_drawdown(points)
+        assert result is not None
+        assert result.mean_drawdown == Decimal('0.1818181818181818181818181818')
+        assert result.mean_drawdown_ms == Decimal('172800000.0')  # 2 days in ms
+
+    def test_multiple_drawdowns(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        points = [
+            (start, 100.0),
+            (start + timedelta(days=1), 110.0),
+            (start + timedelta(days=2), 90.0),  # drawdown of ~0.1818, 1 day
+            (start + timedelta(days=3), 120.0),
+            (start + timedelta(days=4), 105.0),
+            (start + timedelta(days=5), 95.0),  # drawdown of ~0.2083, 1 day
+            (start + timedelta(days=6), 130.0),
+        ]
+        result = calculate_mean_drawdown(points)
+        assert result is not None
+        # Mean of 0.1818 and 0.2083
+        expected_mean = (Decimal('0.1818181818181818181818181818') + Decimal('0.2083333333333333333333333333')) / 2
+        assert result.mean_drawdown == expected_mean
+        assert result.mean_drawdown_ms == Decimal('216000000.0')  # 2.5 days in ms

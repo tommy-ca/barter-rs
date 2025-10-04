@@ -5,9 +5,9 @@ from __future__ import annotations
 import math
 from abc import abstractmethod
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, Protocol, Sequence, TypeVar
 
 
 class TimeInterval(Protocol):
@@ -325,3 +325,267 @@ class RateOfReturn(Generic[IntervalT]):
         new_value = self.value * scale
 
         return RateOfReturn(value=new_value, interval=target)
+
+
+@dataclass(frozen=True)
+class Drawdown:
+    """Drawdown represents the peak-to-trough decline of a value during a specific period.
+
+    Drawdown is a measure of downside volatility.
+
+    Attributes:
+        value: The drawdown value as a decimal (negative for losses).
+        time_start: The start time of the drawdown period.
+        time_end: The end time of the drawdown period.
+    """
+
+    value: Decimal
+    time_start: datetime
+    time_end: datetime
+
+    @property
+    def duration(self) -> timedelta:
+        """Time period of the drawdown."""
+        return self.time_end - self.time_start
+
+
+@dataclass(frozen=True)
+class MaxDrawdown:
+    """Maximum drawdown is the largest peak-to-trough decline of PnL or asset balance.
+
+    Max Drawdown is a measure of downside risk, with larger values indicating
+    downside movements could be volatile.
+    """
+
+    drawdown: Drawdown
+
+
+@dataclass(frozen=True)
+class MeanDrawdown:
+    """Mean drawdown is the average drawdown value and duration from a collection of drawdowns."""
+
+    mean_drawdown: Decimal
+    mean_drawdown_ms: Decimal
+
+
+@dataclass
+class DrawdownGenerator:
+    """Generator for calculating drawdowns from a series of equity points.
+
+    Tracks peak values and calculates drawdown periods when the value recovers
+    above the previous peak.
+    """
+
+    peak: Decimal | None = None
+    drawdown_max: Decimal = Decimal('0')
+    time_peak: datetime | None = None
+    time_now: datetime = datetime.min
+
+    @classmethod
+    def init(cls, point: tuple[datetime, Decimal]) -> DrawdownGenerator:
+        """Initialize from an initial timed value."""
+        time, value = point
+        return cls(
+            peak=value,
+            drawdown_max=Decimal('0'),
+            time_peak=time,
+            time_now=time,
+        )
+
+    def update(self, point: tuple[datetime, Decimal]) -> Drawdown | None:
+        """Update the generator with a new point and return a completed drawdown if any."""
+        time, value = point
+        self.time_now = time
+
+        if self.peak is None:
+            self.peak = value
+            self.time_peak = time
+            return None
+
+        peak = self.peak
+        if value > peak:
+            # Only emit a drawdown if one actually occurred
+            ended_drawdown = self.generate()
+
+            # Reset parameters
+            self.peak = value
+            self.time_peak = time
+            self.drawdown_max = Decimal('0')
+
+            return ended_drawdown
+        else:
+            # Calculate current drawdown
+            if peak != 0:
+                drawdown_current = (peak - value) / peak
+                if drawdown_current > self.drawdown_max:
+                    self.drawdown_max = drawdown_current
+
+            return None
+
+    def generate(self) -> Drawdown | None:
+        """Generate the current drawdown if it is non-zero."""
+        if self.time_peak is None or self.drawdown_max == 0:
+            return None
+
+        return Drawdown(
+            value=self.drawdown_max,
+            time_start=self.time_peak,
+            time_end=self.time_now,
+        )
+
+
+@dataclass
+class MaxDrawdownGenerator:
+    """Generator for tracking the maximum drawdown over time."""
+
+    max_drawdown: MaxDrawdown | None = None
+
+    @classmethod
+    def init(cls, drawdown: Drawdown) -> MaxDrawdownGenerator:
+        """Initialize from an initial drawdown."""
+        return cls(max_drawdown=MaxDrawdown(drawdown))
+
+    def update(self, drawdown: Drawdown) -> None:
+        """Update with a new drawdown, keeping the maximum."""
+        if self.max_drawdown is None:
+            self.max_drawdown = MaxDrawdown(drawdown)
+        elif abs(drawdown.value) > abs(self.max_drawdown.drawdown.value):
+            self.max_drawdown = MaxDrawdown(drawdown)
+
+    def generate(self) -> MaxDrawdown | None:
+        """Generate the current maximum drawdown."""
+        return self.max_drawdown
+
+
+@dataclass
+class MeanDrawdownGenerator:
+    """Generator for calculating the mean drawdown from a series of drawdowns."""
+
+    count: int = 0
+    mean_drawdown: MeanDrawdown | None = None
+
+    @classmethod
+    def init(cls, drawdown: Drawdown) -> MeanDrawdownGenerator:
+        """Initialize from an initial drawdown."""
+        return cls(
+            count=1,
+            mean_drawdown=MeanDrawdown(
+                mean_drawdown=drawdown.value,
+                mean_drawdown_ms=Decimal(str(drawdown.duration.total_seconds() * 1000)),
+            )
+        )
+
+    def update(self, drawdown: Drawdown) -> None:
+        """Update with a new drawdown, recalculating the mean."""
+        self.count += 1
+
+        if self.mean_drawdown is None:
+            self.mean_drawdown = MeanDrawdown(
+                mean_drawdown=drawdown.value,
+                mean_drawdown_ms=Decimal(str(drawdown.duration.total_seconds() * 1000)),
+            )
+            return
+
+        # Welford's online algorithm for mean
+        prev_mean = self.mean_drawdown.mean_drawdown
+        next_value = drawdown.value
+        count = Decimal(str(self.count))
+
+        new_mean_drawdown = prev_mean + (next_value - prev_mean) / count
+
+        prev_mean_ms = self.mean_drawdown.mean_drawdown_ms
+        next_ms = Decimal(str(drawdown.duration.total_seconds() * 1000))
+
+        new_mean_ms = prev_mean_ms + (next_ms - prev_mean_ms) / Decimal(str(self.count))
+
+        self.mean_drawdown = MeanDrawdown(
+            mean_drawdown=new_mean_drawdown,
+            mean_drawdown_ms=new_mean_ms,
+        )
+
+    def generate(self) -> MeanDrawdown | None:
+        """Generate the current mean drawdown."""
+        return self.mean_drawdown
+
+
+def build_drawdown_series(points: list[tuple[datetime, Decimal]]) -> list[Drawdown]:
+    """Build a series of drawdowns from equity points."""
+    if not points:
+        return []
+
+    generator = DrawdownGenerator()
+    drawdowns = []
+
+    for point in points:
+        if generator.peak is None:
+            generator = DrawdownGenerator.init(point)
+        else:
+            if completed := generator.update(point):
+                drawdowns.append(completed)
+
+    # Add any remaining drawdown
+    if remaining := generator.generate():
+        drawdowns.append(remaining)
+
+    return drawdowns
+
+
+def generate_drawdown_series(points: Sequence[tuple[datetime, float | Decimal]]) -> list[Drawdown]:
+    """Generate a series of drawdowns from equity points.
+
+    Args:
+        points: List of (datetime, value) tuples representing equity over time.
+
+    Returns:
+        List of Drawdown objects representing completed drawdown periods.
+    """
+    # Convert to Decimal and filter out invalid points
+    parsed_points = []
+    for time, value in points:
+        if isinstance(value, float):
+            if math.isnan(value) or math.isinf(value):
+                continue
+            value = Decimal(str(value))
+        parsed_points.append((time, value))
+
+    return build_drawdown_series(parsed_points)
+
+
+def calculate_max_drawdown(points: Sequence[tuple[datetime, float | Decimal]]) -> MaxDrawdown | None:
+    """Calculate the maximum drawdown from equity points.
+
+    Args:
+        points: List of (datetime, value) tuples representing equity over time.
+
+    Returns:
+        The maximum drawdown, or None if no drawdowns occurred.
+    """
+    drawdowns = generate_drawdown_series(points)
+    if not drawdowns:
+        return None
+
+    generator = MaxDrawdownGenerator.init(drawdowns[0])
+    for drawdown in drawdowns[1:]:
+        generator.update(drawdown)
+
+    return generator.generate()
+
+
+def calculate_mean_drawdown(points: Sequence[tuple[datetime, float | Decimal]]) -> MeanDrawdown | None:
+    """Calculate the mean drawdown from equity points.
+
+    Args:
+        points: List of (datetime, value) tuples representing equity over time.
+
+    Returns:
+        The mean drawdown statistics, or None if no drawdowns occurred.
+    """
+    drawdowns = generate_drawdown_series(points)
+    if not drawdowns:
+        return None
+
+    generator = MeanDrawdownGenerator.init(drawdowns[0])
+    for drawdown in drawdowns[1:]:
+        generator.update(drawdown)
+
+    return generator.generate()
