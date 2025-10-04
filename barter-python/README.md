@@ -204,6 +204,9 @@ python examples/backtest_cli.py \
   --market-data ../barter/examples/data/binance_spot_market_data_with_disconnect_events.json \
   --interval annual-365 \
   --pretty
+
+# Generate statistical trading summaries from synthetic data
+python examples/statistical_trading_summary.py
 ```
 
 Both `SystemHandle.shutdown_with_summary` and `run_historic_backtest` accept an optional
