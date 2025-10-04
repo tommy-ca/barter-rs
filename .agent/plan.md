@@ -17,20 +17,39 @@
 
 ## Pure Python Porting Progress (2025-10-04)
 1. ✅ Implement core barter-instrument data structures in pure Python:
-   - Side enum (Buy/Sell)
-   - ExchangeId enum with all 30+ exchanges
-   - Asset data structures (Asset, AssetNameInternal, AssetNameExchange)
-   - Underlying generic structure for base/quote pairs
-   - Keyed generic wrapper
-   - Instrument name structures (internal/exchange)
-   - Instrument quote asset enum
-   - Option kinds and exercise styles
-   - Contract types (Perpetual, Future, Option)
-   - InstrumentKind enum with all variants
-   - Full Instrument class with spot creation and utilities
-2. ✅ Add comprehensive unit tests (55 tests covering all structures)
-3. ✅ Apply modern Python practices: type hints, dataclasses-like behavior, proper equality/hashing
-4. ✅ Follow TDD with 80% implementation focus, maintain SOLID/KISS/DRY principles
+    - Side enum (Buy/Sell)
+    - ExchangeId enum with all 30+ exchanges
+    - Asset data structures (Asset, AssetNameInternal, AssetNameExchange)
+    - Underlying generic structure for base/quote pairs
+    - Keyed generic wrapper
+    - Instrument name structures (internal/exchange)
+    - Instrument quote asset enum
+    - Option kinds and exercise styles
+    - Contract types (Perpetual, Future, Option)
+    - InstrumentKind enum with all variants
+    - Full Instrument class with spot creation and utilities
+ 2. ✅ Add comprehensive unit tests (55 tests covering all structures)
+ 3. ✅ Apply modern Python practices: type hints, dataclasses-like behavior, proper equality/hashing
+ 4. ✅ Follow TDD with 80% implementation focus, maintain SOLID/KISS/DRY principles
+
+## Pure Python Porting Progress (2025-10-04) - Continued
+1. ✅ Implement core barter-execution data structures in pure Python:
+    - OrderKind enum (Market/Limit)
+    - TimeInForce enum (GTC, GTD, FOK, IOC)
+    - ID classes (ClientOrderId, OrderId, StrategyId)
+    - Balance and AssetBalance structures
+    - Trade and TradeId structures
+    - AssetFees structure
+    - OrderKey and OrderEvent structures
+    - RequestOpen and RequestCancel structures
+    - ActiveOrderState variants (OpenInFlight, Open, CancelInFlight)
+    - InactiveOrderState variants (Cancelled, FullyFilled, Expired, OpenFailed)
+    - OrderState enum
+    - Full Order class
+    - Account event structures (AccountEvent, AccountEventKind, AccountSnapshot, etc.)
+ 2. ✅ Add comprehensive unit tests (100+ tests covering all structures)
+ 3. ✅ Apply modern Python practices: type hints, dataclasses-like behavior, proper equality/hashing
+ 4. ✅ Follow TDD with 80% implementation focus, maintain SOLID/KISS/DRY principles
 
 ## Notes
 - Maintain commit discipline with atomic changes (commit & push each step).
