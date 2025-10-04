@@ -8,11 +8,11 @@
 - Ensure trading summaries returned from backtests reuse existing `PyBacktestSummary` and `PyMultiBacktestSummary` wrappers.
 
 ## Scope
-- Expose `BacktestArgsConstant` and `BacktestArgsDynamic` constructors for default engine types.
 - Provide synchronous Python-callable wrappers for `backtest` and `run_backtests` using Tokio runtimes under the hood.
-- Support market data sources backed by the existing `MarketDataInMemory` binding.
+- Build the necessary `BacktestArgsConstant` values directly from a `SystemConfig`, seeded balances, and `MarketDataInMemory` supplied from Python.
+- Generate `BacktestArgsDynamic` values internally using the default strategy and risk manager; expose a lightweight Python struct to let callers supply unique identifiers and risk-free rates.
 - Return rich Python trading summaries with decimal fidelity and dictionary conversion helpers.
-- Validate inputs (risk-free return, summary interval strings, strategy identifiers) before calling Rust functions.
+- Validate inputs (risk-free return, summary interval strings, requested backtest ids) before calling Rust functions.
 
 ## Out of Scope
 - Custom strategy or risk manager injection beyond the default engine implementations.
@@ -21,18 +21,16 @@
 
 ## Requirements
 1. Add PyO3 bindings in `barter-python/src/backtest.rs` for:
-   - `BacktestArgsConstant::new` accepting instruments, executions, market data, summary interval, and engine state.
-   - `BacktestArgsDynamic::new` accepting id, risk-free return, strategy handles, and risk manager handles.
-   - `backtest` returning a `PyBacktestSummary`.
-   - `run_backtests` returning a `PyMultiBacktestSummary`.
-2. Extend bindings to construct default engine state from Python-provided JSON (reuse `SystemConfig` parsing where possible).
-3. Update the Python `backtest` module to call into the new bindings while preserving high-level ergonomics.
-4. Cover new behaviour with Rust unit tests (where feasible) and Python integration tests exercising single and multi backtests.
+   - Building default `BacktestArgsConstant` instances from `PySystemConfig`, `PyMarketDataInMemory`, seeded balances, and a requested summary interval string.
+   - Constructing lightweight `PyBacktestArgsDynamic` wrappers that capture an id and risk-free return for default strategy/risk setups.
+   - Executing `backtest` and `run_backtests` (multi run) and surfacing results as `PyBacktestSummary` / `PyMultiBacktestSummary`.
+2. Ensure bindings spin up Tokio runtimes and block on the async Rust functions while releasing the GIL.
+3. Update the Python `backtest` module to delegate to the new bindings while preserving a friendly API surface.
+4. Cover new behaviour with Rust smoke tests (where feasible) and Python integration tests exercising single and multi backtests.
 5. Document usage in `barter-python/README.md` and update `.agent/todo.md` if follow-ups emerge.
 
 ## Testing Strategy
-- Add Pytest coverage verifying `run_backtests` aggregates multiple strategies and returns consistent summaries.
+- Add Pytest coverage verifying `run_backtests` aggregates multiple backtests and returns consistent summaries.
 - Ensure numeric fields (duration, risk-free return) round-trip accurately through the bindings.
 - Validate error surfaces for invalid market data or mismatched instruments.
 - Run `cargo test -p barter-python` and `pytest -q tests_py` after implementation.
-
