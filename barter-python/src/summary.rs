@@ -511,7 +511,7 @@ pub struct PyDrawdown {
 }
 
 impl PyDrawdown {
-    fn from_drawdown(py: Python<'_>, drawdown: Drawdown) -> PyResult<Py<PyDrawdown>> {
+    pub(crate) fn from_drawdown(py: Python<'_>, drawdown: Drawdown) -> PyResult<Py<PyDrawdown>> {
         let Drawdown {
             value,
             time_start,
@@ -584,7 +584,7 @@ pub struct PyMeanDrawdown {
 }
 
 impl PyMeanDrawdown {
-    fn from_mean(py: Python<'_>, mean: MeanDrawdown) -> PyResult<Py<PyMeanDrawdown>> {
+    pub(crate) fn from_mean(py: Python<'_>, mean: MeanDrawdown) -> PyResult<Py<PyMeanDrawdown>> {
         let MeanDrawdown {
             mean_drawdown,
             mean_drawdown_ms,

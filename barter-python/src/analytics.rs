@@ -1,22 +1,35 @@
 use crate::{
     command::parse_decimal,
-    summary::{PyMetricWithInterval, decimal_to_py},
+    summary::{PyDrawdown, PyMeanDrawdown, PyMetricWithInterval, decimal_to_py},
 };
-use barter::statistic::{
-    metric::{
-        calmar::CalmarRatio, profit_factor::ProfitFactor, rate_of_return::RateOfReturn,
-        sharpe::SharpeRatio, sortino::SortinoRatio, win_rate::WinRate,
+use barter::{
+    Timed,
+    statistic::{
+        metric::{
+            calmar::CalmarRatio,
+            drawdown::{
+                Drawdown, DrawdownGenerator,
+                max::{MaxDrawdown, MaxDrawdownGenerator},
+                mean::MeanDrawdownGenerator,
+            },
+            profit_factor::ProfitFactor,
+            rate_of_return::RateOfReturn,
+            sharpe::SharpeRatio,
+            sortino::SortinoRatio,
+            win_rate::WinRate,
+        },
+        time::{Annual252, Annual365, Daily, TimeInterval},
     },
-    time::{Annual252, Annual365, Daily, TimeInterval},
 };
-use chrono::TimeDelta;
+use chrono::{DateTime, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use pyo3::{
     Bound, PyObject,
     exceptions::PyValueError,
     prelude::*,
-    types::{PyAny, PyDelta},
+    types::{PyAny, PyDelta, PySequence},
 };
 use rust_decimal::Decimal;
+use std::str::FromStr;
 
 #[derive(Debug, Copy, Clone)]
 enum IntervalChoice {
@@ -305,6 +318,162 @@ pub fn calculate_rate_of_return(
         IntervalChoice::Duration(delta) => {
             rate_metric(py, RateOfReturn::calculate(mean, delta), target_choice)
         }
+    }
+}
+
+fn parse_datetime_point(value: &Bound<'_, PyAny>, index: usize) -> PyResult<DateTime<Utc>> {
+    if let Ok(datetime) = value.extract::<DateTime<Utc>>() {
+        return Ok(datetime);
+    }
+
+    if let Ok(naive) = value.extract::<NaiveDateTime>() {
+        return Ok(Utc.from_utc_datetime(&naive));
+    }
+
+    Err(PyValueError::new_err(format!(
+        "points[{index}].time must be a datetime.datetime instance",
+    )))
+}
+
+fn parse_numeric_value(value: &Bound<'_, PyAny>, field: &str) -> PyResult<Decimal> {
+    if let Ok(number) = value.extract::<f64>() {
+        return parse_decimal(number, field);
+    }
+
+    let binding = value
+        .str()
+        .map_err(|_| PyValueError::new_err(format!("{field} must be numeric")))?;
+    let value_str = binding
+        .to_str()
+        .map_err(|_| PyValueError::new_err(format!("{field} must be numeric")))?;
+
+    Decimal::from_str(value_str)
+        .map_err(|_| PyValueError::new_err(format!("{field} must be a finite numeric value")))
+}
+
+fn parse_equity_points(points: &Bound<'_, PyAny>) -> PyResult<Vec<Timed<Decimal>>> {
+    let sequence = points.downcast::<PySequence>().map_err(|_| {
+        PyValueError::new_err("points must be an iterable of (datetime, value) pairs")
+    })?;
+
+    let length = usize::try_from(sequence.len()?).unwrap_or(0);
+    let mut parsed = Vec::with_capacity(length);
+
+    for index in 0..length {
+        let item = sequence.get_item(index)?;
+        let pair = item.downcast::<PySequence>().map_err(|_| {
+            PyValueError::new_err(format!(
+                "points[{index}] must be an iterable of length 2 (datetime, value)",
+            ))
+        })?;
+
+        if pair.len()? != 2 {
+            return Err(PyValueError::new_err(format!(
+                "points[{index}] must contain exactly two elements (datetime, value)",
+            )));
+        }
+
+        let time = pair.get_item(0)?;
+        let value = pair.get_item(1)?;
+
+        let timestamp = parse_datetime_point(&time, index)?;
+        let decimal_value = parse_numeric_value(&value, &format!("points[{index}].value"))?;
+
+        parsed.push(Timed::new(decimal_value, timestamp));
+    }
+
+    Ok(parsed)
+}
+
+fn build_drawdown_series(points: Vec<Timed<Decimal>>) -> Vec<Drawdown> {
+    let mut generator = DrawdownGenerator::default();
+    let mut drawdowns = Vec::new();
+
+    for point in points {
+        if let Some(drawdown) = generator.update(point) {
+            drawdowns.push(drawdown);
+        }
+    }
+
+    if let Some(drawdown) = generator.generate() {
+        drawdowns.push(drawdown);
+    }
+
+    drawdowns
+}
+
+fn drawdown_series_from_py(points: &Bound<'_, PyAny>) -> PyResult<Vec<Drawdown>> {
+    let parsed = parse_equity_points(points)?;
+    if parsed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    Ok(build_drawdown_series(parsed))
+}
+
+#[pyfunction]
+#[pyo3(signature = (points))]
+pub fn generate_drawdown_series(
+    py: Python<'_>,
+    points: &Bound<'_, PyAny>,
+) -> PyResult<Vec<Py<PyDrawdown>>> {
+    let drawdowns = drawdown_series_from_py(points)?;
+
+    drawdowns
+        .into_iter()
+        .map(|drawdown| PyDrawdown::from_drawdown(py, drawdown))
+        .collect::<PyResult<Vec<_>>>()
+}
+
+#[pyfunction]
+#[pyo3(signature = (points))]
+pub fn calculate_max_drawdown(
+    py: Python<'_>,
+    points: &Bound<'_, PyAny>,
+) -> PyResult<Option<Py<PyDrawdown>>> {
+    let drawdowns = drawdown_series_from_py(points)?;
+
+    if drawdowns.is_empty() {
+        return Ok(None);
+    }
+
+    let mut generator: Option<MaxDrawdownGenerator> = None;
+    for drawdown in &drawdowns {
+        match generator.as_mut() {
+            Some(existing) => existing.update(drawdown),
+            None => generator = Some(MaxDrawdownGenerator::init(drawdown.clone())),
+        }
+    }
+
+    match generator.and_then(|generator_state| generator_state.generate()) {
+        Some(MaxDrawdown(drawdown)) => PyDrawdown::from_drawdown(py, drawdown).map(Some),
+        None => Ok(None),
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (points))]
+pub fn calculate_mean_drawdown(
+    py: Python<'_>,
+    points: &Bound<'_, PyAny>,
+) -> PyResult<Option<Py<PyMeanDrawdown>>> {
+    let drawdowns = drawdown_series_from_py(points)?;
+
+    if drawdowns.is_empty() {
+        return Ok(None);
+    }
+
+    let mut generator: Option<MeanDrawdownGenerator> = None;
+    for drawdown in &drawdowns {
+        match generator.as_mut() {
+            Some(existing) => existing.update(drawdown),
+            None => generator = Some(MeanDrawdownGenerator::init(drawdown.clone())),
+        }
+    }
+
+    match generator.and_then(|generator_state| generator_state.generate()) {
+        Some(mean) => PyMeanDrawdown::from_mean(py, mean).map(Some),
+        None => Ok(None),
     }
 }
 
