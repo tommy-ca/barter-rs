@@ -5,6 +5,7 @@
 //! Python bindings for the Barter trading engine.
 
 mod analytics;
+mod backtest;
 mod command;
 mod config;
 mod data;
@@ -16,6 +17,14 @@ use analytics::{
     calculate_calmar_ratio, calculate_max_drawdown, calculate_mean_drawdown,
     calculate_profit_factor, calculate_rate_of_return, calculate_sharpe_ratio,
     calculate_sortino_ratio, calculate_win_rate, generate_drawdown_series,
+};
+use backtest::{
+    PyBacktestSummary, PyMarketDataInMemory, PyMultiBacktestSummary, run_backtests_py,
+};
+use barter::backtest::{
+    market_data::{BacktestMarketData, MarketDataInMemory},
+    summary::{BacktestSummary, MultiBacktestSummary},
+    BacktestArgsConstant, BacktestArgsDynamic,
 };
 use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
@@ -741,6 +750,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubKind>()?;
     m.add_class::<PySubscription>()?;
     m.add_class::<PyDynamicStreams>()?;
+    m.add_class::<PyBacktestSummary>()?;
+    m.add_class::<PyMultiBacktestSummary>()?;
+    m.add_class::<PyMarketDataInMemory>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
@@ -756,6 +768,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(generate_drawdown_series, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_max_drawdown, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_mean_drawdown, m)?)?;
+    m.add_function(wrap_pyfunction!(run_backtests_py, m)?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();
