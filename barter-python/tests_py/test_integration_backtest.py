@@ -122,10 +122,11 @@ def test_indexed_instruments_basic():
 
 def test_execution_config_basic():
     """Test basic ExecutionConfig functionality."""
-    from barter_python.backtest import ExecutionConfig
+    from barter_python.backtest import ExecutionConfig, MockExecutionConfig
 
-    config = ExecutionConfig(mock_config="test")
-    assert config.mock_config == "test"
+    mock_config = MockExecutionConfig()
+    config = ExecutionConfig.mock(mock_config)
+    assert config.mock_config is mock_config
 
 
 # TODO: Add more comprehensive backtest integration tests once the full implementation is complete
