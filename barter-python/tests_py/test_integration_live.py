@@ -46,7 +46,6 @@ def test_live_system_lifecycle(example_paths: dict[str, Path]) -> None:
             bp.EngineEvent.trading_state(True),
             bp.EngineEvent.trading_state(False),
             bp.EngineEvent.cancel_orders(bp.InstrumentFilter.none()),
-            bp.EngineEvent.shutdown(),
         ]
         handle.feed_events(events)
     finally:

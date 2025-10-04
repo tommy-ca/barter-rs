@@ -247,9 +247,8 @@ pub fn start_system(
     // Clear initial balances from executions to allow seeded balances to take precedence
     if !seeded_balances.is_empty() {
         for execution in &mut config_inner.executions {
-            if let ExecutionConfig::Mock(mock) = execution {
-                mock.initial_state.balances.clear();
-            }
+            let ExecutionConfig::Mock(mock) = execution;
+            mock.initial_state.balances.clear();
         }
     }
 
@@ -309,9 +308,8 @@ pub fn run_historic_backtest(
     // Clear initial balances from executions to allow seeded balances to take precedence
     if !seeded_balances.is_empty() {
         for execution in &mut config_inner.executions {
-            if let ExecutionConfig::Mock(mock) = execution {
-                mock.initial_state.balances.clear();
-            }
+            let ExecutionConfig::Mock(mock) = execution;
+            mock.initial_state.balances.clear();
         }
     }
     let instruments = IndexedInstruments::new(config_inner.instruments.drain(..));
