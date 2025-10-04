@@ -98,6 +98,24 @@ print("max value", max_drawdown.value if max_drawdown else None)
 print("mean value", mean_drawdown.mean_drawdown if mean_drawdown else None)
 PY
 
+# Create market data subscriptions for streaming
+python - <<'PY'
+import barter_python as bp
+
+# Create a subscription for BTC/USDT public trades on Binance Spot
+subscription = bp.Subscription(
+    bp.ExchangeId.BINANCE_SPOT,
+    "btc",
+    "usdt",
+    bp.SubKind.PUBLIC_TRADES
+)
+
+print("Subscription:", subscription)
+print("Exchange:", subscription.exchange)
+print("Instrument:", subscription.instrument)
+print("Kind:", subscription.kind)
+PY
+
 # Abort a running system immediately without waiting for a summary
 python - <<'PY'
 import barter_python as bp
@@ -217,6 +235,34 @@ cancel_event = bp.EngineEvent.account_order_cancelled(
 These helpers validate inputs (for example ensuring filled quantity never exceeds the requested
 order size) and return strongly typed `EngineEvent` instances that can be fed directly into a
 running system.
+
+### Market Data Streaming
+
+The bindings expose types for creating market data subscriptions that can be used with the
+underlying Barter data streaming infrastructure:
+
+```python
+import barter_python as bp
+
+# Available exchanges
+print(bp.ExchangeId.BINANCE_SPOT)  # BinanceSpot
+print(bp.ExchangeId.COINBASE)      # Coinbase
+
+# Available subscription kinds
+print(bp.SubKind.PUBLIC_TRADES)    # PublicTrades
+print(bp.SubKind.ORDER_BOOKS_L1)   # OrderBooksL1
+print(bp.SubKind.LIQUIDATIONS)     # Liquidations
+
+# Create subscriptions for different instruments
+btc_trades = bp.Subscription(bp.ExchangeId.BINANCE_SPOT, "btc", "usdt", bp.SubKind.PUBLIC_TRADES)
+eth_trades = bp.Subscription(bp.ExchangeId.BINANCE_SPOT, "eth", "usdt", bp.SubKind.PUBLIC_TRADES)
+
+print(btc_trades.instrument)  # btc_usdt_spot
+```
+
+**Note:** Full async streaming functionality is under development. The current bindings provide
+the foundational types for subscription creation, with stream initialization planned for a future
+release.
 
 ## Development
 
