@@ -606,6 +606,40 @@ def test_account_snapshot_balance_validation() -> None:
         )
 
 
+def test_instrument_account_snapshot_instrument_mismatch() -> None:
+    key = bp.OrderKey(1, 7, "strategy-theta", "cid-42")
+    request = bp.OrderRequestOpen(key, "buy", 101.0, 0.5, kind="limit")
+    order_snapshot = bp.OrderSnapshot.from_open_request(
+        request,
+        order_id="order-123",
+        time_exchange=dt.datetime(2025, 10, 4, tzinfo=dt.timezone.utc),
+        filled_quantity=0.0,
+    )
+
+    with pytest.raises(ValueError):
+        bp.InstrumentAccountSnapshot(instrument=6, orders=[order_snapshot])
+
+
+def test_account_snapshot_exchange_validation() -> None:
+    balance_time = dt.datetime(2025, 10, 4, 12, tzinfo=dt.timezone.utc)
+    key = bp.OrderKey(3, 4, "strategy-iota", "cid-77")
+    request = bp.OrderRequestOpen(key, "sell", 250.0, 1.25, kind="limit")
+    order_snapshot = bp.OrderSnapshot.from_open_request(
+        request,
+        order_id="order-321",
+        time_exchange=dt.datetime(2025, 10, 4, 12, 5, tzinfo=dt.timezone.utc),
+        filled_quantity=0.0,
+    )
+    instrument_snapshot = bp.InstrumentAccountSnapshot(instrument=4, orders=[order_snapshot])
+
+    with pytest.raises(ValueError):
+        bp.AccountSnapshot(
+            exchange=2,
+            balances=[(5, 500.0, 250.0, balance_time)],
+            instruments=[instrument_snapshot],
+        )
+
+
 def test_calculate_rate_of_return() -> None:
     metric = bp.calculate_rate_of_return(mean_return=0.01, interval="daily")
 

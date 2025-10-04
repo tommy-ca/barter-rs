@@ -36,3 +36,10 @@
 ## Follow-Ups
 - Consider convenience constructors for building snapshots from Python dictionaries once basic
   support is stable.
+
+## Status (2025-10-04)
+- Added explicit validation ensuring `InstrumentAccountSnapshot` orders share the underlying
+  instrument index and that `AccountSnapshot` orders originate from the same exchange.
+- Expanded pytest coverage with regression tests for instrument mismatches and exchange
+  mismatches to confirm `ValueError` handling.
+- Rebuilt the PyO3 extension via `maturin develop` and verified the targeted snapshot tests.

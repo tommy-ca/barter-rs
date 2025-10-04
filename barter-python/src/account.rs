@@ -40,13 +40,25 @@ impl PyInstrumentAccountSnapshot {
     pub fn __new__(instrument: usize, orders: Vec<Py<PyOrderSnapshot>>) -> PyResult<Self> {
         let instrument_index = InstrumentIndex(instrument);
 
-        let mut converted = Vec::with_capacity(orders.len());
-        Python::with_gil(|py| {
-            for order in orders {
-                let borrowed = order.borrow(py);
-                converted.push(borrowed.clone_inner());
-            }
+        let converted: Vec<_> = Python::with_gil(|py| {
+            orders
+                .into_iter()
+                .map(|order| {
+                    let borrowed = order.borrow(py);
+                    borrowed.clone_inner()
+                })
+                .collect()
         });
+
+        for order in &converted {
+            if order.key.instrument != instrument_index {
+                return Err(PyValueError::new_err(format!(
+                    "order instrument {} does not match snapshot instrument {}",
+                    order.key.instrument.index(),
+                    instrument_index.index(),
+                )));
+            }
+        }
 
         Ok(Self {
             inner: InstrumentAccountSnapshot::new(instrument_index, converted),
@@ -140,13 +152,27 @@ impl PyAccountSnapshot {
             converted_balances.push(AssetBalance::new(AssetIndex(asset), balance, time_exchange));
         }
 
-        let mut converted_instruments = Vec::with_capacity(instruments.len());
-        Python::with_gil(|py| {
-            for instrument in instruments {
-                let borrowed = instrument.borrow(py);
-                converted_instruments.push(borrowed.clone_inner());
-            }
+        let converted_instruments: Vec<_> = Python::with_gil(|py| {
+            instruments
+                .into_iter()
+                .map(|instrument| {
+                    let borrowed = instrument.borrow(py);
+                    borrowed.clone_inner()
+                })
+                .collect()
         });
+
+        for snapshot in &converted_instruments {
+            for order in &snapshot.orders {
+                if order.key.exchange != exchange_index {
+                    return Err(PyValueError::new_err(format!(
+                        "order exchange {} does not match snapshot exchange {}",
+                        order.key.exchange.index(),
+                        exchange_index.index(),
+                    )));
+                }
+            }
+        }
 
         Ok(Self {
             inner: AccountSnapshot::new(exchange_index, converted_balances, converted_instruments),
