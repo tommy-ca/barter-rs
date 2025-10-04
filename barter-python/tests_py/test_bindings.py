@@ -485,3 +485,38 @@ def test_calculate_win_rate() -> None:
     # No trades
     no_trades = bp.calculate_win_rate(wins=0, total=0)
     assert no_trades is None
+
+
+def test_exchange_id_constants() -> None:
+    assert str(bp.ExchangeId.BINANCE_SPOT) == "BinanceSpot"
+    assert str(bp.ExchangeId.COINBASE) == "Coinbase"
+    assert str(bp.ExchangeId.KRAKEN) == "Kraken"
+
+
+def test_sub_kind_constants() -> None:
+    assert str(bp.SubKind.PUBLIC_TRADES) == "PublicTrades"
+    assert str(bp.SubKind.ORDER_BOOKS_L1) == "OrderBooksL1"
+    assert str(bp.SubKind.LIQUIDATIONS) == "Liquidations"
+
+
+def test_subscription_creation() -> None:
+    sub = bp.Subscription(bp.ExchangeId.BINANCE_SPOT, "btc", "usdt", bp.SubKind.PUBLIC_TRADES)
+
+    assert sub.exchange == bp.ExchangeId.BINANCE_SPOT
+    assert sub.kind == bp.SubKind.PUBLIC_TRADES
+    assert "btc_usdt_spot" in sub.instrument
+
+    # Test string representation
+    assert "Subscription" in str(sub)
+    assert "BinanceSpot" in str(sub)
+
+
+def test_dynamic_streams_placeholder() -> None:
+    streams = bp.DynamicStreams()
+
+    # Test that methods exist (even if they return None for now)
+    result = streams.select_trades(bp.ExchangeId.BINANCE_SPOT)
+    assert result is None
+
+    result = streams.select_all_trades()
+    assert result is None
