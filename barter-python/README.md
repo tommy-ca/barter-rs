@@ -98,6 +98,44 @@ print("max value", max_drawdown.value if max_drawdown else None)
 print("mean value", mean_drawdown.mean_drawdown if mean_drawdown else None)
 PY
 
+# Use pure Python strategy implementations
+python - <<'PY'
+import barter_python as bp
+from barter_python.strategy import (
+    EngineState,
+    InstrumentState,
+    Position,
+    close_open_positions_with_market_orders,
+)
+
+# Create a strategy ID
+strategy_id = bp.StrategyId.new("close-positions")
+
+# Create mock engine state with positions to close
+instruments = [
+    bp.strategy.InstrumentState(
+        instrument=0,
+        exchange=0,
+        position=bp.strategy.Position(0, bp.Side.BUY, 100.0, 50000.0),
+        price=51000.0,
+    ),
+    bp.strategy.InstrumentState(
+        instrument=1,
+        exchange=0,
+        position=bp.strategy.Position(1, bp.Side.SELL, 50.0, 30000.0),
+        price=29500.0,
+    ),
+]
+
+state = bp.strategy.EngineState(instruments)
+
+# Generate orders to close all positions
+cancel_requests, open_requests = close_open_positions_with_market_orders(strategy_id, state)
+
+print("Cancel requests:", len(list(cancel_requests)))
+print("Open requests:", len(list(open_requests)))
+PY
+
 # Create market data subscriptions for streaming
 python - <<'PY'
 import barter_python as bp
