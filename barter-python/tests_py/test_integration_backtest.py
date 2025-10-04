@@ -104,8 +104,4 @@ async def test_market_data_in_memory_from_json(example_paths: dict[str, Path]) -
     assert events[0].time_exchange == first_time
 
 
-@pytest.mark.asyncio
-async def test_backtest_basic() -> None:
-    """Test basic backtest functionality with minimal setup."""
-    # This is a placeholder test - full implementation would require more setup
-    pass
+# TODO: Add more comprehensive backtest integration tests once the full implementation is complete
