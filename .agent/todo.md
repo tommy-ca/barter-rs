@@ -33,10 +33,11 @@
 - [x] Draft release cadence doc aligning Rust crate and Python wheel versioning. (2025-10-04)
 - [x] Add "Release Notes" aggregation section to `barter-python/README.md` post cadence adoption.
 
-## Later Opportunities
-- [x] Expand bindings for market stream events (2025-10-03)
-- [x] Add CLI example for Python package (2025-10-03)
-- [x] Automate publishing of built Python wheels once credentials are available (requires `PYPI_API_TOKEN` secret for release tags)
+ ## Later Opportunities
+ - [x] Expand bindings for market stream events (2025-10-03)
+   - Added market_order_book_snapshot constructor (2025-10-04)
+ - [x] Add CLI example for Python package (2025-10-03)
+ - [x] Automate publishing of built Python wheels once credentials are available (requires `PYPI_API_TOKEN` secret for release tags)
 
 ## Completed
 - [x] Expose module version constant to Python consumers.

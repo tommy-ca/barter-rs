@@ -19,7 +19,7 @@ use analytics::{
     calculate_sortino_ratio, calculate_win_rate, generate_drawdown_series,
 };
 use backtest::{
-    PyBacktestSummary, PyMarketDataInMemory, PyMultiBacktestSummary, run_backtests_py,
+    PyBacktestSummary, PyMultiBacktestSummary, run_backtests_py,
 };
 use barter::backtest::{
     market_data::{BacktestMarketData, MarketDataInMemory},
@@ -752,7 +752,6 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDynamicStreams>()?;
     m.add_class::<PyBacktestSummary>()?;
     m.add_class::<PyMultiBacktestSummary>()?;
-    m.add_class::<PyMarketDataInMemory>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
