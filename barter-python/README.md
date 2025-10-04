@@ -42,6 +42,20 @@ summary_dict = summary.to_dict()
 print(summary_dict["instruments"][first_name]["pnl"])
 PY
 
+# Calculate portfolio analytics directly from summary inputs
+python - <<'PY'
+import barter_python as bp
+
+calmar = bp.calculate_calmar_ratio(
+    risk_free_return=0.0015,
+    mean_return=0.0025,
+    max_drawdown=0.02,
+    interval="daily",
+)
+
+print(calmar.interval, calmar.value)
+PY
+
 # Abort a running system immediately without waiting for a summary
 python - <<'PY'
 import barter_python as bp

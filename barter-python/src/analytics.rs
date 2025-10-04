@@ -1,6 +1,6 @@
 use crate::{command::parse_decimal, summary::PyMetricWithInterval};
 use barter::statistic::{
-    metric::{sharpe::SharpeRatio, sortino::SortinoRatio},
+    metric::{calmar::CalmarRatio, sharpe::SharpeRatio, sortino::SortinoRatio},
     time::{Annual252, Annual365, Daily, TimeInterval},
 };
 use chrono::TimeDelta;
@@ -51,6 +51,17 @@ where
     Interval: TimeInterval,
 {
     let SortinoRatio { value, interval } = ratio;
+    ratio_to_metric(py, value, interval)
+}
+
+fn calmar_metric<Interval>(
+    py: Python<'_>,
+    ratio: CalmarRatio<Interval>,
+) -> PyResult<Py<PyMetricWithInterval>>
+where
+    Interval: TimeInterval,
+{
+    let CalmarRatio { value, interval } = ratio;
     ratio_to_metric(py, value, interval)
 }
 
@@ -156,6 +167,38 @@ fn parse_interval_choice(value: &Bound<'_, PyAny>) -> PyResult<IntervalChoice> {
     Err(PyValueError::new_err(
         "interval must be a string identifier or datetime.timedelta",
     ))
+}
+
+#[pyfunction]
+#[pyo3(signature = (risk_free_return, mean_return, max_drawdown, interval))]
+pub fn calculate_calmar_ratio(
+    py: Python<'_>,
+    risk_free_return: f64,
+    mean_return: f64,
+    max_drawdown: f64,
+    interval: &Bound<'_, PyAny>,
+) -> PyResult<Py<PyMetricWithInterval>> {
+    let risk_free = parse_decimal(risk_free_return, "risk_free_return")?;
+    let mean = parse_decimal(mean_return, "mean_return")?;
+    let drawdown = parse_decimal(max_drawdown, "max_drawdown")?;
+    let choice = parse_interval_choice(interval)?;
+
+    match choice {
+        IntervalChoice::Daily => {
+            calmar_metric(py, CalmarRatio::calculate(risk_free, mean, drawdown, Daily))
+        }
+        IntervalChoice::Annual252 => calmar_metric(
+            py,
+            CalmarRatio::calculate(risk_free, mean, drawdown, Annual252),
+        ),
+        IntervalChoice::Annual365 => calmar_metric(
+            py,
+            CalmarRatio::calculate(risk_free, mean, drawdown, Annual365),
+        ),
+        IntervalChoice::Duration(delta) => {
+            calmar_metric(py, CalmarRatio::calculate(risk_free, mean, drawdown, delta))
+        }
+    }
 }
 
 fn parse_interval_from_str(label: &str) -> PyResult<IntervalChoice> {

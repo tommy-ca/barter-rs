@@ -74,3 +74,61 @@ def test_calculate_sharpe_ratio_rejects_non_finite_input() -> None:
             std_dev_returns=0.02,
             interval="Daily",
         )
+
+
+def test_calculate_calmar_ratio_daily_interval() -> None:
+    metric = bp.calculate_calmar_ratio(
+        risk_free_return=0.0015,
+        mean_return=0.0025,
+        max_drawdown=0.02,
+        interval="Daily",
+    )
+
+    assert metric.value == Decimal("0.05")
+    assert metric.interval == "Daily"
+
+
+def test_calculate_calmar_ratio_timedelta_interval() -> None:
+    metric = bp.calculate_calmar_ratio(
+        risk_free_return=0.0015,
+        mean_return=0.0025,
+        max_drawdown=0.02,
+        interval=dt.timedelta(hours=4),
+    )
+
+    assert metric.value == Decimal("0.05")
+    assert metric.interval.startswith("Duration 240")
+
+
+def test_calculate_calmar_ratio_zero_drawdown_positive_excess() -> None:
+    metric = bp.calculate_calmar_ratio(
+        risk_free_return=0.001,
+        mean_return=0.002,
+        max_drawdown=0.0,
+        interval="Daily",
+    )
+
+    assert metric.value == Decimal("79228162514264337593543950335")
+    assert metric.interval == "Daily"
+
+
+def test_calculate_calmar_ratio_zero_drawdown_negative_excess() -> None:
+    metric = bp.calculate_calmar_ratio(
+        risk_free_return=0.002,
+        mean_return=0.001,
+        max_drawdown=0.0,
+        interval="Daily",
+    )
+
+    assert metric.value == Decimal("-79228162514264337593543950335")
+    assert metric.interval == "Daily"
+
+
+def test_calculate_calmar_ratio_invalid_interval_raises() -> None:
+    with pytest.raises(ValueError):
+        bp.calculate_calmar_ratio(
+            risk_free_return=0.001,
+            mean_return=0.002,
+            max_drawdown=0.02,
+            interval="Weekly",
+        )
