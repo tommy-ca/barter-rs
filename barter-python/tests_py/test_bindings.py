@@ -32,6 +32,40 @@ def test_subscription_id() -> None:
     assert sid != sid3
 
 
+def test_index_wrappers_roundtrip() -> None:
+    exchange_idx = bp.ExchangeIndex(5)
+    instrument_idx = bp.InstrumentIndex(11)
+
+    assert exchange_idx.index == 5
+    assert instrument_idx.index == 11
+
+    assert int(exchange_idx) == 5
+    assert int(instrument_idx) == 11
+
+    assert exchange_idx == bp.ExchangeIndex(5)
+    assert instrument_idx != bp.InstrumentIndex(12)
+
+    assert "ExchangeIndex" in repr(exchange_idx)
+    assert "InstrumentIndex" in repr(instrument_idx)
+
+
+def test_order_key_from_index_wrappers() -> None:
+    exchange_idx = bp.ExchangeIndex(2)
+    instrument_idx = bp.InstrumentIndex(7)
+
+    key = bp.OrderKey.from_indices(
+        exchange_idx,
+        instrument_idx,
+        "strategy-alpha",
+        client_order_id="cid-42",
+    )
+
+    assert key.exchange == 2
+    assert key.instrument == 7
+    assert key.strategy_id == "strategy-alpha"
+    assert key.client_order_id == "cid-42"
+
+
 def test_init_tracing_invalid_filter_raises() -> None:
     with pytest.raises(ValueError):
         bp.init_tracing(filter="invalid[filter")

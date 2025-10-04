@@ -69,7 +69,7 @@ use data::{
     PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId,
     init_dynamic_streams,
 };
-use instrument::{PyAsset, PyAssetIndex, PySide};
+use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PySide};
 use logging::{init_json_logging_py, init_tracing};
 use metric::{PyField, PyMetric, PyTag, PyValue};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
@@ -812,6 +812,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDynamicStreams>()?;
     m.add_class::<PyAsset>()?;
     m.add_class::<PyAssetIndex>()?;
+    m.add_class::<PyExchangeIndex>()?;
+    m.add_class::<PyInstrumentIndex>()?;
     m.add_class::<PySide>()?;
     m.add_class::<PyMetric>()?;
     m.add_class::<PyTag>()?;

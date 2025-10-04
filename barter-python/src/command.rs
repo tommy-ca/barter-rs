@@ -1,3 +1,4 @@
+use crate::instrument::{PyExchangeIndex, PyInstrumentIndex};
 use barter::engine::state::instrument::filter::InstrumentFilter;
 use barter_execution::order::request::{
     OrderRequestCancel, OrderRequestOpen, RequestCancel, RequestOpen,
@@ -31,20 +32,13 @@ impl PyOrderKey {
     pub(crate) fn clone_inner(&self) -> DefaultOrderKey {
         self.inner.clone()
     }
-}
 
-#[pymethods]
-impl PyOrderKey {
-    #[new]
-    #[pyo3(signature = (exchange, instrument, strategy_id, client_order_id=None))]
-    pub fn new(
-        exchange: usize,
-        instrument: usize,
+    fn from_parts(
+        exchange: ExchangeIndex,
+        instrument: InstrumentIndex,
         strategy_id: &str,
         client_order_id: Option<&str>,
     ) -> Self {
-        let exchange = ExchangeIndex(exchange);
-        let instrument = InstrumentIndex(instrument);
         let strategy = StrategyId::new(strategy_id);
         let cid = client_order_id
             .map(ClientOrderId::new)
@@ -58,6 +52,42 @@ impl PyOrderKey {
                 cid,
             },
         }
+    }
+}
+
+#[pymethods]
+impl PyOrderKey {
+    #[new]
+    #[pyo3(signature = (exchange, instrument, strategy_id, client_order_id=None))]
+    pub fn new(
+        exchange: usize,
+        instrument: usize,
+        strategy_id: &str,
+        client_order_id: Option<&str>,
+    ) -> Self {
+        Self::from_parts(
+            ExchangeIndex(exchange),
+            InstrumentIndex(instrument),
+            strategy_id,
+            client_order_id,
+        )
+    }
+
+    /// Construct an [`OrderKey`] from wrapper indices.
+    #[staticmethod]
+    #[pyo3(name = "from_indices", signature = (exchange, instrument, strategy_id, client_order_id=None))]
+    pub fn from_indices(
+        exchange: &PyExchangeIndex,
+        instrument: &PyInstrumentIndex,
+        strategy_id: &str,
+        client_order_id: Option<&str>,
+    ) -> Self {
+        Self::from_parts(
+            exchange.inner(),
+            instrument.inner(),
+            strategy_id,
+            client_order_id,
+        )
     }
 
     #[getter]

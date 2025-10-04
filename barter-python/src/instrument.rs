@@ -1,6 +1,8 @@
 use barter_instrument::{
     Side,
     asset::{Asset, AssetIndex},
+    exchange::ExchangeIndex,
+    instrument::InstrumentIndex,
 };
 use pyo3::prelude::*;
 
@@ -61,6 +63,51 @@ impl PyAsset {
     }
 }
 
+/// Wrapper around [`ExchangeIndex`] for Python exposure.
+#[pyclass(module = "barter_python", name = "ExchangeIndex", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyExchangeIndex {
+    inner: ExchangeIndex,
+}
+
+impl PyExchangeIndex {
+    pub(crate) fn inner(&self) -> ExchangeIndex {
+        self.inner
+    }
+}
+
+#[pymethods]
+impl PyExchangeIndex {
+    /// Create a new [`ExchangeIndex`].
+    #[new]
+    fn new(index: usize) -> Self {
+        Self {
+            inner: ExchangeIndex(index),
+        }
+    }
+
+    /// Get the index value.
+    #[getter]
+    fn index(&self) -> usize {
+        self.inner.index()
+    }
+
+    /// Return the integer representation.
+    fn __int__(&self) -> usize {
+        self.index()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("ExchangeIndex({})", self.index())
+    }
+}
+
 /// Wrapper around [`Side`] for Python exposure.
 #[pyclass(module = "barter_python", name = "Side", eq)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -92,6 +139,51 @@ impl PySide {
 impl PySide {
     pub(crate) fn inner(&self) -> Side {
         self.inner
+    }
+}
+
+/// Wrapper around [`InstrumentIndex`] for Python exposure.
+#[pyclass(module = "barter_python", name = "InstrumentIndex", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyInstrumentIndex {
+    inner: InstrumentIndex,
+}
+
+impl PyInstrumentIndex {
+    pub(crate) fn inner(&self) -> InstrumentIndex {
+        self.inner
+    }
+}
+
+#[pymethods]
+impl PyInstrumentIndex {
+    /// Create a new [`InstrumentIndex`].
+    #[new]
+    fn new(index: usize) -> Self {
+        Self {
+            inner: InstrumentIndex(index),
+        }
+    }
+
+    /// Get the index value.
+    #[getter]
+    fn index(&self) -> usize {
+        self.inner.index()
+    }
+
+    /// Return the integer representation.
+    fn __int__(&self) -> usize {
+        self.index()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("InstrumentIndex({})", self.index())
     }
 }
 
