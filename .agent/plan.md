@@ -15,6 +15,23 @@
 4. Align CI to run `cargo test`, `pytest`, and packaging checks on every push & PR (✅ 2025-10-04 via `.github/workflows/ci.yml`).
 5. Prepare developer onboarding notes for maintaining the hybrid workspace (✅ 2025-10-04; see `docs/developer-onboarding.md`).
 
+## Pure Python Porting Progress (2025-10-04)
+1. ✅ Implement core barter-instrument data structures in pure Python:
+   - Side enum (Buy/Sell)
+   - ExchangeId enum with all 30+ exchanges
+   - Asset data structures (Asset, AssetNameInternal, AssetNameExchange)
+   - Underlying generic structure for base/quote pairs
+   - Keyed generic wrapper
+   - Instrument name structures (internal/exchange)
+   - Instrument quote asset enum
+   - Option kinds and exercise styles
+   - Contract types (Perpetual, Future, Option)
+   - InstrumentKind enum with all variants
+   - Full Instrument class with spot creation and utilities
+2. ✅ Add comprehensive unit tests (55 tests covering all structures)
+3. ✅ Apply modern Python practices: type hints, dataclasses-like behavior, proper equality/hashing
+4. ✅ Follow TDD with 80% implementation focus, maintain SOLID/KISS/DRY principles
+
 ## Notes
 - Maintain commit discipline with atomic changes (commit & push each step).
 - Balance effort with ~80% focused on core porting work, ~20% on testing scaffolding.

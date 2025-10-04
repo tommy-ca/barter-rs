@@ -599,3 +599,157 @@ class Instrument(Generic[AssetKey]):
             self.kind,
             self.spec,
         ))
+
+
+class MarketDataFutureContract:
+    """Future contract specification for market data."""
+
+    def __init__(self, expiry: datetime) -> None:
+        self.expiry = expiry
+
+    def __repr__(self) -> str:
+        return f"MarketDataFutureContract(expiry={self.expiry!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MarketDataFutureContract):
+            return NotImplemented
+        return self.expiry == other.expiry
+
+    def __hash__(self) -> int:
+        return hash(self.expiry)
+
+
+class MarketDataOptionContract:
+    """Option contract specification for market data."""
+
+    def __init__(
+        self,
+        kind: OptionKind,
+        exercise: OptionExercise,
+        expiry: datetime,
+        strike: Decimal,
+    ) -> None:
+        self.kind = kind
+        self.exercise = exercise
+        self.expiry = expiry
+        self.strike = strike
+
+    def __repr__(self) -> str:
+        return (
+            f"MarketDataOptionContract("
+            f"kind={self.kind!r}, "
+            f"exercise={self.exercise!r}, "
+            f"expiry={self.expiry!r}, "
+            f"strike={self.strike!r}"
+            f")"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MarketDataOptionContract):
+            return NotImplemented
+        return (
+            self.kind == other.kind
+            and self.exercise == other.exercise
+            and self.expiry == other.expiry
+            and self.strike == other.strike
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.kind, self.exercise, self.expiry, self.strike))
+
+
+MarketDataInstrumentKindType = Union[
+    type(...),  # For Spot (no args)
+    MarketDataFutureContract,
+    MarketDataOptionContract,
+]
+
+
+class MarketDataInstrumentKind:
+    """Instrument kind enum for market data."""
+
+    def __init__(self, kind: str, data: Optional[MarketDataInstrumentKindType] = None) -> None:
+        self._kind = kind
+        self._data = data
+
+    @classmethod
+    def spot(cls) -> MarketDataInstrumentKind:
+        return cls("spot")
+
+    @classmethod
+    def perpetual(cls) -> MarketDataInstrumentKind:
+        return cls("perpetual")
+
+    @classmethod
+    def future(cls, contract: MarketDataFutureContract) -> MarketDataInstrumentKind:
+        return cls("future", contract)
+
+    @classmethod
+    def option(cls, contract: MarketDataOptionContract) -> MarketDataInstrumentKind:
+        return cls("option", contract)
+
+    @property
+    def kind(self) -> str:
+        return self._kind
+
+    @property
+    def data(self) -> Optional[MarketDataInstrumentKindType]:
+        return self._data
+
+    def __repr__(self) -> str:
+        if self._data is None:
+            return f"MarketDataInstrumentKind.{self._kind}()"
+        else:
+            return f"MarketDataInstrumentKind.{self._kind}({self._data!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MarketDataInstrumentKind):
+            return NotImplemented
+        return self._kind == other._kind and self._data == other._data
+
+    def __hash__(self) -> int:
+        return hash((self._kind, self._data))
+
+    def __str__(self) -> str:
+        if self._kind == "spot":
+            return "spot"
+        elif self._kind == "perpetual":
+            return "perpetual"
+        elif self._kind == "future":
+            return f"future_{self._data.expiry.date()}-UTC"  # type: ignore
+        elif self._kind == "option":
+            return f"option_{self._data.kind}_{self._data.exercise}_{self._data.expiry.date()}-UTC_{self._data.strike}"  # type: ignore
+        else:
+            return self._kind
+
+
+class MarketDataInstrument:
+    """Barter representation of a MarketDataInstrument."""
+
+    def __init__(
+        self,
+        base: str | AssetNameInternal,
+        quote: str | AssetNameInternal,
+        kind: MarketDataInstrumentKind,
+    ) -> None:
+        self.base = base if isinstance(base, AssetNameInternal) else AssetNameInternal(base)
+        self.quote = quote if isinstance(quote, AssetNameInternal) else AssetNameInternal(quote)
+        self.kind = kind
+
+    @classmethod
+    def new(cls, base: str | AssetNameInternal, quote: str | AssetNameInternal, kind: MarketDataInstrumentKind) -> MarketDataInstrument:
+        return cls(base, quote, kind)
+
+    def __str__(self) -> str:
+        return f"{self.base}_{self.quote}_{self.kind}"
+
+    def __repr__(self) -> str:
+        return f"MarketDataInstrument(base={self.base!r}, quote={self.quote!r}, kind={self.kind!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MarketDataInstrument):
+            return NotImplemented
+        return self.base == other.base and self.quote == other.quote and self.kind == other.kind
+
+    def __hash__(self) -> int:
+        return hash((self.base, self.quote, self.kind))

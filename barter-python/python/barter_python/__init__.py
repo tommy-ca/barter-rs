@@ -10,11 +10,12 @@ _core: ModuleType = import_module(".barter_python", __name__)
 # Import pure Python modules
 from . import instrument
 from . import execution
+from . import data
 
 __all__ = [name for name in dir(_core) if not name.startswith("_")]
 
 # Add pure Python modules to __all__
-__all__.extend(["instrument", "execution"])
+__all__.extend(["instrument", "execution", "data"])
 
 
 def __getattr__(name: str):
