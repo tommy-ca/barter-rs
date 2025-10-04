@@ -14,6 +14,7 @@ mod books;
 mod command;
 mod config;
 mod data;
+mod execution;
 mod instrument;
 mod integration;
 mod logging;
@@ -72,6 +73,7 @@ use data::{
     PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId,
     init_dynamic_streams,
 };
+use execution::{PyClientOrderId, PyOrderId, PyStrategyId};
 use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PySide};
 use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
@@ -797,6 +799,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
     m.add_class::<PySystemHandle>()?;
+    m.add_class::<PyClientOrderId>()?;
+    m.add_class::<PyOrderId>()?;
+    m.add_class::<PyStrategyId>()?;
     m.add_class::<PyOrderKey>()?;
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;

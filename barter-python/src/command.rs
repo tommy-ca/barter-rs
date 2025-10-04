@@ -1,4 +1,7 @@
-use crate::instrument::{PyExchangeIndex, PyInstrumentIndex};
+use crate::{
+    execution::{PyClientOrderId, PyStrategyId, coerce_client_order_id, coerce_strategy_id},
+    instrument::{PyExchangeIndex, PyInstrumentIndex},
+};
 use barter::engine::state::instrument::filter::InstrumentFilter;
 use barter_execution::order::request::{
     OrderRequestCancel, OrderRequestOpen, RequestCancel, RequestOpen,
@@ -13,7 +16,7 @@ use barter_instrument::{
 };
 use barter_integration::collection::one_or_many::OneOrMany;
 use chrono::{DateTime, Utc};
-use pyo3::{Py, Python, exceptions::PyValueError, prelude::*};
+use pyo3::{Bound, Py, PyAny, Python, exceptions::PyValueError, prelude::*};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 
@@ -22,8 +25,15 @@ pub type DefaultOrderRequestOpen = OrderRequestOpen<ExchangeIndex, InstrumentInd
 pub type DefaultOrderRequestCancel = OrderRequestCancel<ExchangeIndex, InstrumentIndex>;
 pub type DefaultInstrumentFilter = InstrumentFilter<ExchangeIndex, AssetIndex, InstrumentIndex>;
 
-#[pyclass(module = "barter_python", name = "OrderKey", unsendable)]
-#[derive(Debug, Clone)]
+#[pyclass(
+    module = "barter_python",
+    name = "OrderKey",
+    unsendable,
+    eq,
+    hash,
+    frozen
+)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyOrderKey {
     pub(crate) inner: DefaultOrderKey,
 }
@@ -36,14 +46,9 @@ impl PyOrderKey {
     fn from_parts(
         exchange: ExchangeIndex,
         instrument: InstrumentIndex,
-        strategy_id: &str,
-        client_order_id: Option<&str>,
+        strategy: StrategyId,
+        cid: ClientOrderId,
     ) -> Self {
-        let strategy = StrategyId::new(strategy_id);
-        let cid = client_order_id
-            .map(ClientOrderId::new)
-            .unwrap_or_else(ClientOrderId::random);
-
         Self {
             inner: OrderKey {
                 exchange,
@@ -58,36 +63,44 @@ impl PyOrderKey {
 #[pymethods]
 impl PyOrderKey {
     #[new]
-    #[pyo3(signature = (exchange, instrument, strategy_id, client_order_id=None))]
+    #[pyo3(signature = (exchange, instrument, strategy, cid=None))]
     pub fn new(
-        exchange: usize,
-        instrument: usize,
-        strategy_id: &str,
-        client_order_id: Option<&str>,
-    ) -> Self {
-        Self::from_parts(
-            ExchangeIndex(exchange),
-            InstrumentIndex(instrument),
+        exchange: &Bound<'_, PyAny>,
+        instrument: &Bound<'_, PyAny>,
+        strategy: &Bound<'_, PyAny>,
+        cid: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let exchange_index = parse_exchange_index(exchange)?;
+        let instrument_index = parse_instrument_index(instrument)?;
+        let strategy_id = coerce_strategy_id(strategy)?;
+        let client_order_id = coerce_client_order_id(cid)?;
+
+        Ok(Self::from_parts(
+            exchange_index,
+            instrument_index,
             strategy_id,
             client_order_id,
-        )
+        ))
     }
 
     /// Construct an [`OrderKey`] from wrapper indices.
     #[staticmethod]
-    #[pyo3(name = "from_indices", signature = (exchange, instrument, strategy_id, client_order_id=None))]
+    #[pyo3(name = "from_indices", signature = (exchange, instrument, strategy, cid=None))]
     pub fn from_indices(
         exchange: &PyExchangeIndex,
         instrument: &PyInstrumentIndex,
-        strategy_id: &str,
-        client_order_id: Option<&str>,
-    ) -> Self {
-        Self::from_parts(
+        strategy: &Bound<'_, PyAny>,
+        cid: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let strategy_id = coerce_strategy_id(strategy)?;
+        let client_order_id = coerce_client_order_id(cid)?;
+
+        Ok(Self::from_parts(
             exchange.inner(),
             instrument.inner(),
             strategy_id,
             client_order_id,
-        )
+        ))
     }
 
     #[getter]
@@ -98,6 +111,16 @@ impl PyOrderKey {
     #[getter]
     pub fn instrument(&self) -> usize {
         self.inner.instrument.index()
+    }
+
+    #[getter]
+    pub fn strategy(&self) -> PyStrategyId {
+        PyStrategyId::from_inner(self.inner.strategy.clone())
+    }
+
+    #[getter]
+    pub fn cid(&self) -> PyClientOrderId {
+        PyClientOrderId::from_inner(self.inner.cid.clone())
     }
 
     #[getter]
@@ -112,13 +135,51 @@ impl PyOrderKey {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
-            "OrderKey(exchange={}, instrument={}, strategy_id='{}', client_order_id='{}')",
+            "OrderKey(exchange={}, instrument={}, strategy='{}', cid='{}')",
             self.exchange(),
             self.instrument(),
             self.strategy_id(),
             self.client_order_id(),
         ))
     }
+
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!(
+            "{}:{}:{}:{}",
+            self.exchange(),
+            self.instrument(),
+            self.strategy_id(),
+            self.client_order_id()
+        ))
+    }
+}
+
+fn parse_exchange_index(value: &Bound<'_, PyAny>) -> PyResult<ExchangeIndex> {
+    if let Ok(index) = value.extract::<usize>() {
+        return Ok(ExchangeIndex(index));
+    }
+
+    if let Ok(wrapper) = value.extract::<Py<PyExchangeIndex>>() {
+        return Ok(wrapper.borrow(value.py()).inner());
+    }
+
+    Err(PyValueError::new_err(
+        "exchange must be an integer or ExchangeIndex",
+    ))
+}
+
+fn parse_instrument_index(value: &Bound<'_, PyAny>) -> PyResult<InstrumentIndex> {
+    if let Ok(index) = value.extract::<usize>() {
+        return Ok(InstrumentIndex(index));
+    }
+
+    if let Ok(wrapper) = value.extract::<Py<PyInstrumentIndex>>() {
+        return Ok(wrapper.borrow(value.py()).inner());
+    }
+
+    Err(PyValueError::new_err(
+        "instrument must be an integer or InstrumentIndex",
+    ))
 }
 
 #[pyclass(module = "barter_python", name = "OrderRequestOpen", unsendable)]

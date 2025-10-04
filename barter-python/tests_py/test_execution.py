@@ -3,6 +3,8 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import barter_python as bp
+import barter_python.execution as execution
 from barter_python.execution import (
     AccountEvent,
     AccountEventKind,
@@ -29,7 +31,42 @@ from barter_python.execution import (
     Trade,
     TradeId,
 )
-from barter_python.instrument import ExchangeId, QuoteAsset, Side
+from barter_python.instrument import QuoteAsset, Side
+
+
+BINANCE_INDEX = 1
+KRAKEN_INDEX = 2
+
+
+class TestRootExecutionIdentifiers:
+    def test_client_order_id_exposed(self):
+        cid = bp.ClientOrderId.new("root-123")
+        assert cid.value == "root-123"
+        assert isinstance(cid, execution.ClientOrderId)
+
+    def test_order_id_exposed(self):
+        oid = bp.OrderId.new("root-order")
+        assert oid.value == "root-order"
+        assert isinstance(oid, execution.OrderId)
+
+    def test_strategy_id_exposed(self):
+        sid = bp.StrategyId.new("root-strategy")
+        assert sid.value == "root-strategy"
+        assert isinstance(sid, execution.StrategyId)
+
+    def test_order_key_exposed(self):
+        exchange_idx = bp.ExchangeIndex(2)
+        instrument_idx = bp.InstrumentIndex(101)
+        strategy = bp.StrategyId.new("root-strategy")
+        cid = bp.ClientOrderId.new("cid-101")
+
+        key = bp.OrderKey.from_indices(exchange_idx, instrument_idx, strategy, cid)
+        assert key.exchange == exchange_idx.index
+        assert key.instrument == instrument_idx.index
+        assert isinstance(key.strategy, execution.StrategyId)
+        assert key.strategy.value == "root-strategy"
+        assert isinstance(key.cid, execution.ClientOrderId)
+        assert key.cid.value == "cid-101"
 
 
 class TestOrderKind:
@@ -114,7 +151,7 @@ class TestStrategyId:
 
 class TestOrderKey:
     def test_creation(self):
-        exchange = ExchangeId.BINANCE_SPOT
+        exchange = BINANCE_INDEX
         instrument = 42
         strategy = StrategyId.new("strategy-alpha")
         cid = ClientOrderId.new("cid-123")
@@ -127,31 +164,31 @@ class TestOrderKey:
 
     def test_equality(self):
         key1 = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("alpha"),
             ClientOrderId.new("cid-123"),
         )
         key2 = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("alpha"),
             ClientOrderId.new("cid-123"),
         )
         key3 = OrderKey(
-            ExchangeId.KRAKEN, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-123")
+            KRAKEN_INDEX, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-123")
         )
         assert key1 == key2
         assert key1 != key3
 
     def test_str_repr(self):
         key = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("alpha"),
             ClientOrderId.new("cid-123"),
         )
-        assert str(key) == "binance_spot:42:alpha:cid-123"
+        assert str(key) == f"{BINANCE_INDEX}:42:alpha:cid-123"
         assert "OrderKey(" in repr(key)
 
 
@@ -574,7 +611,7 @@ class TestOrderState:
 class TestOrder:
     def test_creation(self):
         key = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("strategy-alpha"),
             ClientOrderId.new("cid-123"),
@@ -597,7 +634,7 @@ class TestOrder:
 
     def test_equality(self):
         key = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("strategy-alpha"),
             ClientOrderId.new("cid-123"),
@@ -636,7 +673,7 @@ class TestOrder:
 
     def test_str_repr(self):
         key = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("strategy-alpha"),
             ClientOrderId.new("cid-123"),
@@ -658,7 +695,7 @@ class TestOrder:
 class TestOrderResponseCancel:
     def test_creation(self):
         key = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("strategy-alpha"),
             ClientOrderId.new("cid-123"),
@@ -674,7 +711,7 @@ class TestOrderResponseCancel:
 
     def test_str_repr(self):
         key = OrderKey(
-            ExchangeId.BINANCE_SPOT,
+            BINANCE_INDEX,
             42,
             StrategyId.new("strategy-alpha"),
             ClientOrderId.new("cid-123"),
@@ -694,7 +731,7 @@ class TestInstrumentAccountSnapshot:
         orders = [
             Order(
                 OrderKey(
-                    ExchangeId.BINANCE_SPOT,
+                    BINANCE_INDEX,
                     42,
                     StrategyId.new("alpha"),
                     ClientOrderId.new("cid-1"),
@@ -731,7 +768,7 @@ class TestInstrumentAccountSnapshot:
 
 class TestAccountSnapshot:
     def test_creation(self):
-        exchange = ExchangeId.BINANCE_SPOT
+        exchange = BINANCE_INDEX
         balances = [
             AssetBalance.new(
                 "btc",
@@ -759,7 +796,7 @@ class TestAccountSnapshot:
                 [
                     Order(
                         OrderKey(
-                            ExchangeId.BINANCE_SPOT,
+                            BINANCE_INDEX,
                             42,
                             StrategyId.new("alpha"),
                             ClientOrderId.new("cid-1"),
@@ -777,7 +814,7 @@ class TestAccountSnapshot:
             )
         ]
 
-        snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, balances, instruments)
+        snapshot = AccountSnapshot.new(BINANCE_INDEX, balances, instruments)
         assert snapshot.time_most_recent() == time2
 
     def test_assets_instruments_iter(self):
@@ -798,7 +835,7 @@ class TestAccountSnapshot:
             InstrumentAccountSnapshot.new(43),
         ]
 
-        snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, balances, instruments)
+        snapshot = AccountSnapshot.new(BINANCE_INDEX, balances, instruments)
 
         assets = list(snapshot.assets())
         assert "btc" in assets
@@ -809,20 +846,20 @@ class TestAccountSnapshot:
         assert 43 in instruments_list
 
     def test_equality(self):
-        snapshot1 = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, [], [])
-        snapshot2 = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, [], [])
-        snapshot3 = AccountSnapshot.new(ExchangeId.KRAKEN, [], [])
+        snapshot1 = AccountSnapshot.new(BINANCE_INDEX, [], [])
+        snapshot2 = AccountSnapshot.new(BINANCE_INDEX, [], [])
+        snapshot3 = AccountSnapshot.new(KRAKEN_INDEX, [], [])
         assert snapshot1 == snapshot2
         assert snapshot1 != snapshot3
 
     def test_str_repr(self):
-        snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, [], [])
+        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
         assert "AccountSnapshot(" in repr(snapshot)
 
 
 class TestAccountEventKind:
     def test_snapshot(self):
-        snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, [], [])
+        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
         aek = AccountEventKind.snapshot(snapshot)
         assert aek.kind == "snapshot"
         assert aek.data == snapshot
@@ -840,7 +877,7 @@ class TestAccountEventKind:
     def test_order_snapshot(self):
         order = Order(
             OrderKey(
-                ExchangeId.BINANCE_SPOT,
+                BINANCE_INDEX,
                 42,
                 StrategyId.new("alpha"),
                 ClientOrderId.new("cid-1"),
@@ -859,7 +896,7 @@ class TestAccountEventKind:
     def test_order_cancelled(self):
         response = OrderResponseCancel(
             OrderKey(
-                ExchangeId.BINANCE_SPOT,
+                BINANCE_INDEX,
                 42,
                 StrategyId.new("alpha"),
                 ClientOrderId.new("cid-1"),
@@ -890,7 +927,7 @@ class TestAccountEventKind:
         assert aek.data == trade
 
     def test_equality(self):
-        snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, [], [])
+        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
         aek1 = AccountEventKind.snapshot(snapshot)
         aek2 = AccountEventKind.snapshot(snapshot)
         balance = AssetBalance.new(
@@ -903,14 +940,14 @@ class TestAccountEventKind:
         assert aek1 != aek3
 
     def test_str_repr(self):
-        snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, [], [])
+        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
         aek = AccountEventKind.snapshot(snapshot)
         assert "AccountEventKind(" in repr(aek)
 
 
 class TestAccountEvent:
     def test_creation(self):
-        exchange = ExchangeId.BINANCE_SPOT
+        exchange = BINANCE_INDEX
         snapshot = AccountSnapshot.new(exchange, [], [])
         kind = AccountEventKind.snapshot(snapshot)
 
@@ -919,18 +956,18 @@ class TestAccountEvent:
         assert event.kind == kind
 
     def test_equality(self):
-        exchange = ExchangeId.BINANCE_SPOT
+        exchange = BINANCE_INDEX
         snapshot = AccountSnapshot.new(exchange, [], [])
         kind = AccountEventKind.snapshot(snapshot)
 
         event1 = AccountEvent.new(exchange, kind)
         event2 = AccountEvent.new(exchange, kind)
-        event3 = AccountEvent.new(ExchangeId.KRAKEN, kind)
+        event3 = AccountEvent.new(KRAKEN_INDEX, kind)
         assert event1 == event2
         assert event1 != event3
 
     def test_str_repr(self):
-        exchange = ExchangeId.BINANCE_SPOT
+        exchange = BINANCE_INDEX
         snapshot = AccountSnapshot.new(exchange, [], [])
         kind = AccountEventKind.snapshot(snapshot)
 

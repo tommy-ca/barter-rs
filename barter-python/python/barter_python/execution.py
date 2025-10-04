@@ -9,6 +9,17 @@ from enum import Enum
 from typing import Generic, TypeVar, Union
 
 from .instrument import QuoteAsset, Side
+from .barter_python import (
+    ClientOrderId as _ClientOrderId,
+    OrderId as _OrderId,
+    OrderKey as _OrderKey,
+    StrategyId as _StrategyId,
+)
+
+ClientOrderId = _ClientOrderId
+OrderId = _OrderId
+StrategyId = _StrategyId
+OrderKey = _OrderKey
 
 AssetKey = TypeVar("AssetKey")
 InstrumentKey = TypeVar("InstrumentKey")
@@ -35,123 +46,6 @@ class TimeInForce(Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-@dataclass(frozen=True)
-class ClientOrderId:
-    """Client order identifier."""
-
-    value: str
-
-    @classmethod
-    def new(cls, value: str) -> ClientOrderId:
-        return cls(value)
-
-    def __str__(self) -> str:
-        return self.value
-
-    def __repr__(self) -> str:
-        return f"ClientOrderId({self.value!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ClientOrderId):
-            return NotImplemented
-        return self.value == other.value
-
-    def __hash__(self) -> int:
-        return hash(self.value)
-
-
-@dataclass(frozen=True)
-class OrderId:
-    """Exchange order identifier."""
-
-    value: str
-
-    @classmethod
-    def new(cls, value: str) -> OrderId:
-        return cls(value)
-
-    def __str__(self) -> str:
-        return self.value
-
-    def __repr__(self) -> str:
-        return f"OrderId({self.value!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, OrderId):
-            return NotImplemented
-        return self.value == other.value
-
-    def __hash__(self) -> int:
-        return hash(self.value)
-
-
-@dataclass(frozen=True)
-class StrategyId:
-    """Strategy identifier."""
-
-    value: str
-
-    @classmethod
-    def new(cls, value: str) -> StrategyId:
-        return cls(value)
-
-    @classmethod
-    def unknown(cls) -> StrategyId:
-        return cls("unknown")
-
-    def __str__(self) -> str:
-        return self.value
-
-    def __repr__(self) -> str:
-        return f"StrategyId({self.value!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, StrategyId):
-            return NotImplemented
-        return self.value == other.value
-
-    def __hash__(self) -> int:
-        return hash(self.value)
-
-
-@dataclass(frozen=True)
-class OrderKey(Generic[ExchangeKey, InstrumentKey]):
-    """Key identifying an order."""
-
-    exchange: ExchangeKey
-    instrument: InstrumentKey
-    strategy: StrategyId
-    cid: ClientOrderId
-
-    def __str__(self) -> str:
-        return f"{self.exchange}:{self.instrument}:{self.strategy}:{self.cid}"
-
-    def __repr__(self) -> str:
-        return (
-            f"OrderKey("
-            f"exchange={self.exchange!r}, "
-            f"instrument={self.instrument!r}, "
-            f"strategy={self.strategy!r}, "
-            f"cid={self.cid!r}"
-            f")"
-        )
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, OrderKey):
-            return NotImplemented
-        return (
-            self.exchange == other.exchange
-            and self.instrument == other.instrument
-            and self.strategy == other.strategy
-            and self.cid == other.cid
-        )
-
-    def __hash__(self) -> int:
-        return hash((self.exchange, self.instrument, self.strategy, self.cid))
-
-
 @dataclass(frozen=True)
 class Balance:
     """Asset balance with total and free amounts."""
@@ -583,7 +477,7 @@ class OrderState(Generic[AssetKey, InstrumentKey]):
 class Order(Generic[ExchangeKey, InstrumentKey, AssetKey]):
     """Order data structure."""
 
-    key: OrderKey[ExchangeKey, InstrumentKey]
+    key: OrderKey
     side: Side
     price: Decimal
     quantity: Decimal
@@ -698,7 +592,7 @@ class RequestOpen:
 class OrderRequestOpen(Generic[ExchangeKey, InstrumentKey]):
     """Request to open an order."""
 
-    key: OrderKey[ExchangeKey, InstrumentKey]
+    key: OrderKey
     state: RequestOpen
 
     def __str__(self) -> str:
@@ -720,7 +614,7 @@ class OrderRequestOpen(Generic[ExchangeKey, InstrumentKey]):
 class OrderRequestCancel(Generic[ExchangeKey, InstrumentKey]):
     """Request to cancel an order."""
 
-    key: OrderKey[ExchangeKey, InstrumentKey]
+    key: OrderKey
     state: OrderId | None
 
     def __str__(self) -> str:
@@ -953,7 +847,7 @@ OrderSnapshot = Order
 class OrderResponseCancel(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     """Order cancellation response."""
 
-    key: OrderKey[ExchangeKey, InstrumentKey]
+    key: OrderKey
     state: Cancelled | Exception  # Simplified for now
 
     def __str__(self) -> str:
