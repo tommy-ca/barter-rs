@@ -5,6 +5,7 @@
 //! Python bindings for the Barter trading engine.
 
 mod analytics;
+mod books;
 mod command;
 mod config;
 mod data;
@@ -20,6 +21,7 @@ use analytics::{
     welford_calculate_mean, welford_calculate_recurrence_relation_m,
     welford_calculate_sample_variance, welford_calculate_population_variance,
 };
+use books::{calculate_mid_price, calculate_volume_weighted_mid_price, PyLevel, PyOrderBook};
 
 
 use barter::engine::{command::Command, state::trading::TradingState};
@@ -798,6 +800,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySide>()?;
     m.add_class::<PyBacktestSummary>()?;
     m.add_class::<PyMultiBacktestSummary>()?;
+    m.add_class::<PyLevel>()?;
+    m.add_class::<PyOrderBook>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(init_json_logging_py, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
@@ -818,6 +822,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(welford_calculate_recurrence_relation_m, m)?)?;
     m.add_function(wrap_pyfunction!(welford_calculate_sample_variance, m)?)?;
     m.add_function(wrap_pyfunction!(welford_calculate_population_variance, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_mid_price, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_volume_weighted_mid_price, m)?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();
