@@ -28,6 +28,36 @@ InstrumentKey = TypeVar("InstrumentKey")
 State = TypeVar("State")
 
 
+class AlgoStrategy(Protocol[ExchangeKey, InstrumentKey]):
+    """Strategy interface for generating algorithmic open and cancel order requests based on the current EngineState.
+
+    This allows full customisation of algorithmic trading logic.
+
+    Different strategies may:
+    - Implement momentum-based trading
+    - Use statistical arbitrage
+    - Apply machine learning models
+    - etc.
+    """
+
+    def generate_algo_orders(
+        self,
+        state: State,
+    ) -> tuple[
+        Iterable[OrderRequestCancel[ExchangeKey, InstrumentKey]],
+        Iterable[OrderRequestOpen[ExchangeKey, InstrumentKey]],
+    ]:
+        """Generate algorithmic orders based on current system State.
+
+        Args:
+            state: Current system state
+
+        Returns:
+            Tuple of (cancel_requests, open_requests)
+        """
+        ...
+
+
 class ClosePositionsStrategy(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
     """Strategy interface for generating open and cancel order requests that close open positions.
 
@@ -179,6 +209,46 @@ def close_open_positions_with_market_orders(
         open_requests.append(request)
 
     return ([], open_requests)
+
+
+class DefaultStrategy:
+    """Naive implementation of all strategy interfaces.
+
+    *THIS IS FOR DEMONSTRATION PURPOSES ONLY, NEVER USE FOR REAL TRADING OR IN PRODUCTION*.
+
+    This strategy:
+    - Generates no algorithmic orders (AlgoStrategy).
+    - Closes positions via the naive close_open_positions_with_market_orders logic (ClosePositionsStrategy).
+    - Does nothing when an exchange disconnects (OnDisconnectStrategy).
+    - Does nothing when trading state is set to disabled (OnTradingDisabledStrategy).
+    """
+
+    def __init__(self, strategy_id: str = "default") -> None:
+        self.id = StrategyId.new(strategy_id)
+
+    @classmethod
+    def default(cls) -> DefaultStrategy:
+        return cls()
+
+    def generate_algo_orders(self, state: State) -> tuple[list, list]:
+        """Generate no algorithmic orders."""
+        return ([], [])
+
+    def close_positions_requests(
+        self,
+        state: EngineState,
+        filter: Optional[InstrumentFilter] = None,
+    ) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+        """Close positions using market orders."""
+        return close_open_positions_with_market_orders(self.id, state, filter)
+
+    def on_disconnect(self, exchange_id: str) -> None:
+        """Do nothing when an exchange disconnects."""
+        pass
+
+    def on_trading_disabled(self) -> None:
+        """Do nothing when trading is disabled."""
+        pass
 
 
 class OnDisconnectStrategy(Protocol):

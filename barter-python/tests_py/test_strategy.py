@@ -3,6 +3,8 @@
 from barter_python.execution import ClientOrderId, OrderKind, StrategyId, TimeInForce
 from barter_python.instrument import Side
 from barter_python.strategy import (
+    AlgoStrategy,
+    DefaultStrategy,
     EngineState,
     InstrumentState,
     Position,
@@ -175,3 +177,61 @@ class TestTradingDisabledStrategies:
         # Currently returns empty lists as placeholders
         assert cancel_requests == []
         assert open_requests == []
+
+
+class TestAlgoStrategy:
+    def test_default_strategy_creation(self):
+        """Test creating a DefaultStrategy instance."""
+        strategy = DefaultStrategy()
+        assert strategy.id.value == "default"
+
+        custom_strategy = DefaultStrategy("custom-strategy")
+        assert custom_strategy.id.value == "custom-strategy"
+
+    def test_default_strategy_default_method(self):
+        """Test the default() class method."""
+        strategy = DefaultStrategy.default()
+        assert strategy.id.value == "default"
+
+    def test_default_strategy_generate_algo_orders(self):
+        """Test that DefaultStrategy generates no algorithmic orders."""
+        strategy = DefaultStrategy()
+        state = EngineState([])  # Empty state
+
+        cancel_requests, open_requests = strategy.generate_algo_orders(state)
+
+        assert cancel_requests == []
+        assert open_requests == []
+
+    def test_default_strategy_close_positions_requests(self):
+        """Test that DefaultStrategy closes positions using market orders."""
+        strategy = DefaultStrategy("close-test")
+
+        instruments = [
+            InstrumentState(
+                instrument=0,
+                exchange=0,
+                position=Position(0, Side.BUY, 100.0, 50000.0),
+                price=51000.0,
+            ),
+        ]
+        state = EngineState(instruments)
+
+        cancel_requests, open_requests = strategy.close_positions_requests(state)
+
+        assert cancel_requests == []
+        assert len(open_requests) == 1
+        assert open_requests[0].key.strategy == strategy.id
+        assert open_requests[0].state.side == Side.SELL
+
+    def test_default_strategy_on_disconnect(self):
+        """Test that DefaultStrategy does nothing on disconnect."""
+        strategy = DefaultStrategy()
+        # Should not raise any exceptions
+        strategy.on_disconnect("binance_spot")
+
+    def test_default_strategy_on_trading_disabled(self):
+        """Test that DefaultStrategy does nothing when trading is disabled."""
+        strategy = DefaultStrategy()
+        # Should not raise any exceptions
+        strategy.on_trading_disabled()
