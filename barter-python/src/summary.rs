@@ -9,6 +9,7 @@ use barter::statistic::{
     summary::{TradingSummary, asset::TearSheetAsset, instrument::TearSheet},
     time::TimeInterval,
 };
+use barter::backtest::summary::{BacktestSummary, MultiBacktestSummary};
 use barter_execution::balance::Balance;
 use chrono::{DateTime, Utc};
 use pyo3::{
@@ -681,6 +682,165 @@ impl PyBalance {
         let total = decimal_to_py(py, self.total)?;
         let free = decimal_to_py(py, self.free)?;
         Ok(format!("Balance(total={}, free={})", total, free))
+    }
+}
+
+#[pyclass(module = "barter_python", name = "BacktestSummary", unsendable)]
+pub struct PyBacktestSummary {
+    id: String,
+    risk_free_return: Decimal,
+    trading_summary: Py<PyTradingSummary>,
+}
+
+impl PyBacktestSummary {
+    fn from_backtest_summary<Interval>(
+        py: Python<'_>,
+        summary: BacktestSummary<Interval>,
+    ) -> PyResult<Py<PyBacktestSummary>>
+    where
+        Interval: TimeInterval,
+    {
+        let BacktestSummary {
+            id,
+            risk_free_return,
+            trading_summary,
+        } = summary;
+
+        let trading_summary = summary_to_py(py, trading_summary)?;
+
+        Py::new(
+            py,
+            PyBacktestSummary {
+                id: id.to_string(),
+                risk_free_return,
+                trading_summary,
+            },
+        )
+    }
+
+    fn dictionary(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let dict = PyDict::new_bound(py);
+        dict.set_item("id", &self.id)?;
+        dict.set_item("risk_free_return", decimal_to_py(py, self.risk_free_return)?)?;
+        dict.set_item(
+            "trading_summary",
+            self.trading_summary.clone_ref(py).call_method0(py, "to_dict")?,
+        )?;
+        Ok(dict.into())
+    }
+}
+
+#[pymethods]
+impl PyBacktestSummary {
+    #[getter]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    #[getter]
+    pub fn risk_free_return(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.risk_free_return)
+    }
+
+    #[getter]
+    pub fn trading_summary(&self, py: Python<'_>) -> PyResult<PyObject> {
+        Ok(self.trading_summary.clone_ref(py).into_py(py))
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        Ok(self.dictionary(py)?.into_py(py))
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        let rfr = decimal_to_py(py, self.risk_free_return)?;
+        Ok(format!(
+            "BacktestSummary(id={}, risk_free_return={})",
+            self.id, rfr
+        ))
+    }
+}
+
+#[pyclass(module = "barter_python", name = "MultiBacktestSummary", unsendable)]
+pub struct PyMultiBacktestSummary {
+    num_backtests: usize,
+    duration_ms: u128,
+    summaries: Vec<Py<PyBacktestSummary>>,
+}
+
+impl PyMultiBacktestSummary {
+    fn from_multi_backtest_summary<Interval>(
+        py: Python<'_>,
+        summary: MultiBacktestSummary<Interval>,
+    ) -> PyResult<Py<PyMultiBacktestSummary>>
+    where
+        Interval: TimeInterval,
+    {
+        let MultiBacktestSummary {
+            num_backtests,
+            duration,
+            summaries,
+        } = summary;
+
+        let mut py_summaries = Vec::with_capacity(summaries.len());
+        for summary in summaries {
+            let py_summary = PyBacktestSummary::from_backtest_summary(py, summary)?;
+            py_summaries.push(py_summary);
+        }
+
+        Py::new(
+            py,
+            PyMultiBacktestSummary {
+                num_backtests,
+                duration_ms: duration.as_millis(),
+                summaries: py_summaries,
+            },
+        )
+    }
+
+    fn dictionary(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let dict = PyDict::new_bound(py);
+        dict.set_item("num_backtests", self.num_backtests)?;
+        dict.set_item("duration_ms", self.duration_ms)?;
+        let summaries = self
+            .summaries
+            .iter()
+            .map(|s| s.clone_ref(py).call_method0(py, "to_dict"))
+            .collect::<PyResult<Vec<_>>>()?;
+        dict.set_item("summaries", summaries)?;
+        Ok(dict.into())
+    }
+}
+
+#[pymethods]
+impl PyMultiBacktestSummary {
+    #[getter]
+    pub fn num_backtests(&self) -> usize {
+        self.num_backtests
+    }
+
+    #[getter]
+    pub fn duration_ms(&self) -> u128 {
+        self.duration_ms
+    }
+
+    #[getter]
+    pub fn summaries(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+        Ok(self
+            .summaries
+            .iter()
+            .map(|s| s.clone_ref(py).into_py(py))
+            .collect())
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        Ok(self.dictionary(py)?.into_py(py))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "MultiBacktestSummary(num_backtests={}, duration_ms={})",
+            self.num_backtests, self.duration_ms
+        ))
     }
 }
 

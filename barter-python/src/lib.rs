@@ -57,8 +57,8 @@ use logging::init_tracing;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use serde_json::Value;
 use summary::{
-    PyAssetTearSheet, PyBalance, PyDrawdown, PyInstrumentTearSheet, PyMeanDrawdown,
-    PyMetricWithInterval, PyTradingSummary,
+    PyAssetTearSheet, PyBacktestSummary, PyBalance, PyDrawdown, PyInstrumentTearSheet,
+    PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
 use system::{PySystemHandle, run_historic_backtest, start_system};
 
