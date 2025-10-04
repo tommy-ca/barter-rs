@@ -74,6 +74,30 @@ calmar = bp.calculate_calmar_ratio(
 print(calmar.interval, calmar.value)
 PY
 
+# Generate drawdown statistics from equity points
+python - <<'PY'
+import datetime as dt
+from decimal import Decimal
+
+import barter_python as bp
+
+base = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+points = [
+    (base, Decimal("100")),
+    (base + dt.timedelta(days=1), Decimal("110")),
+    (base + dt.timedelta(days=2), Decimal("90")),
+    (base + dt.timedelta(days=3), Decimal("115")),
+]
+
+drawdowns = bp.generate_drawdown_series(points)
+max_drawdown = bp.calculate_max_drawdown(points)
+mean_drawdown = bp.calculate_mean_drawdown(points)
+
+print("drawdowns", [d.value for d in drawdowns])
+print("max value", max_drawdown.value if max_drawdown else None)
+print("mean value", mean_drawdown.mean_drawdown if mean_drawdown else None)
+PY
+
 # Abort a running system immediately without waiting for a summary
 python - <<'PY'
 import barter_python as bp
@@ -217,6 +241,8 @@ cadence defined in `.agent/specs/release-cadence.md` so both ecosystems stay in 
 
 - Added `calculate_profit_factor` and `calculate_win_rate` helpers mirroring trading summary values.
 - Added `calculate_rate_of_return` with optional interval scaling support.
+- Added drawdown helpers (`generate_drawdown_series`, `calculate_max_drawdown`,
+  `calculate_mean_drawdown`) for downside risk analysis.
 - Expanded pytest coverage for portfolio analytics edge cases and custom intervals.
 
 ### 0.1.0 — 2025-10-04

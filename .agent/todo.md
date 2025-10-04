@@ -51,6 +51,9 @@
 - [x] Allow selecting annualisation interval for Python trading summaries (2025-10-03).
 - [x] Capture a release checklist for Python publishing (see `.agent/specs/python-release-checklist.md`, 2025-10-03).
 - [x] Expose account order snapshot & cancellation helpers in Python bindings (2025-10-03).
+- [x] Expose drawdown analytics helpers (`generate_drawdown_series`,
+      `calculate_max_drawdown`, `calculate_mean_drawdown`) in Python bindings
+      (2025-10-04).
 
 ## In Progress (2025-10-04)
 - [x] Expose Python helpers for profit factor and win rate calculations (bindings + pytest coverage). (2025-10-04)
