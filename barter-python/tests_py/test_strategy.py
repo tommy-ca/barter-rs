@@ -3,7 +3,6 @@
 from barter_python.execution import ClientOrderId, OrderKind, StrategyId, TimeInForce
 from barter_python.instrument import Side
 from barter_python.strategy import (
-    AlgoStrategy,
     DefaultStrategy,
     EngineState,
     InstrumentState,

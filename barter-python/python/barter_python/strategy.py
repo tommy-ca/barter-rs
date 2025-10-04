@@ -6,7 +6,6 @@ from typing import Callable, Iterable, Optional, Protocol, TypeVar
 
 from .execution import (
     ClientOrderId,
-    OrderId,
     OrderKey,
     OrderKind,
     OrderRequestCancel,
@@ -238,7 +237,7 @@ class DefaultStrategy:
         self,
         state: EngineState,
         filter: Optional[InstrumentFilter] = None,
-    ) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    ) -> tuple[Iterable[OrderRequestCancel], Iterable[OrderRequestOpen]]:
         """Close positions using market orders."""
         return close_open_positions_with_market_orders(self.id, state, filter)
 
