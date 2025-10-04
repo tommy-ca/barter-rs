@@ -286,6 +286,25 @@ class InstrumentQuoteAsset(Enum):
         return self.value
 
 
+class QuoteAsset:
+    """Special type that represents a quote asset."""
+
+    def __init__(self) -> None:
+        pass
+
+    def __str__(self) -> str:
+        return "QuoteAsset"
+
+    def __repr__(self) -> str:
+        return "QuoteAsset()"
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, QuoteAsset)
+
+    def __hash__(self) -> int:
+        return hash("QuoteAsset")
+
+
 class OptionKind(Enum):
     """Option contract kind - Put or Call."""
 
