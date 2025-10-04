@@ -12,11 +12,12 @@ from . import instrument  # noqa: E402,F401
 from . import execution  # noqa: E402,F401
 from . import data  # noqa: E402,F401
 from . import integration  # noqa: E402,F401
+from . import strategy  # noqa: E402,F401
 
 __all__ = [name for name in dir(_core) if not name.startswith("_")]
 
 # Add pure Python modules to __all__
-__all__.extend(["instrument", "execution", "data", "integration"])
+__all__.extend(["instrument", "execution", "data", "integration", "strategy"])
 
 
 def __getattr__(name: str):

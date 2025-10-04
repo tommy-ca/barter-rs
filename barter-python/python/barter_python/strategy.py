@@ -1,0 +1,223 @@
+"""Pure Python implementation of barter-strategy algorithms."""
+
+from __future__ import annotations
+
+from typing import Callable, Iterable, Optional, Protocol, TypeVar
+
+from .execution import (
+    ClientOrderId,
+    OrderId,
+    OrderKey,
+    OrderKind,
+    OrderRequestCancel,
+    OrderRequestOpen,
+    RequestOpen,
+    StrategyId,
+    TimeInForce,
+)
+from .instrument import Side
+
+# Type aliases for common key types
+ExchangeIndex = int
+InstrumentIndex = int
+
+# Type variables for generic strategy interfaces
+ExchangeKey = TypeVar("ExchangeKey")
+AssetKey = TypeVar("AssetKey")
+InstrumentKey = TypeVar("InstrumentKey")
+State = TypeVar("State")
+
+
+class ClosePositionsStrategy(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
+    """Strategy interface for generating open and cancel order requests that close open positions.
+
+    This allows full customisation of how a strategy will close a position.
+
+    Different strategies may:
+    - Use different order types (Market, Limit, etc.).
+    - Prioritise certain exchanges.
+    - Increase the position of an inversely correlated instrument in order to neutralise exposure.
+    - etc.
+    """
+
+    def close_positions_requests(
+        self,
+        state: State,
+        filter: InstrumentFilter[ExchangeKey, AssetKey, InstrumentKey],
+    ) -> tuple[
+        Iterable[OrderRequestCancel[ExchangeKey, InstrumentKey]],
+        Iterable[OrderRequestOpen[ExchangeKey, InstrumentKey]],
+    ]:
+        """Generate orders based on current system State.
+
+        Args:
+            state: Current system state
+            filter: Instrument filter to apply
+
+        Returns:
+            Tuple of (cancel_requests, open_requests)
+        """
+        ...
+
+
+class InstrumentFilter(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
+    """Filter for instruments in the engine state."""
+
+    def matches(self, exchange: ExchangeKey, instrument: InstrumentKey) -> bool:
+        """Check if the instrument matches the filter."""
+        ...
+
+
+class Position:
+    """Represents a trading position."""
+
+    def __init__(
+        self,
+        instrument: InstrumentIndex,
+        side: Side,
+        quantity_abs: float,
+        entry_price: float,
+    ) -> None:
+        self.instrument = instrument
+        self.side = side
+        self.quantity_abs = quantity_abs
+        self.entry_price = entry_price
+
+    def __repr__(self) -> str:
+        return (
+            f"Position("
+            f"instrument={self.instrument!r}, "
+            f"side={self.side!r}, "
+            f"quantity_abs={self.quantity_abs!r}, "
+            f"entry_price={self.entry_price!r}"
+            f")"
+        )
+
+
+class InstrumentState:
+    """State of a single instrument in the engine."""
+
+    def __init__(
+        self,
+        instrument: InstrumentIndex,
+        exchange: ExchangeIndex,
+        position: Optional[Position],
+        price: Optional[float],
+    ) -> None:
+        self.instrument = instrument
+        self.exchange = exchange
+        self.position = position
+        self.price = price
+
+    def __repr__(self) -> str:
+        return (
+            f"InstrumentState("
+            f"instrument={self.instrument!r}, "
+            f"exchange={self.exchange!r}, "
+            f"position={self.position!r}, "
+            f"price={self.price!r}"
+            f")"
+        )
+
+
+class EngineState:
+    """Simplified engine state for strategy operations."""
+
+    def __init__(self, instruments: list[InstrumentState]) -> None:
+        self.instruments = instruments
+
+    def instruments_iter(
+        self, filter: Optional[InstrumentFilter] = None
+    ) -> Iterable[InstrumentState]:
+        """Iterate over instruments, optionally filtered."""
+        for instrument in self.instruments:
+            if filter is None or filter.matches(instrument.exchange, instrument.instrument):
+                yield instrument
+
+
+def close_open_positions_with_market_orders(
+    strategy_id: StrategyId,
+    state: EngineState,
+    filter: Optional[InstrumentFilter] = None,
+    gen_cid: Optional[Callable[[InstrumentState], ClientOrderId]] = None,
+) -> tuple[
+    Iterable[OrderRequestCancel],
+    Iterable[OrderRequestOpen],
+]:
+    """Naive strategy logic for closing open positions with market orders only.
+
+    This function finds all open positions and generates equal but opposite Side market orders
+    that will neutralise the position.
+
+    Args:
+        strategy_id: Strategy identifier for generated orders
+        state: Current engine state
+        filter: Optional instrument filter
+        gen_cid: Function to generate client order IDs, defaults to using instrument index
+
+    Returns:
+        Tuple of (cancel_requests, open_requests)
+    """
+    if gen_cid is None:
+        def default_gen_cid(inst_state: InstrumentState) -> ClientOrderId:
+            return ClientOrderId.new(f"close-{inst_state.instrument}")
+        gen_cid = default_gen_cid
+
+    open_requests = []
+    for inst_state in state.instruments_iter(filter):
+        # Only generate orders if there is a Position and we have market data
+        if inst_state.position is None or inst_state.price is None:
+            continue
+
+        request = build_ioc_market_order_to_close_position(
+            inst_state.exchange,
+            inst_state.position,
+            strategy_id,
+            inst_state.price,
+            lambda: gen_cid(inst_state),
+        )
+        open_requests.append(request)
+
+    return ([], open_requests)
+
+
+def build_ioc_market_order_to_close_position(
+    exchange: ExchangeIndex,
+    position: Position,
+    strategy_id: StrategyId,
+    price: float,
+    gen_cid: Callable[[], ClientOrderId],
+) -> OrderRequestOpen[ExchangeIndex, InstrumentIndex]:
+    """Build an equal but opposite Side ImmediateOrCancel Market order that neutralises the provided Position.
+
+    For example, if Position is LONG by 100, build a market order request to sell 100.
+
+    Args:
+        exchange: Exchange index
+        position: Position to close
+        strategy_id: Strategy identifier
+        price: Current market price
+        gen_cid: Function to generate client order ID
+
+    Returns:
+        Order request to close the position
+    """
+    from decimal import Decimal
+
+    side = Side.SELL if position.side == Side.BUY else Side.BUY
+
+    return OrderRequestOpen(
+        key=OrderKey(
+            exchange=exchange,
+            instrument=position.instrument,
+            strategy=strategy_id,
+            cid=gen_cid(),
+        ),
+        state=RequestOpen(
+            side=side,
+            price=Decimal(str(price)),
+            quantity=Decimal(str(position.quantity_abs)),
+            kind=OrderKind.MARKET,
+            time_in_force=TimeInForce.IMMEDIATE_OR_CANCEL,
+        ),
+    )

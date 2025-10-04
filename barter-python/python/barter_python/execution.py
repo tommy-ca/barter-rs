@@ -630,6 +630,98 @@ class Order(Generic[ExchangeKey, InstrumentKey, AssetKey]):
         ))
 
 
+# Order request types
+@dataclass(frozen=True)
+class RequestOpen:
+    """Request to open an order."""
+
+    side: Side
+    price: Decimal
+    quantity: Decimal
+    kind: OrderKind
+    time_in_force: TimeInForce
+
+    def __str__(self) -> str:
+        return (
+            f"RequestOpen("
+            f"side={self.side}, "
+            f"price={self.price}, "
+            f"quantity={self.quantity}, "
+            f"kind={self.kind}, "
+            f"time_in_force={self.time_in_force}"
+            f")"
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"RequestOpen("
+            f"side={self.side!r}, "
+            f"price={self.price!r}, "
+            f"quantity={self.quantity!r}, "
+            f"kind={self.kind!r}, "
+            f"time_in_force={self.time_in_force!r}"
+            f")"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, RequestOpen):
+            return NotImplemented
+        return (
+            self.side == other.side
+            and self.price == other.price
+            and self.quantity == other.quantity
+            and self.kind == other.kind
+            and self.time_in_force == other.time_in_force
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.side, self.price, self.quantity, self.kind, self.time_in_force))
+
+
+@dataclass(frozen=True)
+class OrderRequestOpen(Generic[ExchangeKey, InstrumentKey]):
+    """Request to open an order."""
+
+    key: OrderKey[ExchangeKey, InstrumentKey]
+    state: RequestOpen
+
+    def __str__(self) -> str:
+        return f"OrderRequestOpen(key={self.key}, state={self.state})"
+
+    def __repr__(self) -> str:
+        return f"OrderRequestOpen(key={self.key!r}, state={self.state!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, OrderRequestOpen):
+            return NotImplemented
+        return self.key == other.key and self.state == other.state
+
+    def __hash__(self) -> int:
+        return hash((self.key, self.state))
+
+
+@dataclass(frozen=True)
+class OrderRequestCancel(Generic[ExchangeKey, InstrumentKey]):
+    """Request to cancel an order."""
+
+    key: OrderKey[ExchangeKey, InstrumentKey]
+    state: Optional[OrderId]
+
+    def __str__(self) -> str:
+        return f"OrderRequestCancel(key={self.key}, state={self.state})"
+
+    def __repr__(self) -> str:
+        return f"OrderRequestCancel(key={self.key!r}, state={self.state!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, OrderRequestCancel):
+            return NotImplemented
+        return self.key == other.key and self.state == other.state
+
+    def __hash__(self) -> int:
+        return hash((self.key, self.state))
+
+
 # Account events
 @dataclass(frozen=True)
 class AccountEvent(Generic[ExchangeKey, AssetKey, InstrumentKey]):
