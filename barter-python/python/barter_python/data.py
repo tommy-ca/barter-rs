@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -246,14 +245,14 @@ class OrderBookSide:
     def bids(cls, levels: list[Level]) -> OrderBookSide:
         """Construct a new OrderBookSide<Bids> from the provided Levels."""
         # Sort bids in descending price order (highest first)
-        sorted_levels = sorted(levels, key=lambda l: l.price, reverse=True)
+        sorted_levels = sorted(levels, key=lambda level: level.price, reverse=True)
         return cls(Bids(), sorted_levels)
 
     @classmethod
     def asks(cls, levels: list[Level]) -> OrderBookSide:
         """Construct a new OrderBookSide<Asks> from the provided Levels."""
         # Sort asks in ascending price order (lowest first)
-        sorted_levels = sorted(levels, key=lambda l: l.price)
+        sorted_levels = sorted(levels, key=lambda level: level.price)
         return cls(Asks(), sorted_levels)
 
     def best(self) -> Optional[Level]:
