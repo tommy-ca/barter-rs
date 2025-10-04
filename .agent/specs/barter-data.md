@@ -1,0 +1,17 @@
+# barter-data Python Binding Notes (2025-10-04)
+
+## Current Coverage
+- Exposed exchange identifiers via `PyExchangeId` with major venues.
+- Python `SubKind` now includes `PUBLIC_TRADES`, `ORDER_BOOKS_L1`, `ORDER_BOOKS_L2`, `ORDER_BOOKS_L3`, `LIQUIDATIONS`, and `CANDLES`.
+- `PySubscription` supports spot, perpetual, future, and option market data instruments.
+- Instrument kind mapping parses expiry, strike, option kind, and exercise fields.
+
+## Remaining Gaps / Follow-ups
+- Add support for additional exchange identifiers introduced upstream (e.g., derivatives variants) when needed.
+- Expose builder helpers for dynamic stream selectors once Rust APIs stabilize.
+- Support more complex instrument kinds (e.g., options with settlement metadata) if required by upstream crates.
+- Provide validation utilities for subscription dictionaries on the Python side for clearer UX errors.
+
+## Testing Strategy
+- Rely on `tests_py/test_bindings.py::test_subscription_creation` for coverage of SubKind and instrument variants.
+- Consider adding round-trip tests for future option serialization in Rust integration tests (`python_smoke.rs`).
