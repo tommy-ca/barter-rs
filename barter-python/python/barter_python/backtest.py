@@ -12,16 +12,15 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, AsyncIterable, Generic, Iterable, Optional, Protocol, TypeVar
 
-from .data import MarketEvent, DataKind, PublicTrade, OrderBookL1, Candle, Liquidation, as_public_trade, as_candle
-from .engine import Engine, EngineState as EngineEngineState, InstrumentState as EngineInstrumentState, Position as EnginePosition, TradingState
-from .execution import AccountEvent, OrderRequestOpen, OrderRequestCancel
+from .data import MarketEvent, DataKind, PublicTrade, Candle, Liquidation, as_public_trade, as_candle
+from .engine import Engine, EngineState as EngineEngineState
+from .execution import OrderRequestOpen, OrderRequestCancel
 from .instrument import (
-    Asset, AssetIndex, AssetNameInternal, ExchangeAsset, ExchangeId, ExchangeIndex,
-    Instrument, InstrumentIndex, InstrumentNameInternal, Keyed, Underlying, Side
+    Side
 )
 from .risk import RiskManager
 from .statistic import TimeInterval, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
-from .strategy import AlgoStrategy, ClosePositionsStrategy, OnDisconnectStrategy, OnTradingDisabledStrategy, EngineState, InstrumentState, Position
+from .strategy import EngineState
 
 # Type variables for generic backtest interfaces
 MarketEventKind = TypeVar("MarketEventKind")
@@ -205,7 +204,6 @@ class MarketDataInMemory:
                 kind = DataKind.trade(trade)
             elif 'OrderBookL1' in kind_data:
                 # Handle OrderBookL1 parsing
-                l1_data = kind_data['OrderBookL1']
                 # This would need more implementation
                 continue  # Skip for now
             elif 'Candle' in kind_data:
@@ -437,7 +435,6 @@ class BacktestEngineSimulator:
         if event.kind.kind == "trade":
             trade_event = as_public_trade(event)
             if trade_event:
-                trade = trade_event.kind
                 # Update price for the instrument
                 inst_state = self.engine.state.get_instrument_state(event.instrument)
                 if inst_state:
@@ -446,7 +443,6 @@ class BacktestEngineSimulator:
         elif event.kind.kind == "candle":
             candle_event = as_candle(event)
             if candle_event:
-                candle = candle_event.kind
                 # Update price with candle close
                 inst_state = self.engine.state.get_instrument_state(event.instrument)
                 if inst_state:

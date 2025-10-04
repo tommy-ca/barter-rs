@@ -223,14 +223,6 @@ class Keyed(Generic[KeyType, ValueType]):
     def __hash__(self) -> int:
         return hash((self.key, self.value))
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Keyed):
-            return NotImplemented
-        return self.key == other.key and self.value == other.value
-
-    def __hash__(self) -> int:
-        return hash((self.key, self.value))
-
 
 class InstrumentNameInternal:
     """Barter lowercase string representation for an Instrument."""

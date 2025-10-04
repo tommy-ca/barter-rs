@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from barter_python import backtest
-from barter_python.data import Candle, DataKind, Liquidation, MarketEvent, PublicTrade
-from barter_python.instrument import Asset, AssetNameExchange, AssetNameInternal, ExchangeId, Instrument, Side, Underlying
+from barter_python.data import DataKind, MarketEvent, PublicTrade
+from barter_python.instrument import Asset, ExchangeId, Instrument, Side, Underlying
 from barter_python.statistic import Annual365
 
 

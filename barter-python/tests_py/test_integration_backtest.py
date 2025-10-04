@@ -8,8 +8,7 @@ from typing import Callable
 import pytest
 
 import barter_python as bp
-from barter_python.backtest import MarketDataInMemory, BacktestArgsConstant, BacktestArgsDynamic
-from barter_python.statistic import Daily
+from barter_python.backtest import MarketDataInMemory
 
 
 @pytest.mark.integration
