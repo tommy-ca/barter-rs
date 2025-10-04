@@ -31,7 +31,7 @@
 - [x] Surface portfolio analytics helpers (eg. Sharpe, Sortino calculators) for Python summaries. (2025-10-04)
 - [x] Provide combined test runner script (Rust + Python) for contributors. (2025-10-03)
 - [x] Draft release cadence doc aligning Rust crate and Python wheel versioning. (2025-10-04)
-- [x] Add "Release Notes" aggregation section to `barter-python/README.md` post cadence adoption.
+- [x] Add "Release Notes" aggregation section to `barter-python/README.md` post cadence adoption. (2025-10-04)
 
  ## Later Opportunities
  - [x] Expand bindings for market stream events (2025-10-03)
@@ -64,3 +64,4 @@
  ## Completed (2025-10-04)
 - [x] Allow seeding initial balances when starting systems or running historic backtests from Python bindings. (2025-10-04)
 - [x] Complete pure Python port of barter-data structures (Candle, Liquidation, OrderBook, OrderBookSide) with comprehensive tests. (2025-10-04)
+- [x] Fix linting issues in Python and Rust codebases (unused imports, variables, clippy warnings). (2025-10-04)
