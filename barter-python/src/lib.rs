@@ -7,6 +7,7 @@
 mod analytics;
 mod command;
 mod config;
+mod data;
 mod logging;
 mod summary;
 mod system;
@@ -49,6 +50,7 @@ use command::{
     clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
 use config::PySystemConfig;
+use data::{init_dynamic_streams, PyDynamicStreams, PyExchangeId, PySubKind, PySubscription};
 use logging::init_tracing;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use serde_json::Value;
@@ -675,11 +677,16 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDrawdown>()?;
     m.add_class::<PyMeanDrawdown>()?;
     m.add_class::<PyBalance>()?;
+    m.add_class::<PyExchangeId>()?;
+    m.add_class::<PySubKind>()?;
+    m.add_class::<PySubscription>()?;
+    m.add_class::<PyDynamicStreams>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
     m.add_function(wrap_pyfunction!(start_system, m)?)?;
+    m.add_function(wrap_pyfunction!(init_dynamic_streams, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_sharpe_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_sortino_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_calmar_ratio, m)?)?;
