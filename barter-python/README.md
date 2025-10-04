@@ -288,6 +288,10 @@ release.
 Track the highlights from each coordinated Rust and Python release here. Align the entries with the
 cadence defined in `.agent/specs/release-cadence.md` so both ecosystems stay in sync.
 
+### 0.1.2 — 2025-10-04
+
+- Version bump to reflect analytics helpers stabilization.
+
 ### 0.1.1 — 2025-10-04
 
 - Added `calculate_profit_factor` and `calculate_win_rate` helpers mirroring trading summary values.
