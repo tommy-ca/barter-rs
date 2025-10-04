@@ -151,10 +151,22 @@ impl PySubKind {
         inner: SubKind::OrderBooksL2,
     };
 
+    /// Order book L3 subscription.
+    #[classattr]
+    const ORDER_BOOKS_L3: Self = Self {
+        inner: SubKind::OrderBooksL3,
+    };
+
     /// Liquidations subscription.
     #[classattr]
     const LIQUIDATIONS: Self = Self {
         inner: SubKind::Liquidations,
+    };
+
+    /// Candles subscription.
+    #[classattr]
+    const CANDLES: Self = Self {
+        inner: SubKind::Candles,
     };
 
     /// Return the string representation.

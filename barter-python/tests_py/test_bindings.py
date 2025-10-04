@@ -558,7 +558,9 @@ def test_exchange_id_constants() -> None:
 def test_sub_kind_constants() -> None:
     assert str(bp.SubKind.PUBLIC_TRADES) == "PublicTrades"
     assert str(bp.SubKind.ORDER_BOOKS_L1) == "OrderBooksL1"
+    assert str(bp.SubKind.ORDER_BOOKS_L3) == "OrderBooksL3"
     assert str(bp.SubKind.LIQUIDATIONS) == "Liquidations"
+    assert str(bp.SubKind.CANDLES) == "Candles"
 
 
 def test_subscription_creation() -> None:
@@ -573,6 +575,16 @@ def test_subscription_creation() -> None:
     # Test string representation
     assert "Subscription" in str(sub)
     assert "BinanceSpot" in str(sub)
+
+    sub_l3 = bp.Subscription(
+        bp.ExchangeId.BINANCE_SPOT, "btc", "usdt", bp.SubKind.ORDER_BOOKS_L3
+    )
+    assert sub_l3.kind == bp.SubKind.ORDER_BOOKS_L3
+
+    sub_candles = bp.Subscription(
+        bp.ExchangeId.BINANCE_SPOT, "btc", "usdt", bp.SubKind.CANDLES
+    )
+    assert sub_candles.kind == bp.SubKind.CANDLES
 
 
 def test_dynamic_streams_placeholder() -> None:
