@@ -212,42 +212,43 @@ fn system_config_risk_limits_round_trip() {
         let global_limits = risk_dict.get_item("global").unwrap();
         assert!(global_limits.is_none());
 
-        let mut global = PyDict::new_bound(py);
+        let global = PyDict::new_bound(py);
         global.set_item("max_leverage", 3.5_f64)?;
         global.set_item("max_position_notional", 12_500_f64)?;
         config.call_method1("set_global_risk_limits", (global,))?;
 
-        let mut per_instrument = PyDict::new_bound(py);
+        let per_instrument = PyDict::new_bound(py);
         per_instrument.set_item("max_position_quantity", 2.5_f64)?;
         config.call_method1("set_instrument_risk_limits", (0usize, per_instrument))?;
 
         let risk_limits = config.call_method0("risk_limits")?;
         let risk_dict = risk_limits.downcast::<PyDict>()?;
 
-        let global_limits = risk_dict.get_item("global").unwrap();
+        let global_limits = risk_dict.get_item("global").unwrap().unwrap();
         let global_limits = global_limits.downcast::<PyDict>()?;
         let max_leverage_repr: String = global_limits
-            .get_item("max_leverage")
+            .get_item("max_leverage")?
             .unwrap()
             .repr()?
             .extract()?;
         assert!(max_leverage_repr.contains("3.5"));
 
-        let entries = risk_dict.get_item("instruments").unwrap();
+        let entries = risk_dict.get_item("instruments")?.unwrap();
         let entries = entries.downcast::<PyList>()?;
         let entry = entries
             .iter()
             .find_map(|value| {
-                let value = value.downcast::<PyDict>().ok()?;
-                let index: usize = value.get_item("index")?.extract().ok()?;
-                if index == 0 { Some(value) } else { None }
+                let dict = value.downcast::<PyDict>().ok()?;
+                let index_item = dict.get_item("index").ok()?;
+                let index: usize = index_item?.extract().ok()?;
+                if index == 0 { Some(dict.clone()) } else { None }
             })
             .expect("instrument 0 limits present");
 
-        let instrument_limits = entry.get_item("limits").unwrap();
+        let instrument_limits = entry.get_item("limits")?.unwrap();
         let instrument_limits = instrument_limits.downcast::<PyDict>()?;
         let qty_repr: String = instrument_limits
-            .get_item("max_position_quantity")
+            .get_item("max_position_quantity")?
             .unwrap()
             .repr()?
             .extract()?;

@@ -791,6 +791,7 @@ impl
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn build_engine(
     trading_state: TradingState,
     execution_tx: UnboundedTx<ExecutionRequest>,
@@ -832,7 +833,7 @@ fn build_engine(
 
     let clock = HistoricalClock::new(STARTING_TIMESTAMP);
 
-    let state = EngineState::builder(&instruments, DefaultGlobalData::default(), |_| {
+    let state = EngineState::builder(&instruments, DefaultGlobalData, |_| {
         DefaultInstrumentMarketData::default()
     })
     .time_engine_start(STARTING_TIMESTAMP)

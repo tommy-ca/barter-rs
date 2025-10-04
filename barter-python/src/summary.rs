@@ -693,6 +693,7 @@ pub struct PyBacktestSummary {
 }
 
 impl PyBacktestSummary {
+    #[allow(dead_code)]
     fn from_backtest_summary<Interval>(
         py: Python<'_>,
         summary: BacktestSummary<Interval>,
@@ -768,6 +769,7 @@ pub struct PyMultiBacktestSummary {
 }
 
 impl PyMultiBacktestSummary {
+    #[allow(dead_code)]
     fn from_multi_backtest_summary<Interval>(
         py: Python<'_>,
         summary: MultiBacktestSummary<Interval>,

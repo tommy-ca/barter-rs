@@ -413,6 +413,7 @@ impl PyEngineEvent {
     }
 
     /// Construct an [`EngineEvent::Market`] wrapping an order book snapshot.
+    #[allow(clippy::too_many_arguments)]
     #[staticmethod]
     #[pyo3(signature = (exchange, instrument, sequence, time_engine, bids, asks, time_exchange=None, time_received=None))]
     pub fn market_order_book_snapshot(

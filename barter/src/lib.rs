@@ -195,17 +195,11 @@ pub mod test_utils {
     use chrono::{DateTime, Days, TimeDelta, Utc};
     use rust_decimal::Decimal;
 
+    // Ensure dev-dependencies are considered used
     #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn test_calculate_average() {
-            let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-            let average = calculate_average(&values);
-            assert_eq!(average, 3.0);
-        }
-    }
+    use criterion as _;
+    #[cfg(test)]
+    use serde_json as _;
 
     pub fn f64_is_eq(actual: f64, expected: f64, epsilon: f64) -> bool {
         if actual.is_nan() && expected.is_nan() {
@@ -290,6 +284,18 @@ pub mod test_utils {
             0.0
         } else {
             values.iter().sum::<f64>() / values.len() as f64
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_calculate_average() {
+            let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+            let average = calculate_average(&values);
+            assert_eq!(average, 3.0);
         }
     }
 }
