@@ -8,15 +8,17 @@ from types import ModuleType
 _core: ModuleType = import_module(".barter_python", __name__)
 
 # Import pure Python modules
-from . import instrument  # noqa: E402,F401
-from . import execution  # noqa: E402,F401
-from . import data  # noqa: E402,F401
-from . import integration  # noqa: E402,F401
-from . import strategy  # noqa: E402,F401
-from . import statistic  # noqa: E402,F401
-from . import backtest  # noqa: E402,F401
-from . import risk  # noqa: E402,F401
-from . import engine  # noqa: E402,F401
+from . import (
+    backtest,  # noqa: E402,F401
+    data,  # noqa: E402,F401
+    engine,  # noqa: E402,F401
+    execution,  # noqa: E402,F401
+    instrument,  # noqa: E402,F401
+    integration,  # noqa: E402,F401
+    risk,  # noqa: E402,F401
+    statistic,  # noqa: E402,F401
+    strategy,  # noqa: E402,F401
+)
 
 __all__ = [name for name in dir(_core) if not name.startswith("_")]
 

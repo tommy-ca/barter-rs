@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, Optional, TypeVar, Union
+from typing import Generic, TypeVar
 
 from .instrument import Side
 
@@ -74,8 +74,8 @@ class OrderBookL1:
     def __init__(
         self,
         last_update_time: datetime,
-        best_bid: Optional[Level] = None,
-        best_ask: Optional[Level] = None,
+        best_bid: Level | None = None,
+        best_ask: Level | None = None,
     ) -> None:
         self.last_update_time = last_update_time
         self.best_bid = best_bid
@@ -85,18 +85,18 @@ class OrderBookL1:
     def new(
         cls,
         last_update_time: datetime,
-        best_bid: Optional[Level] = None,
-        best_ask: Optional[Level] = None,
+        best_bid: Level | None = None,
+        best_ask: Level | None = None,
     ) -> OrderBookL1:
         return cls(last_update_time, best_bid, best_ask)
 
-    def mid_price(self) -> Optional[Decimal]:
+    def mid_price(self) -> Decimal | None:
         """Calculate the mid-price by taking the average of the best bid and ask prices."""
         if self.best_ask is None or self.best_bid is None:
             return None
         return (self.best_bid.price + self.best_ask.price) / Decimal("2")
 
-    def volume_weighted_mid_price(self) -> Optional[Decimal]:
+    def volume_weighted_mid_price(self) -> Decimal | None:
         """Calculate the volume weighted mid-price (micro-price)."""
         if self.best_ask is None or self.best_bid is None:
             return None
@@ -237,7 +237,7 @@ class Asks:
 class OrderBookSide:
     """Normalised Barter Levels for one Side of the OrderBook."""
 
-    def __init__(self, side: Union[Bids, Asks], levels: list[Level]) -> None:
+    def __init__(self, side: Bids | Asks, levels: list[Level]) -> None:
         self.side = side
         self.levels = levels
 
@@ -255,7 +255,7 @@ class OrderBookSide:
         sorted_levels = sorted(levels, key=lambda level: level.price)
         return cls(Asks(), sorted_levels)
 
-    def best(self) -> Optional[Level]:
+    def best(self) -> Level | None:
         """Get the best Level on this OrderBookSide."""
         return self.levels[0] if self.levels else None
 
@@ -275,7 +275,7 @@ class OrderBook:
     def __init__(
         self,
         sequence: int,
-        time_engine: Optional[datetime],
+        time_engine: datetime | None,
         bids: OrderBookSide,
         asks: OrderBookSide,
     ) -> None:
@@ -288,7 +288,7 @@ class OrderBook:
     def new(
         cls,
         sequence: int,
-        time_engine: Optional[datetime],
+        time_engine: datetime | None,
         bids: list[Level],
         asks: list[Level],
     ) -> OrderBook:
@@ -300,7 +300,7 @@ class OrderBook:
             OrderBookSide.asks(asks),
         )
 
-    def mid_price(self) -> Optional[Decimal]:
+    def mid_price(self) -> Decimal | None:
         """Calculate the mid-price by taking the average of the best bid and ask prices."""
         best_bid = self.bids.best()
         best_ask = self.asks.best()
@@ -308,7 +308,7 @@ class OrderBook:
             return None
         return (best_bid.price + best_ask.price) / Decimal("2")
 
-    def volume_weighted_mid_price(self) -> Optional[Decimal]:
+    def volume_weighted_mid_price(self) -> Decimal | None:
         """Calculate the volume weighted mid-price (micro-price)."""
         best_bid = self.bids.best()
         best_ask = self.asks.best()
@@ -479,7 +479,7 @@ class MarketEvent(Generic[InstrumentKey, T]):
 
 
 # For convenience, define typed versions
-def as_public_trade(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, PublicTrade]]:
+def as_public_trade(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, PublicTrade] | None:
     """Return as PublicTrade if applicable."""
     if isinstance(event.kind.data, PublicTrade):
         return MarketEvent(
@@ -492,7 +492,7 @@ def as_public_trade(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[Mar
     return None
 
 
-def as_order_book_l1(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, OrderBookL1]]:
+def as_order_book_l1(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, OrderBookL1] | None:
     """Return as OrderBookL1 if applicable."""
     if isinstance(event.kind.data, OrderBookL1):
         return MarketEvent(
@@ -505,7 +505,7 @@ def as_order_book_l1(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[Ma
     return None
 
 
-def as_order_book(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, OrderBookEvent]]:
+def as_order_book(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, OrderBookEvent] | None:
     """Return as OrderBookEvent if applicable."""
     if isinstance(event.kind.data, OrderBookEvent):
         return MarketEvent(
@@ -518,7 +518,7 @@ def as_order_book(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[Marke
     return None
 
 
-def as_candle(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, Candle]]:
+def as_candle(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, Candle] | None:
     """Return as Candle if applicable."""
     if isinstance(event.kind.data, Candle):
         return MarketEvent(
@@ -531,7 +531,7 @@ def as_candle(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEve
     return None
 
 
-def as_liquidation(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, Liquidation]]:
+def as_liquidation(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, Liquidation] | None:
     """Return as Liquidation if applicable."""
     if isinstance(event.kind.data, Liquidation):
         return MarketEvent(

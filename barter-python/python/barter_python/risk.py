@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Generic, Iterable, Protocol, TypeVar, Union
+from collections.abc import Iterable
+from typing import Generic, Protocol, TypeVar, Union
 
 from .execution import OrderRequestCancel, OrderRequestOpen
 

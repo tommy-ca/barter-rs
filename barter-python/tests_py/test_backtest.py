@@ -356,7 +356,15 @@ class TestTearSheet:
 
     def test_creation(self):
         """Test creating a TearSheet."""
-        from barter_python.statistic import Annual365, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
+        from barter_python.statistic import (
+            Annual365,
+            CalmarRatio,
+            ProfitFactor,
+            RateOfReturn,
+            SharpeRatio,
+            SortinoRatio,
+            WinRate,
+        )
 
         interval = Annual365()
         tear_sheet = backtest.TearSheet(
@@ -418,7 +426,15 @@ class TestTradingSummary:
 
     def test_creation(self):
         """Test creating a TradingSummary."""
-        from barter_python.statistic import Annual365, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
+        from barter_python.statistic import (
+            Annual365,
+            CalmarRatio,
+            ProfitFactor,
+            RateOfReturn,
+            SharpeRatio,
+            SortinoRatio,
+            WinRate,
+        )
 
         start_time = datetime(2023, 1, 1, 9, 0, 0)
         end_time = datetime(2023, 1, 1, 17, 0, 0)

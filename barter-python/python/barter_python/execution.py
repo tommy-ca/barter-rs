@@ -458,7 +458,7 @@ class OrderError(Enum):
 class InactiveOrderState(Generic[AssetKey, InstrumentKey]):
     """Inactive order state."""
 
-    def __init__(self, state: Union[Cancelled, OrderError, str]):
+    def __init__(self, state: Cancelled | OrderError | str):
         self._state = state
 
     @classmethod
@@ -478,7 +478,7 @@ class InactiveOrderState(Generic[AssetKey, InstrumentKey]):
         return cls(error)
 
     @property
-    def state(self) -> Union[Cancelled, OrderError, str]:
+    def state(self) -> Cancelled | OrderError | str:
         return self._state
 
     def is_cancelled(self) -> bool:
@@ -511,7 +511,7 @@ class InactiveOrderState(Generic[AssetKey, InstrumentKey]):
 class OrderState(Generic[AssetKey, InstrumentKey]):
     """Order state enum."""
 
-    def __init__(self, state: Union[ActiveOrderState, InactiveOrderState[AssetKey, InstrumentKey]]):
+    def __init__(self, state: ActiveOrderState | InactiveOrderState[AssetKey, InstrumentKey]):
         self._state = state
 
     @classmethod
@@ -531,7 +531,7 @@ class OrderState(Generic[AssetKey, InstrumentKey]):
         return cls(InactiveOrderState.expired())
 
     @property
-    def state(self) -> Union[ActiveOrderState, InactiveOrderState[AssetKey, InstrumentKey]]:
+    def state(self) -> ActiveOrderState | InactiveOrderState[AssetKey, InstrumentKey]:
         return self._state
 
     def is_active(self) -> bool:
@@ -766,7 +766,7 @@ class AccountEventKind(Generic[ExchangeKey, AssetKey, InstrumentKey]):
         self._data = data
 
     @classmethod
-    def snapshot(cls, snapshot: "AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]") -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def snapshot(cls, snapshot: AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("snapshot", snapshot)
 
     @classmethod
@@ -774,11 +774,11 @@ class AccountEventKind(Generic[ExchangeKey, AssetKey, InstrumentKey]):
         return cls("balance_snapshot", balance)
 
     @classmethod
-    def order_snapshot(cls, order: "Order[ExchangeKey, InstrumentKey, AssetKey]") -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def order_snapshot(cls, order: Order[ExchangeKey, InstrumentKey, AssetKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("order_snapshot", order)
 
     @classmethod
-    def order_cancelled(cls, response: "OrderResponseCancel[ExchangeKey, AssetKey, InstrumentKey]") -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def order_cancelled(cls, response: OrderResponseCancel[ExchangeKey, AssetKey, InstrumentKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("order_cancelled", response)
 
     @classmethod
@@ -813,10 +813,10 @@ class InstrumentAccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     """Account snapshot for a specific instrument."""
 
     instrument: InstrumentKey
-    orders: list["OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]"]
+    orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]]
 
     @classmethod
-    def new(cls, instrument: InstrumentKey, orders: Optional[list["OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]"]] = None) -> InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
+    def new(cls, instrument: InstrumentKey, orders: Optional[list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]]] = None) -> InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
         return cls(instrument, orders or [])
 
     def __str__(self) -> str:
@@ -913,7 +913,7 @@ class OrderResponseCancel(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     """Order cancellation response."""
 
     key: OrderKey[ExchangeKey, InstrumentKey]
-    state: Union[Cancelled, Exception]  # Simplified for now
+    state: Cancelled | Exception  # Simplified for now
 
     def __str__(self) -> str:
         return f"OrderResponseCancel(key={self.key}, state={self.state})"

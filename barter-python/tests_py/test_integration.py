@@ -4,8 +4,8 @@
 from barter_python.integration import (
     Field,
     Metric,
-    SnapUpdates,
     Snapshot,
+    SnapUpdates,
     SubscriptionId,
     Tag,
     Value,

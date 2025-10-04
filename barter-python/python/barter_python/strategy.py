@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, Optional, Protocol, TypeVar
+from collections.abc import Iterable
+from typing import Callable, Optional, Protocol, TypeVar
 
 from .execution import (
     ClientOrderId,
@@ -198,12 +199,18 @@ def close_open_positions_with_market_orders(
         if inst_state.position is None or inst_state.price is None:
             continue
 
+        assert inst_state.position is not None
+        assert inst_state.price is not None
+        inst = inst_state
+        def get_cid():  # noqa: B023
+            return gen_cid(inst) if gen_cid else ClientOrderId("close_position")
+
         request = build_ioc_market_order_to_close_position(
             inst_state.exchange,
             inst_state.position,
             strategy_id,
             inst_state.price,
-            lambda: gen_cid(inst_state),
+            get_cid,
         )
         open_requests.append(request)
 

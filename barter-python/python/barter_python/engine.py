@@ -8,7 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Generic, Optional, Protocol, TypeVar
 
-from .data import MarketEvent, OrderBookL1, Candle, as_public_trade, as_candle
+from .data import Candle, MarketEvent, OrderBookL1, as_candle, as_public_trade
 from .execution import (
     AssetBalance,
     Order,

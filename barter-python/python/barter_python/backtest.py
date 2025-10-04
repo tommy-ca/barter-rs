@@ -6,21 +6,39 @@ import asyncio
 import json
 import time
 from abc import abstractmethod
+from collections.abc import AsyncIterable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, AsyncIterable, Generic, Iterable, Optional, Protocol, TypeVar
+from typing import Any, Generic, Protocol, TypeVar
 
-from .data import MarketEvent, DataKind, PublicTrade, Candle, Liquidation, as_public_trade, as_candle
-from .engine import Engine, EngineState as EngineEngineState
-from .execution import OrderRequestOpen, OrderRequestCancel
+from .data import (
+    Candle,
+    DataKind,
+    Liquidation,
+    MarketEvent,
+    PublicTrade,
+    as_candle,
+    as_public_trade,
+)
+from .engine import Engine
+from .engine import EngineState as EngineEngineState
+from .execution import OrderRequestCancel, OrderRequestOpen
 from .instrument import (
-    Side,
     InstrumentIndex,
+    Side,
 )
 from .risk import RiskManager
-from .statistic import TimeInterval, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
+from .statistic import (
+    CalmarRatio,
+    ProfitFactor,
+    RateOfReturn,
+    SharpeRatio,
+    SortinoRatio,
+    TimeInterval,
+    WinRate,
+)
 
 # Type variables for generic backtest interfaces
 MarketEventKind = TypeVar("MarketEventKind")
@@ -114,24 +132,24 @@ class PnLReturns:
 class TearSheet(Generic[SummaryInterval]):
     """Tear sheet summarizing trading performance for an instrument."""
     pnl: Decimal
-    pnl_return: "RateOfReturn[SummaryInterval]"
-    sharpe_ratio: "SharpeRatio[SummaryInterval]"
-    sortino_ratio: "SortinoRatio[SummaryInterval]"
-    calmar_ratio: "CalmarRatio[SummaryInterval]"
-    pnl_drawdown: Optional[Drawdown]
-    pnl_drawdown_mean: Optional[MeanDrawdown]
-    pnl_drawdown_max: Optional[MaxDrawdown]
-    win_rate: Optional["WinRate"]
-    profit_factor: Optional["ProfitFactor"]
+    pnl_return: RateOfReturn[SummaryInterval]
+    sharpe_ratio: SharpeRatio[SummaryInterval]
+    sortino_ratio: SortinoRatio[SummaryInterval]
+    calmar_ratio: CalmarRatio[SummaryInterval]
+    pnl_drawdown: Drawdown | None
+    pnl_drawdown_mean: MeanDrawdown | None
+    pnl_drawdown_max: MaxDrawdown | None
+    win_rate: WinRate | None
+    profit_factor: ProfitFactor | None
 
 
 @dataclass(frozen=True)
 class TearSheetAsset:
     """Tear sheet summarizing asset changes."""
-    balance_end: Optional[AssetBalance]
-    drawdown: Optional[Drawdown]
-    drawdown_mean: Optional[MeanDrawdown]
-    drawdown_max: Optional[MaxDrawdown]
+    balance_end: AssetBalance | None
+    drawdown: Drawdown | None
+    drawdown_mean: MeanDrawdown | None
+    drawdown_max: MaxDrawdown | None
 
 
 @dataclass(frozen=True)
@@ -172,7 +190,7 @@ class MarketDataInMemory:
     @classmethod
     def from_json_file(cls, path: Path) -> MarketDataInMemory:
         """Load market data from a JSON file."""
-        with open(path, 'r') as f:
+        with open(path) as f:
             data = json.load(f)
 
         events = []
@@ -415,8 +433,8 @@ class BacktestEngineSimulator:
 
     def __init__(self, initial_engine_state: EngineEngineState, strategy: Any, risk_manager: RiskManager):
         self.engine: Engine = Engine(initial_engine_state, strategy, risk_manager)
-        self.current_time: Optional[datetime] = None
-        self.start_time: Optional[datetime] = None
+        self.current_time: datetime | None = None
+        self.start_time: datetime | None = None
         self.positions: dict[int, Any] = {}  # Track positions by instrument
         self.trades: list[Any] = []  # Track executed trades
         self.pnl_by_instrument: dict[int, Any] = {}  # Track PnL by instrument
@@ -485,7 +503,7 @@ class BacktestEngineSimulator:
                 # TODO: Update engine state positions
 
         # Cancel requests - just mark as cancelled
-        for cancel in cancel_requests:
+        for _cancel in cancel_requests:
             # TODO: Update order state to cancelled
             pass
 
@@ -496,7 +514,7 @@ class BacktestEngineSimulator:
 
         # Generate instrument tear sheets
         instruments = {}
-        for inst_index, inst_state in self.engine.state.instruments.items():
+        for inst_index, _inst_state in self.engine.state.instruments.items():
             instrument_name = f"instrument_{inst_index}"
             pnl = self.pnl_by_instrument.get(inst_index.index, Decimal('0'))
 

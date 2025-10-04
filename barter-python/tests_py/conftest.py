@@ -10,11 +10,11 @@ from __future__ import annotations
 import importlib
 import os
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable
 
 import pytest
-
 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 REPO_ROOT = PACKAGE_ROOT.parent

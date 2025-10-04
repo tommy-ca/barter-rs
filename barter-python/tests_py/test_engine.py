@@ -3,15 +3,15 @@
 from datetime import datetime
 from decimal import Decimal
 
-from barter_python.data import MarketEvent, DataKind, PublicTrade, Candle
+from barter_python.data import Candle, DataKind, MarketEvent, PublicTrade
 from barter_python.engine import (
-    TradingState,
-    EngineState,
-    InstrumentState,
+    AllInstrumentsFilter,
     DefaultInstrumentMarketData,
     Engine,
-    AllInstrumentsFilter,
+    EngineState,
     ExchangeFilter,
+    InstrumentState,
+    TradingState,
 )
 from barter_python.instrument import Side
 from barter_python.risk import DefaultRiskManager

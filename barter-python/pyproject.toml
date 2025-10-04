@@ -36,6 +36,9 @@ Repository = "https://github.com/barter-rs/barter-rs"
 test = [
     "pytest>=8.3",
 ]
+dev = [
+    "ruff>=0.6.0",
+]
 
 [project.scripts]
 barter-backtest = "barter_python_cli.backtest:main"
@@ -52,4 +55,37 @@ addopts = "-ra"
 testpaths = ["tests_py"]
 markers = [
     "integration: end-to-end engine lifecycle scenarios",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by black
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"test_*.py" = ["B011"] # assert false
+"python/barter_python/strategy.py" = ["B023"] # false positive for closure capturing loop variable
+
+[tool.ruff.lint.isort]
+known-first-party = ["barter_python"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13.3",
 ]
