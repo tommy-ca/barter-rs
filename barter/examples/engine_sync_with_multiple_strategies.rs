@@ -1,7 +1,7 @@
 use barter::{
     EngineEvent,
     engine::{
-        Engine, Processor,
+        Processor,
         clock::LiveClock,
         state::{
             EngineState,
@@ -21,9 +21,6 @@ use barter::{
     strategy::{
         DefaultStrategy,
         algo::AlgoStrategy,
-        close_positions::{ClosePositionsStrategy, build_ioc_market_order_to_close_position},
-        on_disconnect::OnDisconnectStrategy,
-        on_trading_disabled::OnTradingDisabled,
     },
     system::{
         builder::{AuditMode, EngineFeedMode, SystemArgs, SystemBuilder},
@@ -38,13 +35,12 @@ use barter_data::{
 use barter_execution::{
     AccountEvent, AccountEventKind,
     order::{
-        id::{ClientOrderId, StrategyId},
+        id::StrategyId,
         request::{OrderRequestCancel, OrderRequestOpen},
     },
 };
 use barter_instrument::{
-    asset::AssetIndex,
-    exchange::{ExchangeId, ExchangeIndex},
+    exchange::ExchangeIndex,
     index::IndexedInstruments,
     instrument::InstrumentIndex,
 };
