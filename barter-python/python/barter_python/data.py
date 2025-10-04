@@ -127,16 +127,220 @@ class OrderBookL1:
         return hash((self.last_update_time, self.best_bid, self.best_ask))
 
 
-# Placeholder for OrderBook - to be implemented later
-@dataclass(frozen=True)
-class OrderBook:
-    """Placeholder for OrderBook - full implementation later."""
-    sequence: int
-    time_engine: Optional[datetime]
-    # bids and asks would be added later
+class Candle:
+    """Normalised Barter OHLCV Candle model."""
 
-    def __str__(self) -> str:
-        return f"OrderBook(sequence={self.sequence}, time_engine={self.time_engine})"
+    def __init__(
+        self,
+        close_time: datetime,
+        open: float,
+        high: float,
+        low: float,
+        close: float,
+        volume: float,
+        trade_count: int,
+    ) -> None:
+        self.close_time = close_time
+        self.open = open
+        self.high = high
+        self.low = low
+        self.close = close
+        self.volume = volume
+        self.trade_count = trade_count
+
+    def __repr__(self) -> str:
+        return (
+            f"Candle("
+            f"close_time={self.close_time!r}, "
+            f"open={self.open!r}, "
+            f"high={self.high!r}, "
+            f"low={self.low!r}, "
+            f"close={self.close!r}, "
+            f"volume={self.volume!r}, "
+            f"trade_count={self.trade_count!r}"
+            f")"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Candle):
+            return NotImplemented
+        return (
+            self.close_time == other.close_time
+            and self.open == other.open
+            and self.high == other.high
+            and self.low == other.low
+            and self.close == other.close
+            and self.volume == other.volume
+            and self.trade_count == other.trade_count
+        )
+
+    def __hash__(self) -> int:
+        return hash((
+            self.close_time,
+            self.open,
+            self.high,
+            self.low,
+            self.close,
+            self.volume,
+            self.trade_count,
+        ))
+
+
+class Liquidation:
+    """Normalised Barter Liquidation model."""
+
+    def __init__(
+        self,
+        side: Side,
+        price: float,
+        quantity: float,
+        time: datetime,
+    ) -> None:
+        self.side = side
+        self.price = price
+        self.quantity = quantity
+        self.time = time
+
+    def __repr__(self) -> str:
+        return (
+            f"Liquidation("
+            f"side={self.side!r}, "
+            f"price={self.price!r}, "
+            f"quantity={self.quantity!r}, "
+            f"time={self.time!r}"
+            f")"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Liquidation):
+            return NotImplemented
+        return (
+            self.side == other.side
+            and self.price == other.price
+            and self.quantity == other.quantity
+            and self.time == other.time
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.side, self.price, self.quantity, self.time))
+
+
+class Bids:
+    """Unit type to tag an OrderBookSide as the bid side (buyers) of an OrderBook."""
+    pass
+
+
+class Asks:
+    """Unit type to tag an OrderBookSide as the ask side (sellers) of an OrderBook."""
+    pass
+
+
+class OrderBookSide:
+    """Normalised Barter Levels for one Side of the OrderBook."""
+
+    def __init__(self, side: Union[Bids, Asks], levels: list[Level]) -> None:
+        self.side = side
+        self.levels = levels
+
+    @classmethod
+    def bids(cls, levels: list[Level]) -> OrderBookSide:
+        """Construct a new OrderBookSide<Bids> from the provided Levels."""
+        # Sort bids in descending price order (highest first)
+        sorted_levels = sorted(levels, key=lambda l: l.price, reverse=True)
+        return cls(Bids(), sorted_levels)
+
+    @classmethod
+    def asks(cls, levels: list[Level]) -> OrderBookSide:
+        """Construct a new OrderBookSide<Asks> from the provided Levels."""
+        # Sort asks in ascending price order (lowest first)
+        sorted_levels = sorted(levels, key=lambda l: l.price)
+        return cls(Asks(), sorted_levels)
+
+    def best(self) -> Optional[Level]:
+        """Get the best Level on this OrderBookSide."""
+        return self.levels[0] if self.levels else None
+
+    def __repr__(self) -> str:
+        side_name = "Bids" if isinstance(self.side, Bids) else "Asks"
+        return f"OrderBookSide({side_name}, levels={self.levels!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, OrderBookSide):
+            return NotImplemented
+        return self.side.__class__ == other.side.__class__ and self.levels == other.levels
+
+
+class OrderBook:
+    """Normalised Barter OrderBook snapshot."""
+
+    def __init__(
+        self,
+        sequence: int,
+        time_engine: Optional[datetime],
+        bids: OrderBookSide,
+        asks: OrderBookSide,
+    ) -> None:
+        self.sequence = sequence
+        self.time_engine = time_engine
+        self.bids = bids
+        self.asks = asks
+
+    @classmethod
+    def new(
+        cls,
+        sequence: int,
+        time_engine: Optional[datetime],
+        bids: list[Level],
+        asks: list[Level],
+    ) -> OrderBook:
+        """Construct a new sorted OrderBook."""
+        return cls(
+            sequence,
+            time_engine,
+            OrderBookSide.bids(bids),
+            OrderBookSide.asks(asks),
+        )
+
+    def mid_price(self) -> Optional[Decimal]:
+        """Calculate the mid-price by taking the average of the best bid and ask prices."""
+        best_bid = self.bids.best()
+        best_ask = self.asks.best()
+        if best_bid is None or best_ask is None:
+            return None
+        return (best_bid.price + best_ask.price) / Decimal("2")
+
+    def volume_weighted_mid_price(self) -> Optional[Decimal]:
+        """Calculate the volume weighted mid-price (micro-price)."""
+        best_bid = self.bids.best()
+        best_ask = self.asks.best()
+        if best_bid is None or best_ask is None:
+            return None
+        return (
+            (best_bid.price * best_ask.amount) + (best_ask.price * best_bid.amount)
+        ) / (best_bid.amount + best_ask.amount)
+
+    def __repr__(self) -> str:
+        return (
+            f"OrderBook("
+            f"sequence={self.sequence!r}, "
+            f"time_engine={self.time_engine!r}, "
+            f"bids={self.bids!r}, "
+            f"asks={self.asks!r}"
+            f")"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, OrderBook):
+            return NotImplemented
+        return (
+            self.sequence == other.sequence
+            and self.time_engine == other.time_engine
+            and self.bids == other.bids
+            and self.asks == other.asks
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.sequence, self.time_engine, self.bids, self.asks))
 
 
 class OrderBookEvent(Enum):
@@ -148,7 +352,7 @@ class OrderBookEvent(Enum):
         return self.value
 
 
-DataKindType = Union[PublicTrade, OrderBookL1, OrderBookEvent, None, None, None]  # Candle and Liquidation placeholders
+DataKindType = Union[PublicTrade, OrderBookL1, OrderBookEvent, Candle, Liquidation, None]
 
 
 class DataKind:
@@ -171,12 +375,12 @@ class DataKind:
         return cls("order_book", event)
 
     @classmethod
-    def candle(cls) -> DataKind:
-        return cls("candle", None)
+    def candle(cls, candle: Candle) -> DataKind:
+        return cls("candle", candle)
 
     @classmethod
-    def liquidation(cls) -> DataKind:
-        return cls("liquidation", None)
+    def liquidation(cls, liquidation: Liquidation) -> DataKind:
+        return cls("liquidation", liquidation)
 
     @property
     def kind(self) -> str:
@@ -305,6 +509,32 @@ def as_order_book_l1(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[Ma
 def as_order_book(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, OrderBookEvent]]:
     """Return as OrderBookEvent if applicable."""
     if isinstance(event.kind.data, OrderBookEvent):
+        return MarketEvent(
+            event.time_exchange,
+            event.time_received,
+            event.exchange,
+            event.instrument,
+            event.kind.data,
+        )
+    return None
+
+
+def as_candle(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, Candle]]:
+    """Return as Candle if applicable."""
+    if isinstance(event.kind.data, Candle):
+        return MarketEvent(
+            event.time_exchange,
+            event.time_received,
+            event.exchange,
+            event.instrument,
+            event.kind.data,
+        )
+    return None
+
+
+def as_liquidation(event: MarketEvent[InstrumentKey, DataKind]) -> Optional[MarketEvent[InstrumentKey, Liquidation]]:
+    """Return as Liquidation if applicable."""
+    if isinstance(event.kind.data, Liquidation):
         return MarketEvent(
             event.time_exchange,
             event.time_received,
