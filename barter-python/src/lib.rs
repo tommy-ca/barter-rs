@@ -4,12 +4,14 @@
 
 //! Python bindings for the Barter trading engine.
 
+mod analytics;
 mod command;
 mod config;
 mod logging;
 mod summary;
 mod system;
 
+use analytics::{calculate_sharpe_ratio, calculate_sortino_ratio};
 use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
 use barter::{EngineEvent, Timed};
@@ -674,6 +676,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
     m.add_function(wrap_pyfunction!(start_system, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_sharpe_ratio, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_sortino_ratio, m)?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();

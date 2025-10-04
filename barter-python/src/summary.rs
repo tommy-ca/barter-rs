@@ -466,7 +466,7 @@ pub struct PyMetricWithInterval {
 }
 
 impl PyMetricWithInterval {
-    fn from_components(
+    pub(crate) fn from_components(
         py: Python<'_>,
         value: Decimal,
         interval: String,
