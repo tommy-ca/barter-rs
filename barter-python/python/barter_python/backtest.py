@@ -248,15 +248,36 @@ async def backtest(
     )
 
 
-# TODO: Define placeholder types that need to be implemented
+# Placeholder types for backtest configuration
 class IndexedInstruments:
-    """Placeholder for indexed instruments."""
-    pass
+    """Indexed collection of exchanges, assets, and instruments for efficient lookup."""
+
+    def __init__(self, exchanges=None, assets=None, instruments=None):
+        self._exchanges = exchanges or []
+        self._assets = assets or []
+        self._instruments = instruments or []
+
+    @classmethod
+    def new(cls, instruments):
+        """Create IndexedInstruments from a list of instruments."""
+        # Simple implementation - in practice this would do proper indexing
+        return cls(instruments=instruments)
+
+    def exchanges(self):
+        return self._exchanges
+
+    def assets(self):
+        return self._assets
+
+    def instruments(self):
+        return self._instruments
 
 
 class ExecutionConfig:
-    """Placeholder for execution configuration."""
-    pass
+    """Configuration for execution links."""
+
+    def __init__(self, mock_config=None):
+        self.mock_config = mock_config
 
 
 class BacktestEngineSimulator:
