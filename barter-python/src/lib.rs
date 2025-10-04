@@ -11,7 +11,10 @@ mod logging;
 mod summary;
 mod system;
 
-use analytics::{calculate_calmar_ratio, calculate_sharpe_ratio, calculate_sortino_ratio};
+use analytics::{
+    calculate_calmar_ratio, calculate_profit_factor, calculate_rate_of_return,
+    calculate_sharpe_ratio, calculate_sortino_ratio, calculate_win_rate,
+};
 use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
 use barter::{EngineEvent, Timed};
@@ -679,6 +682,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calculate_sharpe_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_sortino_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_calmar_ratio, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_profit_factor, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_win_rate, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_rate_of_return, m)?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();

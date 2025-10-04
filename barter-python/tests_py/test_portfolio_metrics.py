@@ -132,3 +132,91 @@ def test_calculate_calmar_ratio_invalid_interval_raises() -> None:
             max_drawdown=0.02,
             interval="Weekly",
         )
+
+
+def test_calculate_profit_factor_typical_case() -> None:
+    factor = bp.calculate_profit_factor(
+        profits_gross_abs=10.0,
+        losses_gross_abs=5.0,
+    )
+
+    assert factor == Decimal("2")
+
+
+def test_calculate_profit_factor_returns_none_when_no_activity() -> None:
+    assert bp.calculate_profit_factor(
+        profits_gross_abs=0.0,
+        losses_gross_abs=0.0,
+    ) is None
+
+
+def test_calculate_profit_factor_handles_perfect_performance() -> None:
+    factor = bp.calculate_profit_factor(
+        profits_gross_abs=5.0,
+        losses_gross_abs=0.0,
+    )
+
+    assert factor == Decimal("79228162514264337593543950335")
+
+
+def test_calculate_profit_factor_rejects_non_finite_input() -> None:
+    with pytest.raises(ValueError):
+        bp.calculate_profit_factor(
+            profits_gross_abs=float("nan"),
+            losses_gross_abs=1.0,
+        )
+
+
+def test_calculate_win_rate_typical_case() -> None:
+    rate = bp.calculate_win_rate(wins=6.0, total=10.0)
+
+    assert rate == Decimal("0.6")
+
+
+def test_calculate_win_rate_zero_total_returns_none() -> None:
+    assert bp.calculate_win_rate(wins=0.0, total=0.0) is None
+
+
+def test_calculate_win_rate_rejects_non_finite_input() -> None:
+    with pytest.raises(ValueError):
+        bp.calculate_win_rate(wins=1.0, total=float("inf"))
+
+
+def test_calculate_rate_of_return_daily_interval() -> None:
+    metric = bp.calculate_rate_of_return(
+        mean_return=0.01,
+        interval="daily",
+    )
+
+    assert metric.value == Decimal("0.01")
+    assert metric.interval == "Daily"
+
+
+def test_calculate_rate_of_return_scale_to_annual() -> None:
+    metric = bp.calculate_rate_of_return(
+        mean_return=0.01,
+        interval="daily",
+        target_interval="annual_252",
+    )
+
+    assert metric.value == Decimal("2.52")
+    assert metric.interval == "Annual(252)"
+
+
+def test_calculate_rate_of_return_scale_custom_interval() -> None:
+    metric = bp.calculate_rate_of_return(
+        mean_return=0.01,
+        interval=dt.timedelta(hours=2),
+        target_interval=dt.timedelta(hours=8),
+    )
+
+    assert metric.value == Decimal("0.04")
+    assert metric.interval.startswith("Duration 480")
+
+
+def test_calculate_rate_of_return_invalid_interval_raises() -> None:
+    with pytest.raises(ValueError):
+        bp.calculate_rate_of_return(
+            mean_return=0.01,
+            interval="weekly",
+        )

@@ -702,7 +702,7 @@ fn optional_decimal(py: Python<'_>, value: Option<Decimal>) -> PyResult<Option<P
     value.map(|decimal| decimal_to_py(py, decimal)).transpose()
 }
 
-fn decimal_to_py(py: Python<'_>, value: Decimal) -> PyResult<PyObject> {
+pub(crate) fn decimal_to_py(py: Python<'_>, value: Decimal) -> PyResult<PyObject> {
     let module = PyModule::import_bound(py, "decimal")?;
     let decimal_cls = module.getattr("Decimal")?;
     let value_str = value.to_string();

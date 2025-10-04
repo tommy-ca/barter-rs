@@ -1,11 +1,17 @@
-use crate::{command::parse_decimal, summary::PyMetricWithInterval};
+use crate::{
+    command::parse_decimal,
+    summary::{PyMetricWithInterval, decimal_to_py},
+};
 use barter::statistic::{
-    metric::{calmar::CalmarRatio, sharpe::SharpeRatio, sortino::SortinoRatio},
+    metric::{
+        calmar::CalmarRatio, profit_factor::ProfitFactor, rate_of_return::RateOfReturn,
+        sharpe::SharpeRatio, sortino::SortinoRatio, win_rate::WinRate,
+    },
     time::{Annual252, Annual365, Daily, TimeInterval},
 };
 use chrono::TimeDelta;
 use pyo3::{
-    Bound,
+    Bound, PyObject,
     exceptions::PyValueError,
     prelude::*,
     types::{PyAny, PyDelta},
@@ -63,6 +69,42 @@ where
 {
     let CalmarRatio { value, interval } = ratio;
     ratio_to_metric(py, value, interval)
+}
+
+fn rate_metric<Interval>(
+    py: Python<'_>,
+    rate: RateOfReturn<Interval>,
+    target_choice: Option<IntervalChoice>,
+) -> PyResult<Py<PyMetricWithInterval>>
+where
+    Interval: TimeInterval,
+{
+    match target_choice {
+        Some(IntervalChoice::Daily) => {
+            let scaled = rate.scale(Daily);
+            let RateOfReturn { value, interval } = scaled;
+            ratio_to_metric(py, value, interval)
+        }
+        Some(IntervalChoice::Annual252) => {
+            let scaled = rate.scale(Annual252);
+            let RateOfReturn { value, interval } = scaled;
+            ratio_to_metric(py, value, interval)
+        }
+        Some(IntervalChoice::Annual365) => {
+            let scaled = rate.scale(Annual365);
+            let RateOfReturn { value, interval } = scaled;
+            ratio_to_metric(py, value, interval)
+        }
+        Some(IntervalChoice::Duration(delta)) => {
+            let scaled = rate.scale(delta);
+            let RateOfReturn { value, interval } = scaled;
+            ratio_to_metric(py, value, interval)
+        }
+        None => {
+            let RateOfReturn { value, interval } = rate;
+            ratio_to_metric(py, value, interval)
+        }
+    }
 }
 
 #[pyfunction]
@@ -197,6 +239,71 @@ pub fn calculate_calmar_ratio(
         ),
         IntervalChoice::Duration(delta) => {
             calmar_metric(py, CalmarRatio::calculate(risk_free, mean, drawdown, delta))
+        }
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (profits_gross_abs, losses_gross_abs))]
+pub fn calculate_profit_factor(
+    py: Python<'_>,
+    profits_gross_abs: f64,
+    losses_gross_abs: f64,
+) -> PyResult<Option<PyObject>> {
+    let profits = parse_decimal(profits_gross_abs, "profits_gross_abs")?;
+    let losses = parse_decimal(losses_gross_abs, "losses_gross_abs")?;
+
+    let factor = ProfitFactor::calculate(profits, losses);
+    factor
+        .map(|metric| decimal_to_py(py, metric.value))
+        .transpose()
+}
+
+#[pyfunction]
+#[pyo3(signature = (wins, total))]
+pub fn calculate_win_rate(py: Python<'_>, wins: f64, total: f64) -> PyResult<Option<PyObject>> {
+    let wins_decimal = parse_decimal(wins, "wins")?;
+    let total_decimal = parse_decimal(total, "total")?;
+
+    if total_decimal.is_sign_negative() {
+        return Err(PyValueError::new_err("total must be non-negative"));
+    }
+
+    if wins_decimal.is_sign_negative() {
+        return Err(PyValueError::new_err("wins must be non-negative"));
+    }
+
+    let rate = WinRate::calculate(wins_decimal, total_decimal);
+    rate.map(|metric| decimal_to_py(py, metric.value))
+        .transpose()
+}
+
+#[pyfunction]
+#[pyo3(signature = (mean_return, interval, target_interval=None))]
+pub fn calculate_rate_of_return(
+    py: Python<'_>,
+    mean_return: f64,
+    interval: &Bound<'_, PyAny>,
+    target_interval: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Py<PyMetricWithInterval>> {
+    let mean = parse_decimal(mean_return, "mean_return")?;
+    let base_choice = parse_interval_choice(interval)?;
+    let target_choice = target_interval
+        .map(|value| parse_interval_choice(value))
+        .transpose()?;
+
+    match base_choice {
+        IntervalChoice::Daily => {
+            rate_metric(py, RateOfReturn::calculate(mean, Daily), target_choice)
+        }
+        IntervalChoice::Annual252 => {
+            rate_metric(py, RateOfReturn::calculate(mean, Annual252), target_choice)
+        }
+        IntervalChoice::Annual365 => {
+            rate_metric(py, RateOfReturn::calculate(mean, Annual365), target_choice)
+        }
+        IntervalChoice::Duration(delta) => {
+            rate_metric(py, RateOfReturn::calculate(mean, delta), target_choice)
         }
     }
 }
