@@ -53,6 +53,6 @@
 - [x] Expose account order snapshot & cancellation helpers in Python bindings (2025-10-03).
 
 ## In Progress (2025-10-04)
-- [ ] Expose Python helpers for profit factor and win rate calculations (bindings + pytest coverage).
-- [ ] Add `calculate_rate_of_return` with optional target interval scaling (bindings + pytest coverage).
-- [ ] Refresh package metadata (version bump + release notes) once analytics helpers land.
+- [x] Expose Python helpers for profit factor and win rate calculations (bindings + pytest coverage). (2025-10-04)
+- [x] Add `calculate_rate_of_return` with optional target interval scaling (bindings + pytest coverage). (2025-10-04)
+- [x] Refresh package metadata (version bump + release notes) once analytics helpers land. (2025-10-04)
