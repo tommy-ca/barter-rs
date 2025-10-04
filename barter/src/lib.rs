@@ -195,6 +195,18 @@ pub mod test_utils {
     use chrono::{DateTime, Days, TimeDelta, Utc};
     use rust_decimal::Decimal;
 
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_calculate_average() {
+            let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+            let average = calculate_average(&values);
+            assert_eq!(average, 3.0);
+        }
+    }
+
     pub fn f64_is_eq(actual: f64, expected: f64, epsilon: f64) -> bool {
         if actual.is_nan() && expected.is_nan() {
             true
@@ -270,6 +282,14 @@ pub mod test_utils {
             asset: asset(symbol),
             balance: Some(balance),
             statistics: TearSheetAssetGenerator::init(&balance),
+        }
+    }
+
+    pub fn calculate_average(values: &[f64]) -> f64 {
+        if values.is_empty() {
+            0.0
+        } else {
+            values.iter().sum::<f64>() / values.len() as f64
         }
     }
 }
