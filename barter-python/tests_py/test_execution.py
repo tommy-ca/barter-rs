@@ -31,6 +31,7 @@ from barter_python.execution import (
     Trade,
     TradeId,
 )
+from barter_python import ExecutionConfig, MockExecutionConfig
 from barter_python.instrument import QuoteAsset, Side
 
 
@@ -973,3 +974,70 @@ class TestAccountEvent:
 
         event = AccountEvent.new(exchange, kind)
         assert "AccountEvent(" in repr(event)
+
+
+class TestMockExecutionConfigBindings:
+    def test_defaults(self):
+        config = MockExecutionConfig()
+
+        assert config.mocked_exchange == bp.ExchangeId.MOCK
+        assert config.latency_ms == 0
+        assert config.fees_percent == Decimal("0")
+
+        state = config.initial_state
+        assert state["exchange"] == "mock"
+        assert state["balances"] == []
+        assert state["instruments"] == []
+
+    def test_custom_configuration(self):
+        timestamp = datetime(2025, 1, 1, 12, 30, tzinfo=timezone.utc)
+        initial_state = {
+            "exchange": "binance_spot",
+            "balances": [
+                {
+                    "asset": "USDT",
+                    "balance": {"total": "1000", "free": "750"},
+                    "time_exchange": timestamp.isoformat().replace("+00:00", "Z"),
+                }
+            ],
+            "instruments": [],
+        }
+
+        config = MockExecutionConfig(
+            mocked_exchange=bp.ExchangeId.BINANCE_SPOT,
+            initial_state=initial_state,
+            latency_ms=25,
+            fees_percent=0.25,
+        )
+
+        assert config.mocked_exchange == bp.ExchangeId.BINANCE_SPOT
+        assert config.latency_ms == 25
+        assert config.fees_percent == Decimal("0.25")
+
+        state = config.initial_state
+        assert state["exchange"] == "binance_spot"
+        assert state["balances"][0]["asset"] == "USDT"
+        assert state["balances"][0]["balance"] == {"total": "1000", "free": "750"}
+
+        execution_config = ExecutionConfig.mock(config)
+        assert execution_config.kind == "mock"
+
+        round_tripped = execution_config.mock_config
+        assert round_tripped.mocked_exchange == bp.ExchangeId.BINANCE_SPOT
+        assert round_tripped.latency_ms == 25
+        assert round_tripped.fees_percent == Decimal("0.25")
+
+        system_dict = {"instruments": [], "executions": [], "risk": {}}
+        system_config = bp.SystemConfig.from_dict(system_dict)
+        assert system_config.executions() == []
+
+        system_config.add_execution(execution_config)
+        executions = system_config.executions()
+        assert len(executions) == 1
+
+        rehydrated = executions[0]
+        assert isinstance(rehydrated, bp.ExecutionConfig)
+        assert rehydrated.kind == "mock"
+
+        system_config.clear_executions()
+        assert system_config.executions() == []

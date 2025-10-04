@@ -27,6 +27,16 @@ pub struct PyExchangeId {
     inner: ExchangeId,
 }
 
+impl PyExchangeId {
+    pub(crate) fn as_inner(&self) -> ExchangeId {
+        self.inner
+    }
+
+    pub(crate) fn from_inner(inner: ExchangeId) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyExchangeId {
     /// Other / unknown exchange.

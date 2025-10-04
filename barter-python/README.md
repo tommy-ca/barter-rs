@@ -60,6 +60,24 @@ assets = summary.assets
 print(assets["binance_spot:usdt"].balance_end.total)
 PY
 
+# Configure mock execution directly from Rust bindings
+python - <<'PY'
+import barter_python as bp
+
+mock_execution = bp.MockExecutionConfig(
+    mocked_exchange=bp.ExchangeId.BINANCE_SPOT,
+    latency_ms=25,
+    fees_percent=0.25,
+)
+
+execution_config = bp.ExecutionConfig.mock(mock_execution)
+config = bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
+config.clear_executions()
+config.add_execution(execution_config)
+
+print(execution_config.to_dict())
+PY
+
 # Calculate portfolio analytics directly from summary inputs
 python - <<'PY'
 import barter_python as bp

@@ -71,7 +71,7 @@ use command::{
     PyInstrumentFilter, PyOrderKey, PyOrderRequestCancel, PyOrderRequestOpen, PyOrderSnapshot,
     clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
-use config::PySystemConfig;
+use config::{PyExecutionConfig, PyMockExecutionConfig, PySystemConfig};
 use data::{
     PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId,
     init_dynamic_streams,
@@ -813,6 +813,8 @@ pub fn timed_f64(value: f64, time: DateTime<Utc>) -> PyTimedF64 {
 #[pymodule]
 pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySystemConfig>()?;
+    m.add_class::<PyMockExecutionConfig>()?;
+    m.add_class::<PyExecutionConfig>()?;
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
     m.add_class::<PySystemHandle>()?;

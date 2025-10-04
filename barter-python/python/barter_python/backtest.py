@@ -12,7 +12,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar
 
-from .barter_python import MarketDataInMemory as _RustMarketDataInMemory
+from .barter_python import (
+    ExecutionConfig as _ExecutionConfig,
+    MarketDataInMemory as _RustMarketDataInMemory,
+    MockExecutionConfig as _MockExecutionConfig,
+)
 
 from .data import (
     Candle,
@@ -41,6 +45,9 @@ from .statistic import (
     TimeInterval,
     WinRate,
 )
+
+ExecutionConfig = _ExecutionConfig
+MockExecutionConfig = _MockExecutionConfig
 
 # Type variables for generic backtest interfaces
 MarketEventKind = TypeVar("MarketEventKind")
@@ -345,24 +352,6 @@ async def backtest(
         risk_free_return=args_dynamic.risk_free_return,
         trading_summary=trading_summary,
     )
-
-
-class MockExecutionConfig:
-    """Configuration for mock execution."""
-
-    def __init__(self, initial_balances=None):
-        self.initial_balances = initial_balances or {}
-
-
-class ExecutionConfig:
-    """Configuration for execution links."""
-
-    def __init__(self, mock_config: MockExecutionConfig):
-        self.mock_config = mock_config
-
-    @classmethod
-    def mock(cls, mock_config: MockExecutionConfig) -> ExecutionConfig:
-        return cls(mock_config)
 
 
 class BacktestEngineSimulator:

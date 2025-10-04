@@ -160,7 +160,12 @@ def test_execution_config_basic():
 
     mock_config = MockExecutionConfig()
     config = ExecutionConfig.mock(mock_config)
-    assert config.mock_config is mock_config
+
+    assert config.kind == "mock"
+
+    round_tripped = config.mock_config
+    assert round_tripped.mocked_exchange == mock_config.mocked_exchange
+    assert round_tripped.latency_ms == mock_config.latency_ms
 
 
 # TODO: Add more comprehensive backtest integration tests once the full implementation is complete

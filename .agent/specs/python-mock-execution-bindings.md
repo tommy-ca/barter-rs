@@ -4,12 +4,12 @@ Last updated: 2025-10-04
 
 ## Goal
 - Replace the pure Python `MockExecutionConfig` placeholder with bindings to the Rust `barter_execution::client::mock::MockExecutionConfig` and related types.
-- Allow constructing execution configurations programmatically from Python while reusing the existing account snapshot wrappers.
+- Allow constructing execution configurations programmatically from Python while keeping familiar dictionary/JSON representations for account snapshots.
 - Ensure E2E tests can exercise mock execution flows through the PyO3 bindings.
 
 ## Requirements
 - Expose a `MockExecutionConfig` PyO3 wrapper that mirrors all struct fields: `mocked_exchange`, `initial_state`, `latency_ms`, and `fees_percent`.
-- Provide conversion helpers to and from `PyAccountSnapshot` for the `initial_state` field.
+- Provide conversion helpers that accept Python dictionaries / JSON-compatible structures for the `initial_state` field and surface the underlying snapshot back to Python callers.
 - Extend bindings with an `ExecutionConfig.mock(mock_config)` constructor so Python users can append execution configs into `SystemConfig`.
 - Update the Python package (`python/barter_python`) to re-export these bindings and deprecate the existing pure Python placeholders.
 - Add rust-level doctest or unit coverage if practical, plus Python pytest coverage to confirm:
