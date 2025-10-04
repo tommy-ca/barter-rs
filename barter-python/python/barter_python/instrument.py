@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, Optional, TypeVar, Union
+from typing import Generic, TypeVar, Union
 
 AssetKey = TypeVar("AssetKey")
 
@@ -441,7 +441,7 @@ InstrumentKindType = Union[
 class InstrumentKind(Generic[AssetKey]):
     """Instrument kind enum."""
 
-    def __init__(self, kind: str, data: Optional[InstrumentKindType[AssetKey]] = None) -> None:
+    def __init__(self, kind: str, data: InstrumentKindType[AssetKey] | None = None) -> None:
         self._kind = kind
         self._data = data
 
@@ -466,7 +466,7 @@ class InstrumentKind(Generic[AssetKey]):
         return self._kind
 
     @property
-    def data(self) -> Optional[InstrumentKindType[AssetKey]]:
+    def data(self) -> InstrumentKindType[AssetKey] | None:
         return self._data
 
     def contract_size(self) -> Decimal:
@@ -482,7 +482,7 @@ class InstrumentKind(Generic[AssetKey]):
         else:
             raise ValueError(f"Unknown instrument kind: {self._kind}")
 
-    def settlement_asset(self) -> Optional[AssetKey]:
+    def settlement_asset(self) -> AssetKey | None:
         """Returns the settlement asset if applicable."""
         if self._kind == "spot":
             return None
@@ -520,7 +520,7 @@ class Instrument(Generic[AssetKey]):
         underlying: Underlying[AssetKey],
         quote: InstrumentQuoteAsset,
         kind: InstrumentKind[AssetKey],
-        spec: Optional[object] = None,  # TODO: Add spec structures later
+        spec: object | None = None,  # TODO: Add spec structures later
     ) -> None:
         self.exchange = exchange
         self.name_internal = (
@@ -545,7 +545,7 @@ class Instrument(Generic[AssetKey]):
         name_internal: str | InstrumentNameInternal,
         name_exchange: str | InstrumentNameExchange,
         underlying: Underlying[AssetKey],
-        spec: Optional[object] = None,
+        spec: object | None = None,
     ) -> Instrument[AssetKey]:
         """Create a spot instrument."""
         return cls(
@@ -675,7 +675,7 @@ MarketDataInstrumentKindType = Union[
 class MarketDataInstrumentKind:
     """Instrument kind enum for market data."""
 
-    def __init__(self, kind: str, data: Optional[MarketDataInstrumentKindType] = None) -> None:
+    def __init__(self, kind: str, data: MarketDataInstrumentKindType | None = None) -> None:
         self._kind = kind
         self._data = data
 
@@ -700,7 +700,7 @@ class MarketDataInstrumentKind:
         return self._kind
 
     @property
-    def data(self) -> Optional[MarketDataInstrumentKindType]:
+    def data(self) -> MarketDataInstrumentKindType | None:
         return self._data
 
     def __repr__(self) -> str:

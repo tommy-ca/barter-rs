@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import math
 from abc import abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Generic, Protocol, Sequence, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 
 class TimeInterval(Protocol):

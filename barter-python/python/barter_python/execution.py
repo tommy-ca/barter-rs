@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, Optional, TypeVar, Union
+from typing import Generic, TypeVar, Union
 
 from .instrument import QuoteAsset, Side
 
@@ -396,10 +396,10 @@ class Open:
 class CancelInFlight:
     """Order cancellation is in flight."""
 
-    order: Optional[Open]
+    order: Open | None
 
     @classmethod
-    def new(cls, order: Optional[Open] = None) -> CancelInFlight:
+    def new(cls, order: Open | None = None) -> CancelInFlight:
         return cls(order)
 
     def __str__(self) -> str:
@@ -540,7 +540,7 @@ class OrderState(Generic[AssetKey, InstrumentKey]):
     def is_inactive(self) -> bool:
         return isinstance(self._state, InactiveOrderState)
 
-    def time_exchange(self) -> Optional[datetime]:
+    def time_exchange(self) -> datetime | None:
         """Get the exchange timestamp if available."""
         if isinstance(self._state, InactiveOrderState):
             if isinstance(self._state.state, Cancelled):
@@ -705,7 +705,7 @@ class OrderRequestCancel(Generic[ExchangeKey, InstrumentKey]):
     """Request to cancel an order."""
 
     key: OrderKey[ExchangeKey, InstrumentKey]
-    state: Optional[OrderId]
+    state: OrderId | None
 
     def __str__(self) -> str:
         return f"OrderRequestCancel(key={self.key}, state={self.state})"
@@ -816,7 +816,7 @@ class InstrumentAccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]]
 
     @classmethod
-    def new(cls, instrument: InstrumentKey, orders: Optional[list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]]] = None) -> InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
+    def new(cls, instrument: InstrumentKey, orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]] | None = None) -> InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
         return cls(instrument, orders or [])
 
     def __str__(self) -> str:
@@ -851,7 +851,7 @@ class AccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     ) -> AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
         return cls(exchange, balances, instruments)
 
-    def time_most_recent(self) -> Optional[datetime]:
+    def time_most_recent(self) -> datetime | None:
         """Get the most recent timestamp from balances or orders."""
         times: list[datetime] = []
         for balance in self.balances:

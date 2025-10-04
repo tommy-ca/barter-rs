@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Callable, Optional, Protocol, TypeVar
+from typing import Callable, Protocol, TypeVar
 
 from .execution import (
     ClientOrderId,
@@ -73,7 +73,7 @@ class ClosePositionsStrategy(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
     def close_positions_requests(
         self,
         state: State,
-        filter: Optional[InstrumentFilter[ExchangeKey, AssetKey, InstrumentKey]] = None,
+        filter: InstrumentFilter[ExchangeKey, AssetKey, InstrumentKey] | None = None,
     ) -> tuple[
         Iterable[OrderRequestCancel[ExchangeKey, InstrumentKey]],
         Iterable[OrderRequestOpen[ExchangeKey, InstrumentKey]],
@@ -131,8 +131,8 @@ class InstrumentState:
         self,
         instrument: InstrumentIndex,
         exchange: ExchangeIndex,
-        position: Optional[Position],
-        price: Optional[float],
+        position: Position | None,
+        price: float | None,
     ) -> None:
         self.instrument = instrument
         self.exchange = exchange
@@ -157,7 +157,7 @@ class EngineState:
         self.instruments = instruments
 
     def instruments_iter(
-        self, filter: Optional[InstrumentFilter] = None
+        self, filter: InstrumentFilter | None = None
     ) -> Iterable[InstrumentState]:
         """Iterate over instruments, optionally filtered."""
         for instrument in self.instruments:
@@ -168,8 +168,8 @@ class EngineState:
 def close_open_positions_with_market_orders(
     strategy_id: StrategyId,
     state: EngineState,
-    filter: Optional[InstrumentFilter] = None,
-    gen_cid: Optional[Callable[[InstrumentState], ClientOrderId]] = None,
+        filter: InstrumentFilter | None = None,
+        gen_cid: Callable[[InstrumentState], ClientOrderId] | None = None,
 ) -> tuple[
     Iterable[OrderRequestCancel],
     Iterable[OrderRequestOpen],
@@ -243,7 +243,7 @@ class DefaultStrategy:
     def close_positions_requests(
         self,
         state: EngineState,
-        filter: Optional[InstrumentFilter] = None,
+        filter: InstrumentFilter | None = None,
     ) -> tuple[Iterable[OrderRequestCancel], Iterable[OrderRequestOpen]]:
         """Close positions using market orders."""
         return close_open_positions_with_market_orders(self.id, state, filter)

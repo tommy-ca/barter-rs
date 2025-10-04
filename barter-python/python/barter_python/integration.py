@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 SnapshotType = TypeVar("SnapshotType")
@@ -48,7 +48,7 @@ class Metric:
         self.fields = fields
 
     @classmethod
-    def new(cls, name: str, time: int, tags: Optional[list[Tag]] = None, fields: Optional[list[Field]] = None) -> Metric:
+    def new(cls, name: str, time: int, tags: list[Tag] | None = None, fields: list[Field] | None = None) -> Metric:
         return cls(name, time, tags or [], fields or [])
 
     def __str__(self) -> str:

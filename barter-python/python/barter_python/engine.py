@@ -6,7 +6,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Generic, Optional, Protocol, TypeVar
+from typing import Any, Generic, Protocol, TypeVar
 
 from .data import Candle, MarketEvent, OrderBookL1, as_candle, as_public_trade
 from .execution import (
@@ -67,10 +67,10 @@ class InstrumentMarketData(Protocol):
 class DefaultInstrumentMarketData:
     """Default implementation of instrument market data."""
 
-    last_price: Optional[Decimal] = None
-    last_update_time: Optional[datetime] = None
-    order_book_l1: Optional[OrderBookL1] = None
-    recent_candle: Optional[Candle] = None
+    last_price: Decimal | None = None
+    last_update_time: datetime | None = None
+    order_book_l1: OrderBookL1 | None = None
+    recent_candle: Candle | None = None
 
 
 @dataclass(frozen=True)
@@ -94,7 +94,7 @@ class InstrumentState:
 
     instrument: InstrumentIndex
     exchange: ExchangeId
-    position: Optional[Position] = None
+    position: Position | None = None
     market_data: DefaultInstrumentMarketData = field(default_factory=DefaultInstrumentMarketData)
     orders: dict[OrderKey, Order] = field(default_factory=dict)
 
@@ -135,7 +135,7 @@ class EngineState:
     trading_state: TradingState = field(default_factory=lambda: TradingState(enabled=True))
     balances: dict[str, AssetBalance] = field(default_factory=dict)
 
-    def get_instrument_state(self, instrument: InstrumentIndex) -> Optional[InstrumentState]:
+    def get_instrument_state(self, instrument: InstrumentIndex) -> InstrumentState | None:
         """Get the state for a specific instrument."""
         return self.instruments.get(instrument)
 
@@ -176,7 +176,7 @@ class ClosePositions(Generic[State]):
 
     strategy: ClosePositionsStrategy
     state: State
-    instrument_filter: Optional[InstrumentFilter] = None
+    instrument_filter: InstrumentFilter | None = None
 
     def execute(self, engine_state: EngineState) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate orders to close positions."""
@@ -201,7 +201,7 @@ class SendRequests:
 class CancelOrders:
     """Action to cancel orders."""
 
-    instrument_filter: Optional[InstrumentFilter] = None  # TODO: Define proper filter
+    instrument_filter: InstrumentFilter | None = None  # TODO: Define proper filter
 
     def execute(self, engine_state: EngineState) -> list[OrderRequestCancel]:
         """Generate cancel requests for orders matching the filter."""
@@ -210,9 +210,7 @@ class CancelOrders:
             if self.instrument_filter is None or self.instrument_filter.matches(inst_state.exchange, inst_state.instrument):
                 for order_key, order in inst_state.orders.items():
                     # Get order ID if available
-                    order_id = None
-                    if order.state.is_active() and hasattr(order.state.state, 'id'):
-                        order_id = order.state.state.id
+                    order_id = getattr(order.state.state, 'id', None)
                     # Create cancel request for this order
                     cancel_request = OrderRequestCancel(key=order_key, state=order_id)
                     cancel_requests.append(cancel_request)
@@ -288,7 +286,7 @@ class Engine(Generic[State]):
         action = GenerateAlgoOrders(self.strategy, self.state)
         return action.execute(self.state)
 
-    def close_positions(self, instrument_filter: Optional[InstrumentFilter] = None) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    def close_positions(self, instrument_filter: InstrumentFilter | None = None) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate orders to close positions."""
         if hasattr(self.strategy, 'close_positions_requests'):
             action = ClosePositions(self.strategy, self.state, instrument_filter)
@@ -311,10 +309,10 @@ class Engine(Generic[State]):
         approved_open_requests = [approved.item for approved in approved_opens]
 
         # Send approved requests
-        action = SendRequests(approved_open_requests, approved_cancel_requests)  # type: ignore
+        action = SendRequests(approved_open_requests, approved_cancel_requests)  # type: ignore[arg-type]
         action.execute(self.state)
 
-    def cancel_orders(self, instrument_filter: Optional[InstrumentFilter] = None) -> None:
+    def cancel_orders(self, instrument_filter: InstrumentFilter | None = None) -> None:
         """Cancel orders matching the filter."""
         action = CancelOrders(instrument_filter)
         cancel_requests = action.execute(self.state)
