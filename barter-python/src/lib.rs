@@ -55,7 +55,7 @@ use command::{
 };
 use config::PySystemConfig;
 use data::{PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId, init_dynamic_streams};
-use logging::init_tracing;
+use logging::{init_json_logging_py, init_tracing};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use serde_json::Value;
 use summary::{
@@ -794,6 +794,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBacktestSummary>()?;
     m.add_class::<PyMultiBacktestSummary>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
+    m.add_function(wrap_pyfunction!(init_json_logging_py, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;

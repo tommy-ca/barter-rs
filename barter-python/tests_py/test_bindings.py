@@ -37,6 +37,11 @@ def test_init_tracing_invalid_filter_raises() -> None:
         bp.init_tracing(filter="invalid[filter")
 
 
+def test_init_json_logging_py() -> None:
+    result = bp.init_json_logging_py()
+    assert isinstance(result, bool)
+
+
 def test_version_matches_package_metadata() -> None:
     from importlib import metadata
 
