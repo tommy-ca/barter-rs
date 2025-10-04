@@ -19,6 +19,19 @@ def test_init_tracing_returns_bool() -> None:
     assert isinstance(result, bool)
 
 
+def test_subscription_id() -> None:
+    sid = bp.SubscriptionId("test-id")
+    assert sid.value == "test-id"
+    assert str(sid) == "test-id"
+    assert repr(sid) == "SubscriptionId('test-id')"
+
+    # Test equality
+    sid2 = bp.SubscriptionId("test-id")
+    sid3 = bp.SubscriptionId("other-id")
+    assert sid == sid2
+    assert sid != sid3
+
+
 def test_init_tracing_invalid_filter_raises() -> None:
     with pytest.raises(ValueError):
         bp.init_tracing(filter="invalid[filter")

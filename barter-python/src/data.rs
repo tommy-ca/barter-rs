@@ -4,6 +4,7 @@ use barter_data::{
     streams::builder::dynamic::DynamicStreams,
     subscription::{SubKind, Subscription},
 };
+use barter_integration::subscription::SubscriptionId;
 use barter_instrument::{
     exchange::ExchangeId,
     instrument::{
@@ -241,6 +242,49 @@ impl PySubscription {
     /// Return the debug representation.
     fn __repr__(&self) -> String {
         format!("{:?}", self.inner)
+    }
+}
+
+/// Wrapper around [`SubscriptionId`] for Python exposure.
+#[pyclass(module = "barter_python", name = "SubscriptionId", eq, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PySubscriptionId {
+    pub(crate) inner: SubscriptionId,
+}
+
+#[pymethods]
+impl PySubscriptionId {
+    /// Create a new [`SubscriptionId`].
+    #[new]
+    fn new(id: &str) -> Self {
+        Self {
+            inner: SubscriptionId::from(id),
+        }
+    }
+
+    /// Get the string value.
+    #[getter]
+    fn value(&self) -> &str {
+        self.inner.0.as_str()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        self.inner.to_string()
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("SubscriptionId('{}')", self.inner)
+    }
+}
+
+impl PySubscriptionId {
+    /// Create a new [`SubscriptionId`] for testing.
+    pub fn new_test(id: &str) -> Self {
+        Self {
+            inner: SubscriptionId::from(id),
+        }
     }
 }
 

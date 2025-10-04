@@ -54,7 +54,7 @@ use command::{
     clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
 use config::PySystemConfig;
-use data::{PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, init_dynamic_streams};
+use data::{PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId, init_dynamic_streams};
 use logging::init_tracing;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use serde_json::Value;
@@ -789,6 +789,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExchangeId>()?;
     m.add_class::<PySubKind>()?;
     m.add_class::<PySubscription>()?;
+    m.add_class::<PySubscriptionId>()?;
     m.add_class::<PyDynamicStreams>()?;
     m.add_class::<PyBacktestSummary>()?;
     m.add_class::<PyMultiBacktestSummary>()?;
@@ -1362,5 +1363,21 @@ mod tests {
                 .unwrap();
             assert!(dumped.contains("Shutdown"));
         });
+    }
+
+    #[test]
+    fn subscription_id_constructor_and_accessors() {
+        let id = PySubscriptionId::new_test("test-subscription");
+        assert_eq!(id.inner.0.as_str(), "test-subscription");
+    }
+
+    #[test]
+    fn subscription_id_equality_and_hash() {
+        let id1 = PySubscriptionId::new_test("same");
+        let id2 = PySubscriptionId::new_test("same");
+        let id3 = PySubscriptionId::new_test("different");
+
+        assert_eq!(id1, id2);
+        assert_ne!(id1, id3);
     }
 }
