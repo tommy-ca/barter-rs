@@ -12,11 +12,11 @@
 4. Publish and verify via `uv` environment using example E2E flows.
 
 ## Current Focus (2025-10-04)
-- Bridge full account snapshot events from `barter-execution` into the Python API.
-  - [x] Document binding requirements under `.agent/specs/python-account-snapshot-bindings.md`.
-  - [x] Add failing pytest coverage capturing snapshot round-trips and validation errors.
-  - [x] Implement new PyO3 wrappers and expose them via the extension module.
-  - [x] Enforce instrument & exchange alignment checks in the PyO3 constructors.
+- Replace Python close-position helpers with Rust-backed strategy bindings.
+  - [ ] Finalise spec requirements under `.agent/specs/python-strategy-bindings.md`.
+  - [ ] Add pytest coverage asserting parity with existing helpers and error handling.
+  - [ ] Implement PyO3 bindings and update Python module exports.
+  - [ ] Verify ergonomics through strategy integration tests and docs refresh.
 
 ## Notes
 - Use `.agent/specs/` to capture crate-specific requirements.
