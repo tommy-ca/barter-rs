@@ -105,4 +105,27 @@ async def test_market_data_in_memory_from_json(example_paths: dict[str, Path]) -
     assert events[0].time_exchange == first_time
 
 
+def test_indexed_instruments_basic():
+    """Test basic IndexedInstruments functionality."""
+    from barter_python.backtest import IndexedInstruments
+
+    # Test empty
+    indexed = IndexedInstruments.new([])
+    assert indexed.exchanges() == []
+    assert indexed.assets() == []
+    assert indexed.instruments() == []
+
+    # Test with instruments (placeholder)
+    indexed = IndexedInstruments.new(["inst1", "inst2"])
+    assert indexed.instruments() == ["inst1", "inst2"]
+
+
+def test_execution_config_basic():
+    """Test basic ExecutionConfig functionality."""
+    from barter_python.backtest import ExecutionConfig
+
+    config = ExecutionConfig(mock_config="test")
+    assert config.mock_config == "test"
+
+
 # TODO: Add more comprehensive backtest integration tests once the full implementation is complete
