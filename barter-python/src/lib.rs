@@ -11,6 +11,7 @@ mod config;
 mod data;
 mod instrument;
 mod logging;
+mod metric;
 mod summary;
 mod system;
 
@@ -60,13 +61,14 @@ use config::PySystemConfig;
 use data::{PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId, init_dynamic_streams};
 use logging::{init_json_logging_py, init_tracing};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
-use serde_json::Value;
+use serde_json::Value as JsonValue;
 use summary::{
     PyAssetTearSheet, PyBacktestSummary, PyBalance, PyDrawdown, PyInstrumentTearSheet,
     PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
 use system::{PySystemHandle, run_historic_backtest, start_system};
 use instrument::{PyAsset, PyAssetIndex, PySide};
+use metric::{PyField, PyMetric, PyTag, PyValue};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]
@@ -138,17 +140,17 @@ impl PyEngineEvent {
         let json_module = PyModule::import_bound(py, "json")?;
         let dumps = json_module.getattr("dumps")?;
         let serialized: String = dumps.call1((value,))?.extract()?;
-        let mut json_value: Value = serde_json::from_str(&serialized)
+        let mut json_value: JsonValue = serde_json::from_str(&serialized)
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
-        if let Value::Object(ref mut outer) = json_value {
+        if let JsonValue::Object(ref mut outer) = json_value {
             let needs_patch = outer
                 .get("Shutdown")
-                .map(|inner| matches!(inner, Value::Object(map) if map.is_empty()))
+                .map(|inner| matches!(inner, JsonValue::Object(map) if map.is_empty()))
                 .unwrap_or(false);
 
             if needs_patch {
-                outer.insert("Shutdown".to_string(), Value::Null);
+                outer.insert("Shutdown".to_string(), JsonValue::Null);
             }
         }
 
@@ -709,7 +711,7 @@ fn parse_exchange_id(value: &str) -> PyResult<ExchangeId> {
     }
 
     let normalized = trimmed.to_ascii_lowercase();
-    serde_json::from_value(Value::String(normalized)).map_err(|_| {
+    serde_json::from_value(JsonValue::String(normalized)).map_err(|_| {
         PyValueError::new_err(format!(
             "unknown exchange identifier: {trimmed}. expected snake_case exchange ids such as 'binance_spot'"
         ))
@@ -798,6 +800,10 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAsset>()?;
     m.add_class::<PyAssetIndex>()?;
     m.add_class::<PySide>()?;
+    m.add_class::<PyMetric>()?;
+    m.add_class::<PyTag>()?;
+    m.add_class::<PyField>()?;
+    m.add_class::<PyValue>()?;
     m.add_class::<PyBacktestSummary>()?;
     m.add_class::<PyMultiBacktestSummary>()?;
     m.add_class::<PyLevel>()?;
@@ -1391,5 +1397,57 @@ mod tests {
 
         assert_eq!(id1, id2);
         assert_ne!(id1, id3);
+    }
+
+    #[test]
+    fn metric_construction_and_accessors() {
+        let tag = PyTag::new("key".to_string(), "value".to_string());
+        let field = PyField::new("field_key".to_string(), PyValue::float(42.5));
+        let metric = PyMetric::new("test_metric".to_string(), 1234567890, vec![tag], vec![field]).unwrap();
+
+        assert_eq!(metric.name(), "test_metric");
+        assert_eq!(metric.time(), 1234567890);
+        assert_eq!(metric.tags().len(), 1);
+        assert_eq!(metric.fields().len(), 1);
+    }
+
+    #[test]
+    fn tag_construction_and_accessors() {
+        let tag = PyTag::new("test_key".to_string(), "test_value".to_string());
+
+        assert_eq!(tag.key(), "test_key");
+        assert_eq!(tag.value(), "test_value");
+    }
+
+    #[test]
+    fn field_construction_and_accessors() {
+        let value = PyValue::int(42);
+        let field = PyField::new("test_field".to_string(), value.clone());
+
+        assert_eq!(field.key(), "test_field");
+        assert_eq!(field.value().inner, value.inner);
+    }
+
+    #[test]
+    fn value_variants() {
+        let float_val = PyValue::float(3.14);
+        assert!(float_val.is_float());
+        assert_eq!(float_val.as_float().unwrap(), 3.14);
+
+        let int_val = PyValue::int(-42);
+        assert!(int_val.is_int());
+        assert_eq!(int_val.as_int().unwrap(), -42);
+
+        let uint_val = PyValue::uint(42);
+        assert!(uint_val.is_uint());
+        assert_eq!(uint_val.as_uint().unwrap(), 42);
+
+        let bool_val = PyValue::bool(true);
+        assert!(bool_val.is_bool());
+        assert_eq!(bool_val.as_bool().unwrap(), true);
+
+        let string_val = PyValue::string("hello".to_string());
+        assert!(string_val.is_string());
+        assert_eq!(string_val.as_string().unwrap(), "hello");
     }
 }
