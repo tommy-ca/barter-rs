@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -890,3 +892,247 @@ class ExchangeAsset:
 
     def __hash__(self) -> int:
         return hash((self.exchange, self.asset))
+
+
+@dataclass(frozen=True)
+class IndexedInstrument:
+    """Indexed representation of an instrument linking to exchange and asset indices."""
+
+    exchange: Keyed[ExchangeIndex, ExchangeId]
+    name_internal: InstrumentNameInternal
+    name_exchange: InstrumentNameExchange
+    underlying: Underlying[AssetIndex]
+    quote: InstrumentQuoteAsset
+    kind: InstrumentKind
+    spec: object | None = None
+
+
+class IndexedInstruments:
+    """Indexed collection of exchanges, assets, and instruments."""
+
+    def __init__(
+        self,
+        exchanges: list[Keyed[ExchangeIndex, ExchangeId]],
+        assets: list[Keyed[AssetIndex, ExchangeAsset]],
+        instruments: list[Keyed[InstrumentIndex, IndexedInstrument]],
+        exchange_lookup: dict[ExchangeId, ExchangeIndex],
+        asset_lookup: dict[tuple[ExchangeId, AssetNameInternal], AssetIndex],
+        instrument_lookup: dict[tuple[ExchangeId, InstrumentNameInternal], InstrumentIndex],
+    ) -> None:
+        self._exchanges = exchanges
+        self._assets = assets
+        self._instruments = instruments
+        self._exchange_lookup = exchange_lookup
+        self._asset_lookup = asset_lookup
+        self._instrument_lookup = instrument_lookup
+        self._asset_by_index = {entry.key: entry.value for entry in assets}
+        self._instrument_by_index = {entry.key: entry.value for entry in instruments}
+
+    @classmethod
+    def new(cls, instruments: Iterable[Instrument]) -> IndexedInstruments:
+        """Construct `IndexedInstruments` from an iterable of `Instrument` objects."""
+        builder = cls.builder()
+        for instrument in instruments:
+            builder.add_instrument(instrument)
+        return builder.build()
+
+    @classmethod
+    def builder(cls) -> IndexedInstrumentsBuilder:
+        """Return a builder for incremental construction."""
+        return IndexedInstrumentsBuilder()
+
+    def exchanges(self) -> list[Keyed[ExchangeIndex, ExchangeId]]:
+        """Return the indexed exchanges."""
+        return list(self._exchanges)
+
+    def assets(self) -> list[Keyed[AssetIndex, ExchangeAsset]]:
+        """Return the indexed assets."""
+        return list(self._assets)
+
+    def instruments(self) -> list[Keyed[InstrumentIndex, IndexedInstrument]]:
+        """Return the indexed instruments."""
+        return list(self._instruments)
+
+    def find_exchange_index(self, exchange: ExchangeId) -> ExchangeIndex:
+        """Find the index associated with an `ExchangeId`."""
+        try:
+            return self._exchange_lookup[exchange]
+        except KeyError as exc:  # pragma: no cover - defensive
+            raise ValueError(
+                f"ExchangeId {exchange} is not present in indexed exchanges"
+            ) from exc
+
+    def find_exchange(self, index: ExchangeIndex) -> ExchangeId:
+        """Find the `ExchangeId` for an `ExchangeIndex`."""
+        for entry in self._exchanges:
+            if entry.key == index:
+                return entry.value
+        raise ValueError(f"ExchangeIndex {index} is not present in indexed exchanges")
+
+    def find_asset_index(
+        self, exchange: ExchangeId, name_internal: AssetNameInternal | str
+    ) -> AssetIndex:
+        """Find the asset index for an exchange and internal asset name."""
+        if isinstance(name_internal, str):
+            name_internal = AssetNameInternal(name_internal)
+        key = (exchange, name_internal)
+        try:
+            return self._asset_lookup[key]
+        except KeyError as exc:
+            raise ValueError(
+                f"Asset ({exchange}, {name_internal}) not present in indexed assets"
+            ) from exc
+
+    def find_asset(self, index: AssetIndex) -> ExchangeAsset:
+        """Find the exchange asset for an asset index."""
+        try:
+            return self._asset_by_index[index]
+        except KeyError as exc:
+            raise ValueError(
+                f"AssetIndex {index} is not present in indexed assets"
+            ) from exc
+
+    def find_instrument_index(
+        self, exchange: ExchangeId, name_internal: InstrumentNameInternal | str
+    ) -> InstrumentIndex:
+        """Find the instrument index for an exchange and internal instrument name."""
+        if isinstance(name_internal, str):
+            name_internal = InstrumentNameInternal(name_internal)
+        key = (exchange, name_internal)
+        try:
+            return self._instrument_lookup[key]
+        except KeyError as exc:
+            raise ValueError(
+                f"Instrument ({exchange}, {name_internal}) not present in indexed instruments"
+            ) from exc
+
+    def find_instrument(self, index: InstrumentIndex) -> IndexedInstrument:
+        """Find the indexed instrument for an instrument index."""
+        try:
+            return self._instrument_by_index[index]
+        except KeyError as exc:
+            raise ValueError(
+                f"InstrumentIndex {index} is not present in indexed instruments"
+            ) from exc
+
+
+class IndexedInstrumentsBuilder:
+    """Builder for constructing `IndexedInstruments` incrementally."""
+
+    def __init__(self) -> None:
+        self._exchanges: list[Keyed[ExchangeIndex, ExchangeId]] = []
+        self._exchanges_by_id: dict[ExchangeId, ExchangeIndex] = {}
+        self._assets: list[Keyed[AssetIndex, ExchangeAsset]] = []
+        self._assets_by_key: dict[tuple[ExchangeId, AssetNameInternal], AssetIndex] = {}
+        self._instruments: list[Keyed[InstrumentIndex, IndexedInstrument]] = []
+        self._instruments_by_key: dict[
+            tuple[ExchangeId, InstrumentNameInternal], InstrumentIndex
+        ] = {}
+
+    def add_instrument(self, instrument: Instrument) -> IndexedInstrumentsBuilder:
+        """Add an instrument to the builder."""
+        if not isinstance(instrument, Instrument):  # pragma: no cover - defensive
+            raise TypeError("IndexedInstrumentsBuilder only accepts Instrument instances")
+
+        exchange_index = self._ensure_exchange(instrument.exchange)
+        base_index = self._ensure_asset(instrument.exchange, instrument.underlying.base)
+        quote_index = self._ensure_asset(instrument.exchange, instrument.underlying.quote)
+        underlying_indices = Underlying(base_index, quote_index)
+        kind_indices = self._convert_kind(instrument.exchange, instrument.kind)
+
+        instrument_index = InstrumentIndex.new(len(self._instruments))
+        record = IndexedInstrument(
+            exchange=Keyed(exchange_index, instrument.exchange),
+            name_internal=instrument.name_internal,
+            name_exchange=instrument.name_exchange,
+            underlying=underlying_indices,
+            quote=instrument.quote,
+            kind=kind_indices,
+            spec=instrument.spec,
+        )
+
+        keyed_instrument = Keyed(instrument_index, record)
+        self._instruments.append(keyed_instrument)
+        self._instruments_by_key[(instrument.exchange, instrument.name_internal)] = (
+            instrument_index
+        )
+
+        return self
+
+    def build(self) -> IndexedInstruments:
+        """Create an immutable `IndexedInstruments` instance from the builder state."""
+        return IndexedInstruments(
+            list(self._exchanges),
+            list(self._assets),
+            list(self._instruments),
+            dict(self._exchanges_by_id),
+            dict(self._assets_by_key),
+            dict(self._instruments_by_key),
+        )
+
+    def _ensure_exchange(self, exchange: ExchangeId) -> ExchangeIndex:
+        if exchange in self._exchanges_by_id:
+            return self._exchanges_by_id[exchange]
+
+        exchange_index = ExchangeIndex.new(len(self._exchanges))
+        keyed_exchange = Keyed(exchange_index, exchange)
+        self._exchanges.append(keyed_exchange)
+        self._exchanges_by_id[exchange] = exchange_index
+        return exchange_index
+
+    def _ensure_asset(self, exchange: ExchangeId, asset: Asset) -> AssetIndex:
+        key = (exchange, asset.name_internal)
+        if key in self._assets_by_key:
+            return self._assets_by_key[key]
+
+        asset_index = AssetIndex.new(len(self._assets))
+        asset_copy = Asset(asset.name_internal, asset.name_exchange)
+        keyed_asset = Keyed(asset_index, ExchangeAsset.new(exchange, asset_copy))
+        self._assets.append(keyed_asset)
+        self._assets_by_key[key] = asset_index
+        return asset_index
+
+    def _convert_kind(self, exchange: ExchangeId, kind: InstrumentKind) -> InstrumentKind:
+        kind_name = kind.kind
+        if kind_name == "spot":
+            return InstrumentKind.spot()
+
+        if kind_name == "perpetual":
+            contract = kind.data
+            if not isinstance(contract, PerpetualContract):
+                raise ValueError("Perpetual instrument missing contract data")
+            settlement_index = self._ensure_asset(exchange, contract.settlement_asset)
+            return InstrumentKind.perpetual(
+                PerpetualContract(contract.contract_size, settlement_index)
+            )
+
+        if kind_name == "future":
+            contract = kind.data
+            if not isinstance(contract, FutureContract):
+                raise ValueError("Future instrument missing contract data")
+            settlement_index = self._ensure_asset(exchange, contract.settlement_asset)
+            return InstrumentKind.future(
+                FutureContract(
+                    contract.contract_size,
+                    settlement_index,
+                    contract.expiry,
+                )
+            )
+
+        if kind_name == "option":
+            contract = kind.data
+            if not isinstance(contract, OptionContract):
+                raise ValueError("Option instrument missing contract data")
+            settlement_index = self._ensure_asset(exchange, contract.settlement_asset)
+            return InstrumentKind.option(
+                OptionContract(
+                    contract.contract_size,
+                    settlement_index,
+                    contract.kind,
+                    contract.exercise,
+                    contract.expiry,
+                    contract.strike,
+                )
+            )
+
+        raise ValueError(f"Unsupported instrument kind: {kind.kind}")

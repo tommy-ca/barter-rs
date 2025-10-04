@@ -26,6 +26,7 @@ from .engine import Engine
 from .engine import EngineState as EngineEngineState
 from .execution import OrderRequestCancel, OrderRequestOpen
 from .instrument import (
+    IndexedInstruments,
     InstrumentIndex,
     Side,
 )
@@ -403,31 +404,6 @@ async def backtest(
         risk_free_return=args_dynamic.risk_free_return,
         trading_summary=trading_summary,
     )
-
-
-# Simplified IndexedInstruments for backtest use
-class IndexedInstruments:
-    """Indexed collection of instruments for backtest."""
-
-    def __init__(self, instruments):
-        self._instruments = instruments
-
-    @classmethod
-    def new(cls, instruments) -> IndexedInstruments:
-        """Create IndexedInstruments from a list of instruments."""
-        return cls(instruments)
-
-    def instruments(self):
-        """Return the instruments."""
-        return self._instruments
-
-    def exchanges(self):
-        """Return unique exchanges."""
-        return []
-
-    def assets(self):
-        """Return unique assets."""
-        return []
 
 
 class MockExecutionConfig:

@@ -114,9 +114,44 @@ def test_indexed_instruments_basic():
     assert indexed.assets() == []
     assert indexed.instruments() == []
 
-    # Test with instruments (placeholder)
-    indexed = IndexedInstruments.new(["inst1", "inst2"])
-    assert indexed.instruments() == ["inst1", "inst2"]
+    # Test with actual instruments
+    from barter_python.instrument import (
+        Asset,
+        ExchangeId,
+        Instrument,
+        InstrumentIndex,
+        InstrumentNameInternal,
+        Underlying,
+    )
+
+    btc_spot = Instrument.spot(
+        exchange=ExchangeId.BINANCE_SPOT,
+        name_internal="binance_spot-btc_usdt",
+        name_exchange="BTCUSDT",
+        underlying=Underlying(
+            base=Asset.new_from_exchange("btc"),
+            quote=Asset.new_from_exchange("usdt"),
+        ),
+    )
+    eth_spot = Instrument.spot(
+        exchange=ExchangeId.BINANCE_SPOT,
+        name_internal="binance_spot-eth_usdt",
+        name_exchange="ETHUSDT",
+        underlying=Underlying(
+            base=Asset.new_from_exchange("eth"),
+            quote=Asset.new_from_exchange("usdt"),
+        ),
+    )
+
+    indexed = IndexedInstruments.new([btc_spot, eth_spot])
+    assert len(indexed.exchanges()) == 1
+    assert len(indexed.assets()) == 3
+    assert len(indexed.instruments()) == 2
+
+    instrument_index = indexed.find_instrument_index(
+        ExchangeId.BINANCE_SPOT, InstrumentNameInternal("binance_spot-btc_usdt")
+    )
+    assert isinstance(instrument_index, InstrumentIndex)
 
 
 def test_execution_config_basic():

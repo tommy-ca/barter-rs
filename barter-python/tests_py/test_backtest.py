@@ -6,7 +6,19 @@ from decimal import Decimal
 
 from barter_python import backtest
 from barter_python.data import DataKind, MarketEvent, PublicTrade
-from barter_python.instrument import Asset, ExchangeId, Instrument, Side, Underlying
+from barter_python.instrument import (
+    Asset,
+    AssetIndex,
+    AssetNameInternal,
+    ExchangeId,
+    ExchangeIndex,
+    Instrument,
+    InstrumentIndex,
+    InstrumentNameInternal,
+    Keyed,
+    Side,
+    Underlying,
+)
 from barter_python.statistic import Annual365
 
 
@@ -180,6 +192,101 @@ class TestIndexedInstruments:
 
         indexed = backtest.IndexedInstruments.new([instrument])
         assert len(indexed.instruments()) == 1
+
+    def test_lookup_helpers(self):
+        """Ensure exchange, asset, and instrument lookups operate with indices."""
+        instrument = Instrument.spot(
+            exchange=ExchangeId.GATEIO_SPOT,
+            name_internal="gateio_spot-eth_usdt",
+            name_exchange="ETH_USDT",
+            underlying=Underlying(
+                base=Asset.new_from_exchange("eth"),
+                quote=Asset.new_from_exchange("usdt"),
+            ),
+        )
+
+        indexed = backtest.IndexedInstruments.new([instrument])
+
+        exchanges = indexed.exchanges()
+        assert len(exchanges) == 1
+        keyed_exchange = exchanges[0]
+        assert isinstance(keyed_exchange, Keyed)
+        assert isinstance(keyed_exchange.key, ExchangeIndex)
+        assert keyed_exchange.value == ExchangeId.GATEIO_SPOT
+
+        assets = indexed.assets()
+        assert len(assets) == 2
+        base_asset_entry, quote_asset_entry = assets
+        assert isinstance(base_asset_entry.key, AssetIndex)
+        assert isinstance(quote_asset_entry.key, AssetIndex)
+
+        base_index = indexed.find_asset_index(
+            instrument.exchange,
+            instrument.underlying.base.name_internal,
+        )
+        quote_index = indexed.find_asset_index(
+            instrument.exchange,
+            instrument.underlying.quote.name_internal,
+        )
+        assert base_index == base_asset_entry.key
+        assert quote_index == quote_asset_entry.key
+        assert indexed.find_asset(base_index).asset.name_internal == AssetNameInternal(
+            "eth"
+        )
+        assert indexed.find_asset(quote_index).asset.name_internal == AssetNameInternal(
+            "usdt"
+        )
+
+        keyed_instruments = indexed.instruments()
+        assert len(keyed_instruments) == 1
+        keyed_instrument = keyed_instruments[0]
+        assert isinstance(keyed_instrument.key, InstrumentIndex)
+        assert keyed_instrument.value.name_internal == InstrumentNameInternal(
+            "gateio_spot-eth_usdt"
+        )
+
+        instrument_index = indexed.find_instrument_index(
+            instrument.exchange,
+            instrument.name_internal,
+        )
+        assert instrument_index == keyed_instrument.key
+        indexed_instrument = indexed.find_instrument(instrument_index)
+        assert indexed_instrument.exchange.key == keyed_exchange.key
+        assert indexed_instrument.exchange.value == ExchangeId.GATEIO_SPOT
+        assert indexed_instrument.underlying.base == base_index
+        assert indexed_instrument.underlying.quote == quote_index
+
+    def test_builder_round_trip(self):
+        """Verify the builder deduplicates exchanges and assets."""
+        instruments = [
+            Instrument.spot(
+                exchange=ExchangeId.BINANCE_SPOT,
+                name_internal="binance_spot-btc_usdt",
+                name_exchange="BTCUSDT",
+                underlying=Underlying(
+                    base=Asset.new_from_exchange("btc"),
+                    quote=Asset.new_from_exchange("usdt"),
+                ),
+            ),
+            Instrument.spot(
+                exchange=ExchangeId.BINANCE_SPOT,
+                name_internal="binance_spot-eth_usdt",
+                name_exchange="ETHUSDT",
+                underlying=Underlying(
+                    base=Asset.new_from_exchange("eth"),
+                    quote=Asset.new_from_exchange("usdt"),
+                ),
+            ),
+        ]
+
+        builder = backtest.IndexedInstruments.builder()
+        for inst in instruments:
+            builder.add_instrument(inst)
+        indexed = builder.build()
+
+        assert len(indexed.exchanges()) == 1
+        assert len(indexed.assets()) == 3
+        assert len(indexed.instruments()) == 2
 
 
 class TestExecutionConfig:
