@@ -128,3 +128,56 @@ class SharpeRatio(Generic[IntervalT]):
         new_value = self.value * scale
 
         return SharpeRatio(value=new_value, interval=target)
+
+
+@dataclass(frozen=True)
+class SortinoRatio(Generic[IntervalT]):
+    """Sortino Ratio value over a specific time interval.
+
+    Similar to the Sharpe Ratio, but only considers downside volatility (standard deviation of
+    negative returns) rather than total volatility. This makes it a better metric for portfolios
+    with non-normal return distributions.
+    """
+
+    value: Decimal
+    interval: IntervalT
+
+    @classmethod
+    def calculate(
+        cls,
+        risk_free_return: Decimal,
+        mean_return: Decimal,
+        std_dev_loss_returns: Decimal,
+        returns_period: IntervalT,
+    ) -> SortinoRatio[IntervalT]:
+        """Calculate the SortinoRatio over the provided time interval."""
+        if std_dev_loss_returns.is_zero():
+            excess_returns = mean_return - risk_free_return
+            if excess_returns > 0:
+                value = Decimal('1e1000')  # Very large positive (like Decimal::MAX)
+            elif excess_returns < 0:
+                value = Decimal('-1e1000')  # Very large negative (like Decimal::MIN)
+            else:
+                value = Decimal('0')
+            return cls(value=value, interval=returns_period)
+        else:
+            excess_returns = mean_return - risk_free_return
+            ratio = excess_returns / std_dev_loss_returns
+            return cls(value=ratio, interval=returns_period)
+
+    def scale(self, target: TimeInterval) -> SortinoRatio[TimeInterval]:
+        """Scale the SortinoRatio from current interval to target interval.
+
+        This scaling assumes returns are independently and identically distributed (IID).
+        However, this assumption may be less appropriate for downside deviation.
+        """
+        # Determine scale factor: square root of number of Self Intervals in Target Intervals
+        target_secs = Decimal(str(target.interval.total_seconds()))
+        current_secs = Decimal(str(self.interval.interval.total_seconds()))
+
+        scale_ratio = target_secs / current_secs
+        scale = Decimal(str(math.sqrt(float(scale_ratio))))
+
+        new_value = self.value * scale
+
+        return SortinoRatio(value=new_value, interval=target)

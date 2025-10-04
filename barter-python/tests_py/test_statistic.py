@@ -8,6 +8,7 @@ from barter_python.statistic import (
     Annual365,
     Daily,
     SharpeRatio,
+    SortinoRatio,
     TimeDeltaInterval,
 )
 
@@ -111,6 +112,127 @@ class TestSharpeRatio:
         actual = input_ratio.scale(Annual252())
 
         # Expected value calculated with Python's precision
+        expected_value = Decimal('0.79372539331937720')
+        assert actual.value == expected_value
+        assert isinstance(actual.interval, Annual252)
+
+
+class TestSortinoRatio:
+    def test_calculate_normal_case(self):
+        # Define test case with reasonable values
+        risk_free_return = Decimal('0.0015')  # 0.15%
+        mean_return = Decimal('0.0025')  # 0.25%
+        std_dev_loss_returns = Decimal('0.02')  # 2%
+        time_period = Daily()
+
+        actual = SortinoRatio.calculate(
+            risk_free_return,
+            mean_return,
+            std_dev_loss_returns,
+            time_period,
+        )
+
+        expected_value = Decimal('0.05')  # (0.0025 - 0.0015) / 0.02
+        assert actual.value == expected_value
+        assert actual.interval == time_period
+
+    def test_calculate_zero_downside_dev_positive_excess(self):
+        # Test case: positive excess returns with no downside risk
+        risk_free_return = Decimal('0.001')  # 0.1%
+        mean_return = Decimal('0.002')  # 0.2%
+        std_dev_loss_returns = Decimal('0.0')
+        time_period = Daily()
+
+        actual = SortinoRatio.calculate(
+            risk_free_return,
+            mean_return,
+            std_dev_loss_returns,
+            time_period,
+        )
+
+        assert actual.value == Decimal('1e1000')
+        assert actual.interval == time_period
+
+    def test_calculate_zero_downside_dev_negative_excess(self):
+        # Test case: negative excess returns with no downside risk
+        risk_free_return = Decimal('0.002')  # 0.2%
+        mean_return = Decimal('0.001')  # 0.1%
+        std_dev_loss_returns = Decimal('0.0')
+        time_period = Daily()
+
+        actual = SortinoRatio.calculate(
+            risk_free_return,
+            mean_return,
+            std_dev_loss_returns,
+            time_period,
+        )
+
+        assert actual.value == Decimal('-1e1000')
+        assert actual.interval == time_period
+
+    def test_calculate_zero_downside_dev_no_excess(self):
+        # Test case: no excess returns with no downside risk
+        risk_free_return = Decimal('0.001')  # 0.1%
+        mean_return = Decimal('0.001')  # 0.1%
+        std_dev_loss_returns = Decimal('0.0')
+        time_period = Daily()
+
+        actual = SortinoRatio.calculate(
+            risk_free_return,
+            mean_return,
+            std_dev_loss_returns,
+            time_period,
+        )
+
+        assert actual.value == Decimal('0.0')
+        assert actual.interval == time_period
+
+    def test_calculate_negative_returns(self):
+        # Test case: negative mean returns
+        risk_free_return = Decimal('0.001')  # 0.1%
+        mean_return = Decimal('-0.002')  # -0.2%
+        std_dev_loss_returns = Decimal('0.015')  # 1.5%
+        time_period = Daily()
+
+        actual = SortinoRatio.calculate(
+            risk_free_return,
+            mean_return,
+            std_dev_loss_returns,
+            time_period,
+        )
+
+        expected_value = Decimal('-0.2')  # (-0.002 - 0.001) / 0.015
+        assert actual.value == expected_value
+        assert actual.interval == time_period
+
+    def test_calculate_custom_interval(self):
+        # Test case with custom time interval
+        risk_free_return = Decimal('0.0015')  # 0.15%
+        mean_return = Decimal('0.0025')  # 0.25%
+        std_dev_loss_returns = Decimal('0.02')  # 2%
+        time_period = TimeDeltaInterval(timedelta(hours=4))
+
+        actual = SortinoRatio.calculate(
+            risk_free_return,
+            mean_return,
+            std_dev_loss_returns,
+            time_period,
+        )
+
+        expected_value = Decimal('0.05')
+        assert actual.value == expected_value
+        assert actual.interval == time_period
+
+    def test_scale_daily_to_annual(self):
+        # Test scaling from daily to annual
+        daily = SortinoRatio(
+            value=Decimal('0.05'),
+            interval=Daily(),
+        )
+
+        actual = daily.scale(Annual252())
+
+        # 0.05 * √252 ≈ 0.7937
         expected_value = Decimal('0.79372539331937720')
         assert actual.value == expected_value
         assert isinstance(actual.interval, Annual252)
