@@ -286,9 +286,14 @@ class BacktestEngineSimulator:
     def __init__(self, initial_state: EngineState):
         self.state = initial_state
         self.current_time = None
+        self.start_time = None
+        self.positions = {}  # Track positions by instrument
+        self.trades = []  # Track executed trades
 
     async def process_market_event(self, event: MarketEvent[int, DataKind]) -> None:
         """Process a market event and update engine state."""
+        if self.start_time is None:
+            self.start_time = event.time_exchange
         self.current_time = event.time_exchange
 
         # Update instrument prices based on market data
@@ -313,10 +318,10 @@ class BacktestEngineSimulator:
 
     def get_trading_summary(self, risk_free_return: Decimal, summary_interval: TimeInterval) -> TradingSummary:
         """Generate a trading summary from current state."""
-        # This is a placeholder implementation
-        # In a real implementation, this would calculate actual metrics
+        # Placeholder implementation - in a full implementation this would
+        # calculate actual P&L, Sharpe ratios, etc. from trades and positions
         return TradingSummary(
-            time_engine_start=self.current_time or datetime.now(),
+            time_engine_start=self.start_time or datetime.now(),
             time_engine_end=self.current_time or datetime.now(),
             instrument_tear_sheets=[],
             asset_tear_sheets=[],
