@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar
+from typing import Generic, Optional, TypeVar, Union
 
 AssetKey = TypeVar("AssetKey")
 
@@ -216,3 +218,365 @@ class Keyed(Generic[KeyType, ValueType]):
 
     def __hash__(self) -> int:
         return hash((self.key, self.value))
+
+
+class InstrumentNameInternal:
+    """Barter lowercase string representation for an Instrument."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name.lower()
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @classmethod
+    def new_from_exchange(cls, exchange: ExchangeId, name_exchange: str | InstrumentNameExchange) -> InstrumentNameInternal:
+        """Create from exchange and exchange name."""
+        name_exchange = name_exchange if isinstance(name_exchange, str) else name_exchange.name
+        return cls(f"{exchange.value}-{name_exchange}")
+
+    def __str__(self) -> str:
+        return self._name
+
+    def __repr__(self) -> str:
+        return f"InstrumentNameInternal({self._name!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, InstrumentNameInternal):
+            return NotImplemented
+        return self._name == other._name
+
+    def __hash__(self) -> int:
+        return hash(self._name)
+
+
+class InstrumentNameExchange:
+    """Exchange string representation for an Instrument."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def __str__(self) -> str:
+        return self._name
+
+    def __repr__(self) -> str:
+        return f"InstrumentNameExchange({self._name!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, InstrumentNameExchange):
+            return NotImplemented
+        return self._name == other._name
+
+    def __hash__(self) -> int:
+        return hash(self._name)
+
+
+class InstrumentQuoteAsset(Enum):
+    """Instrument quote asset."""
+
+    UNDERLYING_BASE = "underlying_base"
+    UNDERLYING_QUOTE = "underlying_quote"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class OptionKind(Enum):
+    """Option contract kind - Put or Call."""
+
+    CALL = "call"
+    PUT = "put"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class OptionExercise(Enum):
+    """Option contract exercise style."""
+
+    AMERICAN = "american"
+    BERMUDAN = "bermudan"
+    EUROPEAN = "european"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class PerpetualContract(Generic[AssetKey]):
+    """Perpetual contract specification."""
+
+    def __init__(self, contract_size: Decimal, settlement_asset: AssetKey) -> None:
+        self.contract_size = contract_size
+        self.settlement_asset = settlement_asset
+
+    def __repr__(self) -> str:
+        return f"PerpetualContract(contract_size={self.contract_size!r}, settlement_asset={self.settlement_asset!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, PerpetualContract):
+            return NotImplemented
+        return (
+            self.contract_size == other.contract_size
+            and self.settlement_asset == other.settlement_asset
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.contract_size, self.settlement_asset))
+
+
+class FutureContract(Generic[AssetKey]):
+    """Future contract specification."""
+
+    def __init__(self, contract_size: Decimal, settlement_asset: AssetKey, expiry: datetime) -> None:
+        self.contract_size = contract_size
+        self.settlement_asset = settlement_asset
+        self.expiry = expiry
+
+    def __repr__(self) -> str:
+        return f"FutureContract(contract_size={self.contract_size!r}, settlement_asset={self.settlement_asset!r}, expiry={self.expiry!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FutureContract):
+            return NotImplemented
+        return (
+            self.contract_size == other.contract_size
+            and self.settlement_asset == other.settlement_asset
+            and self.expiry == other.expiry
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.contract_size, self.settlement_asset, self.expiry))
+
+
+class OptionContract(Generic[AssetKey]):
+    """Option contract specification."""
+
+    def __init__(
+        self,
+        contract_size: Decimal,
+        settlement_asset: AssetKey,
+        kind: OptionKind,
+        exercise: OptionExercise,
+        expiry: datetime,
+        strike: Decimal,
+    ) -> None:
+        self.contract_size = contract_size
+        self.settlement_asset = settlement_asset
+        self.kind = kind
+        self.exercise = exercise
+        self.expiry = expiry
+        self.strike = strike
+
+    def __repr__(self) -> str:
+        return (
+            f"OptionContract("
+            f"contract_size={self.contract_size!r}, "
+            f"settlement_asset={self.settlement_asset!r}, "
+            f"kind={self.kind!r}, "
+            f"exercise={self.exercise!r}, "
+            f"expiry={self.expiry!r}, "
+            f"strike={self.strike!r}"
+            f")"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, OptionContract):
+            return NotImplemented
+        return (
+            self.contract_size == other.contract_size
+            and self.settlement_asset == other.settlement_asset
+            and self.kind == other.kind
+            and self.exercise == other.exercise
+            and self.expiry == other.expiry
+            and self.strike == other.strike
+        )
+
+    def __hash__(self) -> int:
+        return hash((
+            self.contract_size,
+            self.settlement_asset,
+            self.kind,
+            self.exercise,
+            self.expiry,
+            self.strike,
+        ))
+
+
+InstrumentKindType = Union[
+    type(...),  # For Spot (no args)
+    PerpetualContract[AssetKey],
+    FutureContract[AssetKey],
+    OptionContract[AssetKey],
+]
+
+
+class InstrumentKind(Generic[AssetKey]):
+    """Instrument kind enum."""
+
+    def __init__(self, kind: str, data: Optional[InstrumentKindType[AssetKey]] = None) -> None:
+        self._kind = kind
+        self._data = data
+
+    @classmethod
+    def spot(cls) -> InstrumentKind[AssetKey]:
+        return cls("spot")
+
+    @classmethod
+    def perpetual(cls, contract: PerpetualContract[AssetKey]) -> InstrumentKind[AssetKey]:
+        return cls("perpetual", contract)
+
+    @classmethod
+    def future(cls, contract: FutureContract[AssetKey]) -> InstrumentKind[AssetKey]:
+        return cls("future", contract)
+
+    @classmethod
+    def option(cls, contract: OptionContract[AssetKey]) -> InstrumentKind[AssetKey]:
+        return cls("option", contract)
+
+    @property
+    def kind(self) -> str:
+        return self._kind
+
+    @property
+    def data(self) -> Optional[InstrumentKindType[AssetKey]]:
+        return self._data
+
+    def contract_size(self) -> Decimal:
+        """Returns the contract size."""
+        if self._kind == "spot":
+            return Decimal("1")
+        elif self._kind == "perpetual":
+            return self._data.contract_size  # type: ignore
+        elif self._kind == "future":
+            return self._data.contract_size  # type: ignore
+        elif self._kind == "option":
+            return self._data.contract_size  # type: ignore
+        else:
+            raise ValueError(f"Unknown instrument kind: {self._kind}")
+
+    def settlement_asset(self) -> Optional[AssetKey]:
+        """Returns the settlement asset if applicable."""
+        if self._kind == "spot":
+            return None
+        elif self._kind in ("perpetual", "future", "option"):
+            return self._data.settlement_asset  # type: ignore
+        else:
+            raise ValueError(f"Unknown instrument kind: {self._kind}")
+
+    def __repr__(self) -> str:
+        if self._data is None:
+            return f"InstrumentKind.{self._kind}()"
+        else:
+            return f"InstrumentKind.{self._kind}({self._data!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, InstrumentKind):
+            return NotImplemented
+        return self._kind == other._kind and self._data == other._data
+
+    def __hash__(self) -> int:
+        return hash((self._kind, self._data))
+
+
+class Instrument(Generic[AssetKey]):
+    """Comprehensive Instrument model."""
+
+    def __init__(
+        self,
+        exchange: ExchangeId,
+        name_internal: str | InstrumentNameInternal,
+        name_exchange: str | InstrumentNameExchange,
+        underlying: Underlying[AssetKey],
+        quote: InstrumentQuoteAsset,
+        kind: InstrumentKind[AssetKey],
+        spec: Optional[object] = None,  # TODO: Add spec structures later
+    ) -> None:
+        self.exchange = exchange
+        self.name_internal = (
+            name_internal
+            if isinstance(name_internal, InstrumentNameInternal)
+            else InstrumentNameInternal(name_internal)
+        )
+        self.name_exchange = (
+            name_exchange
+            if isinstance(name_exchange, InstrumentNameExchange)
+            else InstrumentNameExchange(name_exchange)
+        )
+        self.underlying = underlying
+        self.quote = quote
+        self.kind = kind
+        self.spec = spec
+
+    @classmethod
+    def spot(
+        cls,
+        exchange: ExchangeId,
+        name_internal: str | InstrumentNameInternal,
+        name_exchange: str | InstrumentNameExchange,
+        underlying: Underlying[AssetKey],
+        spec: Optional[object] = None,
+    ) -> Instrument[AssetKey]:
+        """Create a spot instrument."""
+        return cls(
+            exchange=exchange,
+            name_internal=name_internal,
+            name_exchange=name_exchange,
+            underlying=underlying,
+            quote=InstrumentQuoteAsset.UNDERLYING_QUOTE,
+            kind=InstrumentKind.spot(),
+            spec=spec,
+        )
+
+    def map_exchange_key(self, new_exchange: ExchangeId) -> Instrument[AssetKey]:
+        """Map to a new exchange key."""
+        return Instrument(
+            exchange=new_exchange,
+            name_internal=self.name_internal,
+            name_exchange=self.name_exchange,
+            underlying=self.underlying,
+            quote=self.quote,
+            kind=self.kind,
+            spec=self.spec,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"Instrument("
+            f"exchange={self.exchange!r}, "
+            f"name_internal={self.name_internal!r}, "
+            f"name_exchange={self.name_exchange!r}, "
+            f"underlying={self.underlying!r}, "
+            f"quote={self.quote!r}, "
+            f"kind={self.kind!r}, "
+            f"spec={self.spec!r}"
+            f")"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Instrument):
+            return NotImplemented
+        return (
+            self.exchange == other.exchange
+            and self.name_internal == other.name_internal
+            and self.name_exchange == other.name_exchange
+            and self.underlying == other.underlying
+            and self.quote == other.quote
+            and self.kind == other.kind
+            and self.spec == other.spec
+        )
+
+    def __hash__(self) -> int:
+        return hash((
+            self.exchange,
+            self.name_internal,
+            self.name_exchange,
+            self.underlying,
+            self.quote,
+            self.kind,
+            self.spec,
+        ))

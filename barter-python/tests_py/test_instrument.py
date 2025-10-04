@@ -2,12 +2,25 @@
 
 import pytest
 
+from datetime import datetime, timezone
+from decimal import Decimal
+
 from barter_python.instrument import (
     Asset,
     AssetNameExchange,
     AssetNameInternal,
     ExchangeId,
+    FutureContract,
+    Instrument,
+    InstrumentKind,
+    InstrumentNameExchange,
+    InstrumentNameInternal,
+    InstrumentQuoteAsset,
     Keyed,
+    OptionContract,
+    OptionExercise,
+    OptionKind,
+    PerpetualContract,
     Side,
     Underlying,
 )
@@ -150,3 +163,260 @@ class TestKeyed:
         keyed = Keyed("key", "value")
         assert str(keyed) == "key, value"
         assert "Keyed(" in repr(keyed)
+
+
+class TestInstrumentNameInternal:
+    def test_creation(self):
+        name = InstrumentNameInternal("BTC_USDT")
+        assert name.name == "btc_usdt"
+
+    def test_new_from_exchange(self):
+        name = InstrumentNameInternal.new_from_exchange(ExchangeId.BINANCE_SPOT, "BTCUSDT")
+        assert name.name == "binance_spot-btcusdt"
+
+    def test_equality(self):
+        name1 = InstrumentNameInternal("btc_usdt")
+        name2 = InstrumentNameInternal("BTC_USDT")
+        name3 = InstrumentNameInternal("eth_usdt")
+        assert name1 == name2
+        assert name1 != name3
+
+    def test_str_repr(self):
+        name = InstrumentNameInternal("BTC_USDT")
+        assert str(name) == "btc_usdt"
+        assert repr(name) == "InstrumentNameInternal('btc_usdt')"
+
+
+class TestInstrumentNameExchange:
+    def test_creation(self):
+        name = InstrumentNameExchange("BTCUSDT")
+        assert name.name == "BTCUSDT"
+
+    def test_equality(self):
+        name1 = InstrumentNameExchange("BTCUSDT")
+        name2 = InstrumentNameExchange("BTCUSDT")
+        name3 = InstrumentNameExchange("ETHUSDT")
+        assert name1 == name2
+        assert name1 != name3
+
+    def test_str_repr(self):
+        name = InstrumentNameExchange("BTCUSDT")
+        assert str(name) == "BTCUSDT"
+        assert repr(name) == "InstrumentNameExchange('BTCUSDT')"
+
+
+class TestInstrumentQuoteAsset:
+    def test_enum_values(self):
+        assert InstrumentQuoteAsset.UNDERLYING_BASE.value == "underlying_base"
+        assert InstrumentQuoteAsset.UNDERLYING_QUOTE.value == "underlying_quote"
+
+    def test_str(self):
+        assert str(InstrumentQuoteAsset.UNDERLYING_QUOTE) == "underlying_quote"
+
+
+class TestOptionKind:
+    def test_enum_values(self):
+        assert OptionKind.CALL.value == "call"
+        assert OptionKind.PUT.value == "put"
+
+    def test_str(self):
+        assert str(OptionKind.CALL) == "call"
+
+
+class TestOptionExercise:
+    def test_enum_values(self):
+        assert OptionExercise.AMERICAN.value == "american"
+        assert OptionExercise.EUROPEAN.value == "european"
+
+    def test_str(self):
+        assert str(OptionExercise.AMERICAN) == "american"
+
+
+class TestPerpetualContract:
+    def test_creation(self):
+        contract = PerpetualContract(Decimal("1"), "usdt")
+        assert contract.contract_size == Decimal("1")
+        assert contract.settlement_asset == "usdt"
+
+    def test_equality(self):
+        c1 = PerpetualContract(Decimal("1"), "usdt")
+        c2 = PerpetualContract(Decimal("1"), "usdt")
+        c3 = PerpetualContract(Decimal("2"), "usdt")
+        assert c1 == c2
+        assert c1 != c3
+
+    def test_repr(self):
+        contract = PerpetualContract(Decimal("1"), "usdt")
+        assert "PerpetualContract(" in repr(contract)
+
+
+class TestFutureContract:
+    def test_creation(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        contract = FutureContract(Decimal("1"), "usdt", expiry)
+        assert contract.contract_size == Decimal("1")
+        assert contract.settlement_asset == "usdt"
+        assert contract.expiry == expiry
+
+    def test_equality(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        c1 = FutureContract(Decimal("1"), "usdt", expiry)
+        c2 = FutureContract(Decimal("1"), "usdt", expiry)
+        c3 = FutureContract(Decimal("2"), "usdt", expiry)
+        assert c1 == c2
+        assert c1 != c3
+
+    def test_repr(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        contract = FutureContract(Decimal("1"), "usdt", expiry)
+        assert "FutureContract(" in repr(contract)
+
+
+class TestOptionContract:
+    def test_creation(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        contract = OptionContract(
+            Decimal("1"),
+            "usdt",
+            OptionKind.CALL,
+            OptionExercise.AMERICAN,
+            expiry,
+            Decimal("50000"),
+        )
+        assert contract.contract_size == Decimal("1")
+        assert contract.settlement_asset == "usdt"
+        assert contract.kind == OptionKind.CALL
+        assert contract.exercise == OptionExercise.AMERICAN
+        assert contract.expiry == expiry
+        assert contract.strike == Decimal("50000")
+
+    def test_equality(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        c1 = OptionContract(
+            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+        )
+        c2 = OptionContract(
+            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+        )
+        c3 = OptionContract(
+            Decimal("1"), "usdt", OptionKind.PUT, OptionExercise.AMERICAN, expiry, Decimal("50000")
+        )
+        assert c1 == c2
+        assert c1 != c3
+
+    def test_repr(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        contract = OptionContract(
+            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+        )
+        assert "OptionContract(" in repr(contract)
+
+
+class TestInstrumentKind:
+    def test_spot(self):
+        kind = InstrumentKind.spot()
+        assert kind.kind == "spot"
+        assert kind.data is None
+        assert kind.contract_size() == Decimal("1")
+        assert kind.settlement_asset() is None
+
+    def test_perpetual(self):
+        contract = PerpetualContract(Decimal("1"), "usdt")
+        kind = InstrumentKind.perpetual(contract)
+        assert kind.kind == "perpetual"
+        assert kind.data == contract
+        assert kind.contract_size() == Decimal("1")
+        assert kind.settlement_asset() == "usdt"
+
+    def test_future(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        contract = FutureContract(Decimal("1"), "usdt", expiry)
+        kind = InstrumentKind.future(contract)
+        assert kind.kind == "future"
+        assert kind.data == contract
+        assert kind.contract_size() == Decimal("1")
+        assert kind.settlement_asset() == "usdt"
+
+    def test_option(self):
+        expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
+        contract = OptionContract(
+            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+        )
+        kind = InstrumentKind.option(contract)
+        assert kind.kind == "option"
+        assert kind.data == contract
+        assert kind.contract_size() == Decimal("1")
+        assert kind.settlement_asset() == "usdt"
+
+    def test_equality(self):
+        k1 = InstrumentKind.spot()
+        k2 = InstrumentKind.spot()
+        contract = PerpetualContract(Decimal("1"), "usdt")
+        k3 = InstrumentKind.perpetual(contract)
+        assert k1 == k2
+        assert k1 != k3
+
+
+class TestInstrument:
+    def test_creation(self):
+        underlying = Underlying("btc", "usdt")
+        instrument = Instrument(
+            exchange=ExchangeId.BINANCE_SPOT,
+            name_internal="binance_spot-btcusdt",
+            name_exchange="BTCUSDT",
+            underlying=underlying,
+            quote=InstrumentQuoteAsset.UNDERLYING_QUOTE,
+            kind=InstrumentKind.spot(),
+        )
+        assert instrument.exchange == ExchangeId.BINANCE_SPOT
+        assert instrument.name_internal.name == "binance_spot-btcusdt"
+        assert instrument.name_exchange.name == "BTCUSDT"
+        assert instrument.underlying == underlying
+        assert instrument.quote == InstrumentQuoteAsset.UNDERLYING_QUOTE
+        assert instrument.kind.kind == "spot"
+
+    def test_spot_classmethod(self):
+        underlying = Underlying("btc", "usdt")
+        instrument = Instrument.spot(
+            exchange=ExchangeId.BINANCE_SPOT,
+            name_internal="binance_spot-btcusdt",
+            name_exchange="BTCUSDT",
+            underlying=underlying,
+        )
+        assert instrument.quote == InstrumentQuoteAsset.UNDERLYING_QUOTE
+        assert instrument.kind.kind == "spot"
+
+    def test_map_exchange_key(self):
+        underlying = Underlying("btc", "usdt")
+        instrument = Instrument.spot(
+            exchange=ExchangeId.BINANCE_SPOT,
+            name_internal="binance_spot-btcusdt",
+            name_exchange="BTCUSDT",
+            underlying=underlying,
+        )
+        new_instrument = instrument.map_exchange_key(ExchangeId.KRAKEN)
+        assert new_instrument.exchange == ExchangeId.KRAKEN
+        assert new_instrument.name_internal == instrument.name_internal
+
+    def test_equality(self):
+        underlying = Underlying("btc", "usdt")
+        i1 = Instrument.spot(
+            exchange=ExchangeId.BINANCE_SPOT,
+            name_internal="binance_spot-btcusdt",
+            name_exchange="BTCUSDT",
+            underlying=underlying,
+        )
+        i2 = Instrument.spot(
+            exchange=ExchangeId.BINANCE_SPOT,
+            name_internal="binance_spot-btcusdt",
+            name_exchange="BTCUSDT",
+            underlying=underlying,
+        )
+        i3 = Instrument.spot(
+            exchange=ExchangeId.KRAKEN,
+            name_internal="kraken-btcusdt",
+            name_exchange="BTCUSDT",
+            underlying=underlying,
+        )
+        assert i1 == i2
+        assert i1 != i3
