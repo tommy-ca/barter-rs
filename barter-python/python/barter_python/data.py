@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Union
 
 from .instrument import Side
 
