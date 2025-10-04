@@ -3,12 +3,12 @@ import decimal
 import barter_python as bp
 
 
-def _load_config() -> bp.SystemConfig:
-    return bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
+def _load_config(example_paths) -> bp.SystemConfig:
+    return bp.SystemConfig.from_json(str(example_paths["system_config"]))
 
 
-def test_risk_limits_round_trip(tmp_path):
-    config = _load_config()
+def test_risk_limits_round_trip(example_paths, tmp_path):
+    config = _load_config(example_paths)
 
     risk = config.risk_limits()
     assert risk["global"] is None
