@@ -133,6 +133,11 @@ iterable of mapping objects with `exchange`, `asset`, `total`, and optional `fre
 snake_case `ExchangeId` names such as `binance_spot`) to seed the engine's account balances before
 execution. When omitted, balances default to the data loaded from the system configuration.
 
+Validation rules:
+- `exchange` must map to a known `ExchangeId`; unknown identifiers raise `ValueError`.
+- `free` defaults to the provided `total` when omitted and must never exceed `total`.
+- `total` and `free` must be finite numbers that can be converted via the binding's decimal parser.
+
 ### Risk Configuration
 
 System configurations expose risk manager thresholds that can be inspected or adjusted before
