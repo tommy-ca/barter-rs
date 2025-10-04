@@ -64,7 +64,7 @@ use summary::{
     PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
 use system::{PySystemHandle, run_historic_backtest, start_system};
-use instrument::{PyAsset, PySide};
+use instrument::{PyAsset, PyAssetIndex, PySide};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]
@@ -794,6 +794,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubscriptionId>()?;
     m.add_class::<PyDynamicStreams>()?;
     m.add_class::<PyAsset>()?;
+    m.add_class::<PyAssetIndex>()?;
     m.add_class::<PySide>()?;
     m.add_class::<PyBacktestSummary>()?;
     m.add_class::<PyMultiBacktestSummary>()?;

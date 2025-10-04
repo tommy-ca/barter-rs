@@ -478,3 +478,26 @@ class TestPySide:
     def test_side_repr(self):
         assert repr(bp.Side.BUY) == "Side.Buy"
         assert repr(bp.Side.SELL) == "Side.Sell"
+
+
+class TestPyAssetIndex:
+    def test_creation(self):
+        index = bp.AssetIndex(42)
+        assert index.index == 42
+
+    def test_equality(self):
+        i1 = bp.AssetIndex(1)
+        i2 = bp.AssetIndex(1)
+        i3 = bp.AssetIndex(2)
+        assert i1 == i2
+        assert i1 != i3
+
+    def test_hash(self):
+        i1 = bp.AssetIndex(1)
+        i2 = bp.AssetIndex(1)
+        assert hash(i1) == hash(i2)
+
+    def test_str_repr(self):
+        index = bp.AssetIndex(42)
+        assert str(index) == "AssetIndex(42)"
+        assert "AssetIndex(" in repr(index)

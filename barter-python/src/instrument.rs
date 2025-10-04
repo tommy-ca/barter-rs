@@ -1,4 +1,4 @@
-use barter_instrument::{asset::Asset, Side};
+use barter_instrument::{asset::{Asset, AssetIndex}, Side};
 use pyo3::prelude::*;
 
 /// Wrapper around [`Asset`] for Python exposure.
@@ -83,5 +83,39 @@ impl PySide {
     /// Return the debug representation.
     fn __repr__(&self) -> String {
         format!("Side.{:?}", self.inner)
+    }
+}
+
+/// Wrapper around [`AssetIndex`] for Python exposure.
+#[pyclass(module = "barter_python", name = "AssetIndex", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyAssetIndex {
+    inner: AssetIndex,
+}
+
+#[pymethods]
+impl PyAssetIndex {
+    /// Create a new [`AssetIndex`].
+    #[new]
+    fn new(index: usize) -> Self {
+        Self {
+            inner: AssetIndex(index),
+        }
+    }
+
+    /// Get the index value.
+    #[getter]
+    fn index(&self) -> usize {
+        self.inner.index()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("{:?}", self.inner)
     }
 }
