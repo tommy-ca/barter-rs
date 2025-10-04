@@ -118,9 +118,9 @@ class DefaultRiskManager(Generic[State]):
         Iterable[RiskRefused[OrderRequestOpen[ExchangeKey, InstrumentKey]]],
     ]:
         """Approve all orders without any checks."""
-        approved_cancels = [RiskApproved(cancel) for cancel in cancels]
-        approved_opens = [RiskApproved(open_req) for open_req in opens]
-        refused_cancels = []
-        refused_opens = []
+        approved_cancels: list[RiskApproved[OrderRequestCancel[ExchangeKey, InstrumentKey]]] = [RiskApproved(cancel) for cancel in cancels]
+        approved_opens: list[RiskApproved[OrderRequestOpen[ExchangeKey, InstrumentKey]]] = [RiskApproved(open_req) for open_req in opens]
+        refused_cancels: list[RiskRefused[OrderRequestCancel[ExchangeKey, InstrumentKey]]] = []
+        refused_opens: list[RiskRefused[OrderRequestOpen[ExchangeKey, InstrumentKey]]] = []
 
         return approved_cancels, approved_opens, refused_cancels, refused_opens

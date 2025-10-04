@@ -147,15 +147,15 @@ class Value:
         return cls("float", value)
 
     @classmethod
-    def int(cls, value: int) -> Value:
+    def int_value(cls, value: int) -> Value:
         return cls("int", value)
 
     @classmethod
-    def uint(cls, value: int) -> Value:
+    def uint_value(cls, value: int) -> Value:
         return cls("uint", value)
 
     @classmethod
-    def bool(cls, value: bool) -> Value:
+    def bool_value(cls, value: bool) -> Value:
         return cls("bool", value)
 
     @classmethod

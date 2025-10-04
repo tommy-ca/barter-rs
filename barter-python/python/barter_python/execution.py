@@ -853,13 +853,14 @@ class AccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
 
     def time_most_recent(self) -> Optional[datetime]:
         """Get the most recent timestamp from balances or orders."""
-        times = []
+        times: list[datetime] = []
         for balance in self.balances:
             times.append(balance.time_exchange)
         for instrument in self.instruments:
             for order in instrument.orders:
-                if order.state.time_exchange():
-                    times.append(order.state.time_exchange())
+                time_exchange = order.state.time_exchange()
+                if time_exchange is not None:
+                    times.append(time_exchange)
         return max(times) if times else None
 
     def assets(self):

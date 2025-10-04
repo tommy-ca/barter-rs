@@ -431,7 +431,7 @@ class OptionContract(Generic[AssetKey]):
 
 
 InstrumentKindType = Union[
-    type(...),  # For Spot (no args)
+    None,  # For Spot (no args)
     PerpetualContract[AssetKey],
     FutureContract[AssetKey],
     OptionContract[AssetKey],
@@ -507,7 +507,6 @@ class InstrumentKind(Generic[AssetKey]):
 
 
 ExchangeKey = TypeVar("ExchangeKey")
-AssetKey = TypeVar("AssetKey")
 
 
 class Instrument(Generic[AssetKey]):
@@ -667,7 +666,7 @@ class MarketDataOptionContract:
 
 
 MarketDataInstrumentKindType = Union[
-    type(...),  # For Spot (no args)
+    None,  # For Spot (no args)
     MarketDataFutureContract,
     MarketDataOptionContract,
 ]

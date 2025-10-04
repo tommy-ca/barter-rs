@@ -16,7 +16,8 @@ from .data import MarketEvent, DataKind, PublicTrade, Candle, Liquidation, as_pu
 from .engine import Engine, EngineState as EngineEngineState
 from .execution import OrderRequestOpen, OrderRequestCancel
 from .instrument import (
-    Side
+    Side,
+    InstrumentIndex,
 )
 from .risk import RiskManager
 from .statistic import TimeInterval, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
@@ -148,7 +149,7 @@ class TradingSummary(Generic[SummaryInterval]):
         return self.time_engine_end - self.time_engine_start
 
 
-class BacktestMarketData(Protocol[MarketEventKind]):
+class BacktestMarketData(Protocol):
     """Protocol for market data sources used in backtests."""
 
     @abstractmethod
@@ -282,14 +283,14 @@ class MultiBacktestSummary(Generic[SummaryInterval]):
 
 
 @dataclass(frozen=True)
-class BacktestArgsConstant(Generic[MarketEventKind, SummaryInterval]):
+class BacktestArgsConstant(Generic[SummaryInterval]):
     """Configuration for constants used across all backtests in a batch."""
 
     instruments: IndexedInstruments  # TODO: Define this
     executions: list[ExecutionConfig]  # TODO: Define this
-    market_data: BacktestMarketData[MarketEventKind]
+    market_data: BacktestMarketData
     summary_interval: SummaryInterval
-    engine_state: EngineState
+    engine_state: EngineEngineState
 
 
 @dataclass(frozen=True)
@@ -414,13 +415,13 @@ class BacktestEngineSimulator:
     """Simple engine simulator for backtesting."""
 
     def __init__(self, initial_engine_state: EngineEngineState, strategy: Any, risk_manager: RiskManager):
-        self.engine = Engine(initial_engine_state, strategy, risk_manager)
-        self.current_time = None
-        self.start_time = None
-        self.positions = {}  # Track positions by instrument
-        self.trades = []  # Track executed trades
-        self.pnl_by_instrument = {}  # Track PnL by instrument
-        self.returns_series = []  # Track return series for calculations
+        self.engine: Engine = Engine(initial_engine_state, strategy, risk_manager)
+        self.current_time: Optional[datetime] = None
+        self.start_time: Optional[datetime] = None
+        self.positions: dict[int, Any] = {}  # Track positions by instrument
+        self.trades: list[Any] = []  # Track executed trades
+        self.pnl_by_instrument: dict[int, Any] = {}  # Track PnL by instrument
+        self.returns_series: list[Any] = []  # Track return series for calculations
 
     async def process_market_event(self, event: MarketEvent[int, DataKind]) -> None:
         """Process a market event and update engine state."""
@@ -436,7 +437,7 @@ class BacktestEngineSimulator:
             trade_event = as_public_trade(event)
             if trade_event:
                 # Update price for the instrument
-                inst_state = self.engine.state.get_instrument_state(event.instrument)
+                inst_state = self.engine.state.get_instrument_state(InstrumentIndex(event.instrument))
                 if inst_state:
                     # Note: InstrumentState doesn't have price, so we store in a dict or something
                     pass  # TODO: Add price tracking to InstrumentState
@@ -444,7 +445,7 @@ class BacktestEngineSimulator:
             candle_event = as_candle(event)
             if candle_event:
                 # Update price with candle close
-                inst_state = self.engine.state.get_instrument_state(event.instrument)
+                inst_state = self.engine.state.get_instrument_state(InstrumentIndex(event.instrument))
                 if inst_state:
                     pass  # TODO: Add price tracking
 
@@ -498,7 +499,7 @@ class BacktestEngineSimulator:
         instruments = {}
         for inst_index, inst_state in self.engine.state.instruments.items():
             instrument_name = f"instrument_{inst_index}"
-            pnl = self.pnl_by_instrument.get(inst_index, Decimal('0'))
+            pnl = self.pnl_by_instrument.get(inst_index.index, Decimal('0'))
 
             # Create basic tear sheet with placeholder values
             tear_sheet = TearSheet(
@@ -516,7 +517,7 @@ class BacktestEngineSimulator:
             instruments[instrument_name] = tear_sheet
 
         # Generate asset tear sheets (simplified)
-        assets = {}
+        assets: dict[str, Any] = {}
         # For now, just create empty asset tear sheets
         # In a full implementation, this would track asset balances
 

@@ -130,7 +130,7 @@ class TestBacktestArgs:
             events=[]
         )
         summary_interval = Annual365()
-        engine_state = backtest.EngineState(instruments=[])
+        engine_state = backtest.EngineEngineState()
 
         args = backtest.BacktestArgsConstant(
             instruments=instruments,

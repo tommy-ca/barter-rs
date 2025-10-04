@@ -112,17 +112,17 @@ class TestValue:
         assert value.value == 1.5
 
     def test_int(self):
-        value = Value.int(-42)
+        value = Value.int_value(-42)
         assert value.kind == "int"
         assert value.value == -42
 
     def test_uint(self):
-        value = Value.uint(42)
+        value = Value.uint_value(42)
         assert value.kind == "uint"
         assert value.value == 42
 
     def test_bool(self):
-        value = Value.bool(True)
+        value = Value.bool_value(True)
         assert value.kind == "bool"
         assert value.value is True
 
