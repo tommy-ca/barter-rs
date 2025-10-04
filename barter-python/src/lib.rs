@@ -13,6 +13,7 @@ mod analytics;
 mod backtest;
 mod books;
 mod command;
+mod common;
 mod config;
 mod data;
 mod execution;
