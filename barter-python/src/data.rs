@@ -232,6 +232,7 @@ impl PySubscription {
 #[pyclass(module = "barter_python", name = "DynamicStreams", unsendable)]
 #[derive(Debug)]
 pub struct PyDynamicStreams {
+    #[allow(dead_code)]
     inner: Option<DynamicStreams<InstrumentIndex>>,
 }
 
@@ -261,7 +262,7 @@ impl PyDynamicStreams {
 #[pyfunction]
 #[pyo3(signature = (_subscriptions))]
 pub fn init_dynamic_streams(
-    _py: Python,
+    _py: Python<'_>,
     _subscriptions: Vec<Vec<PySubscription>>,
 ) -> PyResult<PyObject> {
     // Placeholder - need proper async handling
