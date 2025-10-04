@@ -62,7 +62,8 @@
 - [x] Refresh package metadata (version bump + release notes) once analytics helpers land. (2025-10-04)
 - [x] Complete pure Python port of barter-statistic module with comprehensive tests (77 tests covering all metrics, drawdown analytics, and time intervals). (2025-10-04)
 
- ## Completed (2025-10-04)
+  ## Completed (2025-10-04)
 - [x] Allow seeding initial balances when starting systems or running historic backtests from Python bindings. (2025-10-04)
 - [x] Complete pure Python port of barter-data structures (Candle, Liquidation, OrderBook, OrderBookSide) with comprehensive tests. (2025-10-04)
 - [x] Fix linting issues in Python and Rust codebases (unused imports, variables, clippy warnings). (2025-10-04)
+- [x] Update Python type annotations to use modern X | None syntax instead of Optional[X]. (2025-10-04)
