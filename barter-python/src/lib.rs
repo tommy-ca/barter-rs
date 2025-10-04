@@ -1425,7 +1425,7 @@ mod tests {
         let field = PyField::new("test_field".to_string(), value.clone());
 
         assert_eq!(field.key(), "test_field");
-        assert_eq!(field.value().inner, value.inner);
+        assert_eq!(field.value(), value);
     }
 
     #[test]
