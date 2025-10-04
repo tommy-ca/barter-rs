@@ -15,6 +15,11 @@ exposure caps that should be surfaced in Python to keep parity with Rust clients
   `to_json()`.
 - Maintain validation guarantees from Rust (reject invalid thresholds with informative errors).
 
+## Status
+- Implemented 2025-10-04. Rust structures live in `barter/src/system/config.rs` with validation
+  tests, and Python bindings/tests in `barter-python/src/config.rs` plus
+  `barter-python/tests_py/test_risk_config.py`.
+
 ## Proposed Approach
 1. Extend Rust `SystemConfig` (or associated structs) with builder-style helpers for risk options
    when available.

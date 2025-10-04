@@ -72,6 +72,43 @@ Both `SystemHandle.shutdown_with_summary` and `run_historic_backtest` accept an 
 `interval` argument (`"daily"`, `"annual_252"`, or `"annual_365"`, case-insensitive) which controls
 how risk and return metrics are annualised in the generated trading summary.
 
+### Risk Configuration
+
+System configurations expose risk manager thresholds that can be inspected or adjusted before
+starting a system:
+
+```python
+import decimal
+
+import barter_python as bp
+
+config = bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
+
+# Inspect existing limits (None if only JSON defaults are present)
+print(config.risk_limits()["global"])  # -> None
+
+# Set global and per-instrument overrides
+config.set_global_risk_limits({
+    "max_leverage": decimal.Decimal("2.75"),
+    "max_position_notional": decimal.Decimal("5000"),
+})
+
+config.set_instrument_risk_limits(
+    0,
+    {
+        "max_exposure_percent": decimal.Decimal("0.2"),
+        "max_position_quantity": decimal.Decimal("1.5"),
+    },
+)
+
+# Fetch the instrument-specific override
+limits = config.get_instrument_risk_limits(0)
+print(limits["max_exposure_percent"])  # -> Decimal('0.2')
+
+# Persist the updated configuration
+config.to_json_file("/tmp/system_config_with_risk.json")
+```
+
 ### Account Event Helpers
 
 Python connectors can construct account events without building raw dictionaries. For example,

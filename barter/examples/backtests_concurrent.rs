@@ -42,10 +42,12 @@ async fn main() {
 
     let Config {
         risk_free_return,
-        system: SystemConfig {
-            instruments,
-            executions,
-        },
+        system:
+            SystemConfig {
+                instruments,
+                executions,
+                ..
+            },
     } = load_config();
 
     // Construct IndexedInstruments

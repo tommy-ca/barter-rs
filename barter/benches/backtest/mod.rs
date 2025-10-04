@@ -172,10 +172,12 @@ pub struct Config {
 fn benchmark_backtest() {
     let Config {
         risk_free_return,
-        system: SystemConfig {
-            instruments,
-            executions,
-        },
+        system:
+            SystemConfig {
+                instruments,
+                executions,
+                ..
+            },
     } = serde_json::from_str(CONFIG).unwrap();
 
     let args_constant = args_constant(instruments, executions);

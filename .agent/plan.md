@@ -10,7 +10,7 @@
 
 ## Active Focus (2025-10-03)
 1. Establish cross-language maintenance workflow (Rust + Python) including branching strategy and release cadence.
-2. Identify remaining Rust APIs requiring Python exposure (eg. risk manager configuration, portfolio analytics extensions).
+2. Identify remaining Rust APIs requiring Python exposure (risk manager configuration ✅ 2025-10-04; portfolio analytics extensions pending).
 3. Produce incremental TDD plan emphasising new bindings with paired Rust/Python coverage.
 4. Align CI to run `cargo test`, `pytest`, and packaging checks on every push & PR.
 5. Prepare developer onboarding notes for maintaining the hybrid workspace.

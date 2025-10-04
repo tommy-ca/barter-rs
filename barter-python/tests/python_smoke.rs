@@ -188,6 +188,86 @@ fn engine_event_command_builders() {
 }
 
 #[test]
+fn system_config_risk_limits_round_trip() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let system_config_cls = module.getattr("SystemConfig")?;
+
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let config_path = std::path::Path::new(&manifest_dir)
+            .join("..")
+            .join("barter")
+            .join("examples")
+            .join("config")
+            .join("system_config.json");
+
+        let config =
+            system_config_cls.call_method1("from_json", (config_path.display().to_string(),))?;
+
+        let risk_limits = config.call_method0("risk_limits")?;
+        let risk_dict = risk_limits.downcast::<PyDict>()?;
+
+        let global_limits = risk_dict.get_item("global").unwrap();
+        assert!(global_limits.is_none());
+
+        let mut global = PyDict::new_bound(py);
+        global.set_item("max_leverage", 3.5_f64)?;
+        global.set_item("max_position_notional", 12_500_f64)?;
+        config.call_method1("set_global_risk_limits", (global,))?;
+
+        let mut per_instrument = PyDict::new_bound(py);
+        per_instrument.set_item("max_position_quantity", 2.5_f64)?;
+        config.call_method1("set_instrument_risk_limits", (0usize, per_instrument))?;
+
+        let risk_limits = config.call_method0("risk_limits")?;
+        let risk_dict = risk_limits.downcast::<PyDict>()?;
+
+        let global_limits = risk_dict.get_item("global").unwrap();
+        let global_limits = global_limits.downcast::<PyDict>()?;
+        let max_leverage_repr: String = global_limits
+            .get_item("max_leverage")
+            .unwrap()
+            .repr()?
+            .extract()?;
+        assert!(max_leverage_repr.contains("3.5"));
+
+        let entries = risk_dict.get_item("instruments").unwrap();
+        let entries = entries.downcast::<PyList>()?;
+        let entry = entries
+            .iter()
+            .find_map(|value| {
+                let value = value.downcast::<PyDict>().ok()?;
+                let index: usize = value.get_item("index")?.extract().ok()?;
+                if index == 0 { Some(value) } else { None }
+            })
+            .expect("instrument 0 limits present");
+
+        let instrument_limits = entry.get_item("limits").unwrap();
+        let instrument_limits = instrument_limits.downcast::<PyDict>()?;
+        let qty_repr: String = instrument_limits
+            .get_item("max_position_quantity")
+            .unwrap()
+            .repr()?
+            .extract()?;
+        assert!(qty_repr.contains("2.5"));
+
+        config.call_method1("set_instrument_risk_limits", (0usize, py.None()))?;
+        let cleared = config.call_method1("get_instrument_risk_limits", (0usize,))?;
+        assert!(cleared.is_none());
+
+        config.call_method1("set_global_risk_limits", (py.None(),))?;
+        let cleared_global = config.call_method0("risk_limits")?;
+        let cleared_global = cleared_global.downcast::<PyDict>()?;
+        assert!(cleared_global.get_item("global").unwrap().is_none());
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
 fn engine_event_serialization_helpers() {
     Python::with_gil(|py| -> PyResult<()> {
         let module = PyModule::new_bound(py, "barter_python")?;

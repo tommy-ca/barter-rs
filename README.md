@@ -94,6 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let SystemConfig {
         instruments,
         executions,
+        ..
     } = load_config()?;
 
     // Construct IndexedInstruments
