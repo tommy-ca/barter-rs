@@ -557,3 +557,93 @@ def test_dynamic_streams_placeholder() -> None:
 
     result = streams.select_all_trades()
     assert result is None
+
+
+class TestWelfordOnlineAlgorithms:
+    """Test Welford online algorithm functions bound from Rust."""
+
+    def test_welford_calculate_mean(self) -> None:
+        # Test case: dataset = [0.1, -0.2, -0.05, 0.2, 0.15, -0.17]
+        # TC0: first value
+        result = bp.welford_calculate_mean(0.0, 0.1, 1.0)
+        assert result == Decimal('0.1')
+
+        # TC1: second value
+        result = bp.welford_calculate_mean(0.1, -0.2, 2.0)
+        assert result == Decimal('-0.05')
+
+        # TC2: third value
+        result = bp.welford_calculate_mean(-0.05, -0.05, 3.0)
+        assert result == Decimal('-0.05')
+
+        # TC3: fourth value
+        result = bp.welford_calculate_mean(-0.05, 0.2, 4.0)
+        assert result == Decimal('0.0125')
+
+        # TC4: fifth value
+        result = bp.welford_calculate_mean(0.0125, 0.15, 5.0)
+        assert result == Decimal('0.04')
+
+        # TC5: sixth value
+        result = bp.welford_calculate_mean(0.04, -0.17, 6.0)
+        assert result == Decimal('0.005')
+
+    def test_welford_calculate_recurrence_relation_m(self) -> None:
+        # Test cases from Rust implementation
+        # dataset_1 = [10, 100, -10]
+        result = bp.welford_calculate_recurrence_relation_m(0.0, 0.0, 10.0, 10.0)
+        assert result == Decimal('0.0')
+
+        result = bp.welford_calculate_recurrence_relation_m(0.0, 10.0, 100.0, 55.0)
+        assert result == Decimal('4050.0')
+
+        result = bp.welford_calculate_recurrence_relation_m(
+            4050.0, 55.0, -10.0, Decimal('33.333333333333333333')
+        )
+        assert result == Decimal('6866.66666666666710')
+
+        # dataset_2 = [-5, -50, -1000]
+        result = bp.welford_calculate_recurrence_relation_m(0.0, 0.0, -5.0, -5.0)
+        assert result == Decimal('0.0')
+
+        result = bp.welford_calculate_recurrence_relation_m(0.0, -5.0, -50.0, -27.5)
+        assert result == Decimal('1012.5')
+
+        result = bp.welford_calculate_recurrence_relation_m(
+            1012.5, -27.5, -1000.0, Decimal('-351.666666666666666667')
+        )
+        assert result == Decimal('631516.66666666663425')
+
+    def test_welford_calculate_sample_variance(self) -> None:
+        # Test cases from Rust implementation
+        result = bp.welford_calculate_sample_variance(0.0, 1)
+        assert result == Decimal('0.0')
+
+        result = bp.welford_calculate_sample_variance(1050.0, 5)
+        assert result == Decimal('262.5')
+
+        result = bp.welford_calculate_sample_variance(1012.5, 123223)
+        assert result == Decimal('0.0082168768564055120027267858')
+
+        result = bp.welford_calculate_sample_variance(16200000000.0, 3)
+        assert result == Decimal('8100000000.0')
+
+        result = bp.welford_calculate_sample_variance(99999.9999, 23232)
+        assert result == Decimal('4.3045929964271878093926219276')
+
+    def test_welford_calculate_population_variance(self) -> None:
+        # Test cases from Rust implementation
+        result = bp.welford_calculate_population_variance(0.0, 1)
+        assert result == Decimal('0.0')
+
+        result = bp.welford_calculate_population_variance(1050.0, 5)
+        assert result == Decimal('210.0')
+
+        result = bp.welford_calculate_population_variance(1012.5, 123223)
+        assert result == Decimal('0.0082168101734254157097295148')
+
+        result = bp.welford_calculate_population_variance(16200000000.0, 3)
+        assert result == Decimal('5400000000.0')
+
+        result = bp.welford_calculate_population_variance(99999.9999, 23232)
+        assert result == Decimal('4.3044077091942148760330578512')

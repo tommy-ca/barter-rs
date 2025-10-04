@@ -5,6 +5,7 @@ use crate::{
 use barter::{
     Timed,
     statistic::{
+        algorithm::welford_online,
         metric::{
             calmar::CalmarRatio,
             drawdown::{
@@ -475,6 +476,114 @@ pub fn calculate_mean_drawdown(
         Some(mean) => PyMeanDrawdown::from_mean(py, mean).map(Some),
         None => Ok(None),
     }
+}
+
+/// Calculate the next mean using Welford's online algorithm.
+///
+/// This function computes the updated mean after adding a new value to a dataset.
+///
+/// # Arguments
+/// * `prev_mean` - The previous mean value
+/// * `next_value` - The new value to incorporate
+/// * `count` - The current count of values (after adding next_value)
+///
+/// # Returns
+/// The updated mean value
+#[pyfunction]
+#[pyo3(signature = (prev_mean, next_value, count))]
+pub fn welford_calculate_mean(
+    py: Python<'_>,
+    prev_mean: f64,
+    next_value: f64,
+    count: f64,
+) -> PyResult<PyObject> {
+    let prev_mean_decimal = parse_decimal(prev_mean, "prev_mean")?;
+    let next_value_decimal = parse_decimal(next_value, "next_value")?;
+    let count_decimal = parse_decimal(count, "count")?;
+
+    let result = welford_online::calculate_mean(prev_mean_decimal, next_value_decimal, count_decimal);
+    decimal_to_py(py, result)
+}
+
+/// Calculate the next Welford Online recurrence relation M.
+///
+/// This is used internally for variance calculations.
+///
+/// # Arguments
+/// * `prev_m` - The previous M value
+/// * `prev_mean` - The previous mean
+/// * `new_value` - The new value being added
+/// * `new_mean` - The new mean after adding the value
+///
+/// # Returns
+/// The updated M value
+#[pyfunction]
+#[pyo3(signature = (prev_m, prev_mean, new_value, new_mean))]
+pub fn welford_calculate_recurrence_relation_m(
+    py: Python<'_>,
+    prev_m: f64,
+    prev_mean: f64,
+    new_value: f64,
+    new_mean: f64,
+) -> PyResult<PyObject> {
+    let prev_m_decimal = parse_decimal(prev_m, "prev_m")?;
+    let prev_mean_decimal = parse_decimal(prev_mean, "prev_mean")?;
+    let new_value_decimal = parse_decimal(new_value, "new_value")?;
+    let new_mean_decimal = parse_decimal(new_mean, "new_mean")?;
+
+    let result = welford_online::calculate_recurrence_relation_m(
+        prev_m_decimal,
+        prev_mean_decimal,
+        new_value_decimal,
+        new_mean_decimal,
+    );
+    decimal_to_py(py, result)
+}
+
+/// Calculate the sample variance using Welford's online algorithm.
+///
+/// Uses Bessel's correction (divides by count - 1).
+///
+/// # Arguments
+/// * `recurrence_relation_m` - The current M value from the recurrence relation
+/// * `count` - The number of values in the dataset
+///
+/// # Returns
+/// The sample variance
+#[pyfunction]
+#[pyo3(signature = (recurrence_relation_m, count))]
+pub fn welford_calculate_sample_variance(
+    py: Python<'_>,
+    recurrence_relation_m: f64,
+    count: f64,
+) -> PyResult<PyObject> {
+    let m_decimal = parse_decimal(recurrence_relation_m, "recurrence_relation_m")?;
+    let count_decimal = parse_decimal(count, "count")?;
+
+    let result = welford_online::calculate_sample_variance(m_decimal, count_decimal);
+    decimal_to_py(py, result)
+}
+
+/// Calculate the population variance using Welford's online algorithm.
+///
+/// # Arguments
+/// * `recurrence_relation_m` - The current M value from the recurrence relation
+/// * `count` - The number of values in the dataset
+///
+/// # Returns
+/// The population variance
+#[pyfunction]
+#[pyo3(signature = (recurrence_relation_m, count))]
+pub fn welford_calculate_population_variance(
+    py: Python<'_>,
+    recurrence_relation_m: f64,
+    count: f64,
+) -> PyResult<PyObject> {
+    let m_decimal = parse_decimal(recurrence_relation_m, "recurrence_relation_m")?;
+    let count_decimal = parse_decimal(count, "count")?;
+
+    let result = welford_online::calculate_population_variance(m_decimal, count_decimal);
+    decimal_to_py(py, result)
 }
 
 fn parse_interval_from_str(label: &str) -> PyResult<IntervalChoice> {

@@ -16,6 +16,8 @@ use analytics::{
     calculate_calmar_ratio, calculate_max_drawdown, calculate_mean_drawdown,
     calculate_profit_factor, calculate_rate_of_return, calculate_sharpe_ratio,
     calculate_sortino_ratio, calculate_win_rate, generate_drawdown_series,
+    welford_calculate_mean, welford_calculate_recurrence_relation_m,
+    welford_calculate_sample_variance, welford_calculate_population_variance,
 };
 
 
@@ -761,6 +763,10 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(generate_drawdown_series, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_max_drawdown, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_mean_drawdown, m)?)?;
+    m.add_function(wrap_pyfunction!(welford_calculate_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(welford_calculate_recurrence_relation_m, m)?)?;
+    m.add_function(wrap_pyfunction!(welford_calculate_sample_variance, m)?)?;
+    m.add_function(wrap_pyfunction!(welford_calculate_population_variance, m)?)?;
 
     // Expose module level constants.
     let shutdown = PyEngineEvent::shutdown();

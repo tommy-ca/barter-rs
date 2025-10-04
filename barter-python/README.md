@@ -93,11 +93,37 @@ drawdowns = bp.generate_drawdown_series(points)
 max_drawdown = bp.calculate_max_drawdown(points)
 mean_drawdown = bp.calculate_mean_drawdown(points)
 
-print("drawdowns", [d.value for d in drawdowns])
-print("max value", max_drawdown.value if max_drawdown else None)
-print("mean value", mean_drawdown.mean_drawdown if mean_drawdown else None)
-PY
+ print("drawdowns", [d.value for d in drawdowns])
+ print("max value", max_drawdown.value if max_drawdown else None)
+ print("mean value", mean_drawdown.mean_drawdown if mean_drawdown else None)
+ PY
 
+ # Use Welford online algorithms for streaming statistics
+ python - <<'PY'
+ import barter_python as bp
+
+ # Calculate running mean incrementally
+ prev_mean = 10.0
+ new_value = 15.0
+ count = 6  # After adding the new value
+
+ mean = bp.welford_calculate_mean(prev_mean, new_value, count)
+ print("Updated mean:", mean)
+
+ # Calculate variance components
+ prev_m = 50.0
+ prev_mean = 12.5
+ new_value = 18.0
+ new_mean = 13.2
+
+ m = bp.welford_calculate_recurrence_relation_m(prev_m, prev_mean, new_value, new_mean)
+ sample_variance = bp.welford_calculate_sample_variance(m, 10)
+ population_variance = bp.welford_calculate_population_variance(m, 10)
+
+ print("Sample variance:", sample_variance)
+ print("Population variance:", population_variance)
+ PY
+ 
 # Use pure Python strategy implementations
 python - <<'PY'
 import barter_python as bp
