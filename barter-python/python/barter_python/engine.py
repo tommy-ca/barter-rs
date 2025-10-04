@@ -256,7 +256,4 @@ class Engine(Generic[State]):
 
     def set_trading_enabled(self, enabled: bool) -> None:
         """Enable or disable trading."""
-        self.state.trading_state = TradingState(enabled)</content>
-</xai:function_call: <xai:function_call>  
-<xai:function_call name="todowrite">
-<parameter name="todos">[{"status":"completed","id":"port_engine_state"}]
+        self.state.trading_state = TradingState(enabled=enabled)
