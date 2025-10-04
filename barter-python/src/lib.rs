@@ -21,11 +21,11 @@ use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
 use barter::{EngineEvent, Timed};
 use barter_data::{
-    books::Level,
+    books::{Level, OrderBook},
     event::{DataKind, MarketEvent},
     streams::consumer::MarketStreamEvent,
     subscription::{
-        book::OrderBookL1, candle::Candle, liquidation::Liquidation, trade::PublicTrade,
+        book::{OrderBookEvent, OrderBookL1}, candle::Candle, liquidation::Liquidation, trade::PublicTrade,
     },
 };
 use barter_execution::{
@@ -410,6 +410,49 @@ impl PyEngineEvent {
         })
     }
 
+    /// Construct an [`EngineEvent::Market`] wrapping an order book snapshot.
+    #[staticmethod]
+    #[pyo3(signature = (exchange, instrument, sequence, time_engine, bids, asks, time_exchange=None, time_received=None))]
+    pub fn market_order_book_snapshot(
+        exchange: &str,
+        instrument: usize,
+        sequence: i64,
+        time_engine: Option<DateTime<Utc>>,
+        bids: Vec<(f64, f64)>,
+        asks: Vec<(f64, f64)>,
+        time_exchange: Option<DateTime<Utc>>,
+        time_received: Option<DateTime<Utc>>,
+    ) -> PyResult<Self> {
+        let exchange_id = parse_exchange_id(exchange)?;
+        let instrument_index = InstrumentIndex(instrument);
+
+        let bids_levels: Vec<Level> = bids
+            .into_iter()
+            .map(|(p, a)| parse_level(p, a))
+            .collect::<PyResult<Vec<Level>>>()?;
+        let asks_levels: Vec<Level> = asks
+            .into_iter()
+            .map(|(p, a)| parse_level(p, a))
+            .collect::<PyResult<Vec<Level>>>()?;
+
+        let order_book = OrderBook::new(sequence as u64, time_engine, bids_levels, asks_levels);
+
+        let time_exchange = time_exchange.unwrap_or(Utc::now());
+        let time_received = time_received.unwrap_or(time_exchange);
+
+        let event = MarketEvent {
+            time_exchange,
+            time_received,
+            exchange: exchange_id,
+            instrument: instrument_index,
+            kind: DataKind::OrderBook(OrderBookEvent::Snapshot(order_book)),
+        };
+
+        Ok(Self {
+            inner: EngineEvent::Market(MarketStreamEvent::Item(event)),
+        })
+    }
+
     /// Construct an [`EngineEvent::Market`] signalling the stream is reconnecting.
     #[staticmethod]
     pub fn market_reconnecting(exchange: &str) -> PyResult<Self> {
@@ -642,6 +685,25 @@ fn parse_order_book_level(value: Option<(f64, f64)>, label: &str) -> PyResult<Op
             Ok(Some(Level::new(price, amount)))
         }
     }
+}
+
+fn parse_level(price: f64, amount: f64) -> PyResult<Level> {
+    if !price.is_finite() || price <= 0.0 {
+        return Err(PyValueError::new_err(
+            "price must be a positive, finite numeric value",
+        ));
+    }
+
+    if !amount.is_finite() || amount < 0.0 {
+        return Err(PyValueError::new_err(
+            "amount must be a non-negative, finite numeric value",
+        ));
+    }
+
+    let price = parse_decimal(price, "price")?;
+    let amount = parse_decimal(amount, "amount")?;
+
+    Ok(Level::new(price, amount))
 }
 
 /// Convenience function returning a shutdown [`EngineEvent`].
@@ -933,6 +995,48 @@ mod tests {
                         assert_eq!(liquidation.price, 20550.25);
                         assert_eq!(liquidation.quantity, 0.35);
                         assert_eq!(liquidation.time, time_exchange);
+                    }
+                    other => panic!("unexpected market data kind: {other:?}"),
+                }
+            }
+            other => panic!("unexpected event variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn engine_event_market_order_book_snapshot_constructor() {
+        let time_engine = Utc.with_ymd_and_hms(2025, 4, 5, 6, 7, 8).unwrap();
+        let time_exchange = time_engine + TimeDelta::seconds(1);
+
+        let event = PyEngineEvent::market_order_book_snapshot(
+            "binance_spot",
+            3,
+            12345,
+            Some(time_engine),
+            vec![(100.5, 2.0), (100.0, 1.5)],
+            vec![(101.0, 1.0), (101.5, 0.5)],
+            Some(time_exchange),
+            None,
+        )
+        .unwrap();
+
+        match event.inner {
+            EngineEvent::Market(MarketStreamEvent::Item(item)) => {
+                assert_eq!(item.exchange, ExchangeId::BinanceSpot);
+                assert_eq!(item.instrument, InstrumentIndex(3));
+                assert_eq!(item.time_exchange, time_exchange);
+                assert_eq!(item.time_received, time_exchange);
+
+                match item.kind {
+                    DataKind::OrderBook(OrderBookEvent::Snapshot(order_book)) => {
+                        assert_eq!(order_book.sequence(), 12345);
+                        assert_eq!(order_book.time_engine(), Some(time_engine));
+                        assert_eq!(order_book.bids().levels().len(), 2);
+                        assert_eq!(order_book.asks().levels().len(), 2);
+                        // Bids should be sorted descending
+                        assert!(order_book.bids().levels()[0].price > order_book.bids().levels()[1].price);
+                        // Asks should be sorted ascending
+                        assert!(order_book.asks().levels()[0].price < order_book.asks().levels()[1].price);
                     }
                     other => panic!("unexpected market data kind: {other:?}"),
                 }

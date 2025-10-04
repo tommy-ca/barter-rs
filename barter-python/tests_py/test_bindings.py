@@ -176,6 +176,43 @@ def test_engine_event_market_liquidation_builder() -> None:
     assert liquidation["time"] == timestamp.isoformat().replace("+00:00", "Z")
 
 
+def test_engine_event_market_order_book_snapshot_builder() -> None:
+    time_engine = dt.datetime(2025, 4, 5, 6, 7, 8, tzinfo=dt.timezone.utc)
+    time_exchange = time_engine + dt.timedelta(seconds=1)
+
+    event = bp.EngineEvent.market_order_book_snapshot(
+        "binance_spot",
+        3,
+        sequence=12345,
+        time_engine=time_engine,
+        bids=[(100.5, 2.0), (100.0, 1.5)],
+        asks=[(101.0, 1.0), (101.5, 0.5)],
+        time_exchange=time_exchange,
+    )
+
+    market = event.to_dict()["Market"]["Item"]
+    order_book_event = market["kind"]["OrderBook"]["Snapshot"]
+
+    assert order_book_event["sequence"] == 12345
+    assert order_book_event["time_engine"] == time_engine.isoformat().replace("+00:00", "Z")
+
+    bids = order_book_event["bids"]["levels"]
+    assert len(bids) == 2
+    # Bids sorted descending by price
+    assert Decimal(bids[0]["price"]) == Decimal("100.5")
+    assert Decimal(bids[0]["amount"]) == Decimal("2")
+    assert Decimal(bids[1]["price"]) == Decimal("100")
+    assert Decimal(bids[1]["amount"]) == Decimal("1.5")
+
+    asks = order_book_event["asks"]["levels"]
+    assert len(asks) == 2
+    # Asks sorted ascending by price
+    assert Decimal(asks[0]["price"]) == Decimal("101")
+    assert Decimal(asks[0]["amount"]) == Decimal("1")
+    assert Decimal(asks[1]["price"]) == Decimal("101.5")
+    assert Decimal(asks[1]["amount"]) == Decimal("0.5")
+
+
 def test_engine_event_market_reconnecting_builder() -> None:
     event = bp.EngineEvent.market_reconnecting("kraken")
 
