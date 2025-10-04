@@ -41,14 +41,22 @@ class SubscriptionId:
 class Metric:
     """Metric data structure."""
 
-    def __init__(self, name: str, time: int, tags: list[Tag], fields: list[Field]) -> None:
+    def __init__(
+        self, name: str, time: int, tags: list[Tag], fields: list[Field]
+    ) -> None:
         self.name = name
         self.time = time
         self.tags = tags
         self.fields = fields
 
     @classmethod
-    def new(cls, name: str, time: int, tags: list[Tag] | None = None, fields: list[Field] | None = None) -> Metric:
+    def new(
+        cls,
+        name: str,
+        time: int,
+        tags: list[Tag] | None = None,
+        fields: list[Field] | None = None,
+    ) -> Metric:
         return cls(name, time, tags or [], fields or [])
 
     def __str__(self) -> str:
@@ -220,7 +228,9 @@ class SnapUpdates(Generic[SnapshotType, UpdatesType]):
         self.updates = updates
 
     @classmethod
-    def new(cls, snapshot: SnapshotType, updates: UpdatesType) -> SnapUpdates[SnapshotType, UpdatesType]:
+    def new(
+        cls, snapshot: SnapshotType, updates: UpdatesType
+    ) -> SnapUpdates[SnapshotType, UpdatesType]:
         return cls(snapshot, updates)
 
     def __str__(self) -> str:

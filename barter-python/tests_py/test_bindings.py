@@ -65,7 +65,9 @@ def test_engine_event_balance_snapshot_builder() -> None:
     assert balance_snapshot["asset"] == 7
     assert balance_snapshot["balance"]["total"] == "125.5"
     assert balance_snapshot["balance"]["free"] == "100"
-    assert balance_snapshot["time_exchange"] == timestamp.isoformat().replace("+00:00", "Z")
+    assert balance_snapshot["time_exchange"] == timestamp.isoformat().replace(
+        "+00:00", "Z"
+    )
 
     round_trip = bp.EngineEvent.from_json(event.to_json())
     assert not round_trip.is_terminal()
@@ -194,7 +196,9 @@ def test_engine_event_market_order_book_snapshot_builder() -> None:
     order_book_event = market["kind"]["OrderBook"]["Snapshot"]
 
     assert order_book_event["sequence"] == 12345
-    assert order_book_event["time_engine"] == time_engine.isoformat().replace("+00:00", "Z")
+    assert order_book_event["time_engine"] == time_engine.isoformat().replace(
+        "+00:00", "Z"
+    )
 
     bids = order_book_event["bids"]["levels"]
     assert len(bids) == 2
@@ -269,9 +273,7 @@ def test_system_config_to_json_file(
 
 def test_run_historic_backtest_summary(example_paths: dict[str, Path]) -> None:
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
-    summary = bp.run_historic_backtest(
-        config, str(example_paths["market_data"])
-    )
+    summary = bp.run_historic_backtest(config, str(example_paths["market_data"]))
 
     assert isinstance(summary, bp.TradingSummary)
     assert summary.time_engine_start <= summary.time_engine_end
@@ -428,8 +430,12 @@ def test_order_snapshot_open_helper() -> None:
     assert order_snapshot["key"]["instrument"] == 2
     assert order_snapshot["key"]["strategy"] == "strategy-alpha"
     assert order_snapshot["side"].lower() == "buy"
-    assert Decimal(order_snapshot["price"]).quantize(Decimal("0.01")) == Decimal("105.25")
-    assert Decimal(order_snapshot["quantity"]).quantize(Decimal("0.01")) == Decimal("0.75")
+    assert Decimal(order_snapshot["price"]).quantize(Decimal("0.01")) == Decimal(
+        "105.25"
+    )
+    assert Decimal(order_snapshot["quantity"]).quantize(Decimal("0.01")) == Decimal(
+        "0.75"
+    )
     assert order_snapshot["kind"] == "Limit"
     assert order_snapshot["time_in_force"]["GoodUntilCancelled"]["post_only"] is True
 
@@ -478,9 +484,8 @@ def test_account_order_cancelled_helper() -> None:
     assert cancelled["key"]["exchange"] == 2
     assert cancelled["key"]["instrument"] == 5
     assert cancelled["state"]["Ok"]["id"] == "order-456"
-    assert (
-        cancelled["state"]["Ok"]["time_exchange"]
-        == timestamp.isoformat().replace("+00:00", "Z")
+    assert cancelled["state"]["Ok"]["time_exchange"] == timestamp.isoformat().replace(
+        "+00:00", "Z"
     )
 
 
@@ -508,7 +513,9 @@ def test_calculate_profit_factor() -> None:
     assert factor == Decimal("2.0")
 
     # No losses (returns MAX)
-    no_losses = bp.calculate_profit_factor(profits_gross_abs=100.0, losses_gross_abs=0.0)
+    no_losses = bp.calculate_profit_factor(
+        profits_gross_abs=100.0, losses_gross_abs=0.0
+    )
     assert no_losses is not None
     assert str(no_losses) == "79228162514264337593543950335"  # Decimal::MAX
 
@@ -537,7 +544,9 @@ def test_sub_kind_constants() -> None:
 
 
 def test_subscription_creation() -> None:
-    sub = bp.Subscription(bp.ExchangeId.BINANCE_SPOT, "btc", "usdt", bp.SubKind.PUBLIC_TRADES)
+    sub = bp.Subscription(
+        bp.ExchangeId.BINANCE_SPOT, "btc", "usdt", bp.SubKind.PUBLIC_TRADES
+    )
 
     assert sub.exchange == bp.ExchangeId.BINANCE_SPOT
     assert sub.kind == bp.SubKind.PUBLIC_TRADES
@@ -566,84 +575,84 @@ class TestWelfordOnlineAlgorithms:
         # Test case: dataset = [0.1, -0.2, -0.05, 0.2, 0.15, -0.17]
         # TC0: first value
         result = bp.welford_calculate_mean(0.0, 0.1, 1.0)
-        assert result == Decimal('0.1')
+        assert result == Decimal("0.1")
 
         # TC1: second value
         result = bp.welford_calculate_mean(0.1, -0.2, 2.0)
-        assert result == Decimal('-0.05')
+        assert result == Decimal("-0.05")
 
         # TC2: third value
         result = bp.welford_calculate_mean(-0.05, -0.05, 3.0)
-        assert result == Decimal('-0.05')
+        assert result == Decimal("-0.05")
 
         # TC3: fourth value
         result = bp.welford_calculate_mean(-0.05, 0.2, 4.0)
-        assert result == Decimal('0.0125')
+        assert result == Decimal("0.0125")
 
         # TC4: fifth value
         result = bp.welford_calculate_mean(0.0125, 0.15, 5.0)
-        assert result == Decimal('0.04')
+        assert result == Decimal("0.04")
 
         # TC5: sixth value
         result = bp.welford_calculate_mean(0.04, -0.17, 6.0)
-        assert result == Decimal('0.005')
+        assert result == Decimal("0.005")
 
     def test_welford_calculate_recurrence_relation_m(self) -> None:
         # Test cases from Rust implementation
         # dataset_1 = [10, 100, -10]
         result = bp.welford_calculate_recurrence_relation_m(0.0, 0.0, 10.0, 10.0)
-        assert result == Decimal('0.0')
+        assert result == Decimal("0.0")
 
         result = bp.welford_calculate_recurrence_relation_m(0.0, 10.0, 100.0, 55.0)
-        assert result == Decimal('4050.0')
+        assert result == Decimal("4050.0")
 
         result = bp.welford_calculate_recurrence_relation_m(
-            4050.0, 55.0, -10.0, Decimal('33.333333333333333333')
+            4050.0, 55.0, -10.0, Decimal("33.333333333333333333")
         )
-        assert result == Decimal('6866.66666666666710')
+        assert result == Decimal("6866.66666666666710")
 
         # dataset_2 = [-5, -50, -1000]
         result = bp.welford_calculate_recurrence_relation_m(0.0, 0.0, -5.0, -5.0)
-        assert result == Decimal('0.0')
+        assert result == Decimal("0.0")
 
         result = bp.welford_calculate_recurrence_relation_m(0.0, -5.0, -50.0, -27.5)
-        assert result == Decimal('1012.5')
+        assert result == Decimal("1012.5")
 
         result = bp.welford_calculate_recurrence_relation_m(
-            1012.5, -27.5, -1000.0, Decimal('-351.666666666666666667')
+            1012.5, -27.5, -1000.0, Decimal("-351.666666666666666667")
         )
-        assert result == Decimal('631516.66666666663425')
+        assert result == Decimal("631516.66666666663425")
 
     def test_welford_calculate_sample_variance(self) -> None:
         # Test cases from Rust implementation
         result = bp.welford_calculate_sample_variance(0.0, 1)
-        assert result == Decimal('0.0')
+        assert result == Decimal("0.0")
 
         result = bp.welford_calculate_sample_variance(1050.0, 5)
-        assert result == Decimal('262.5')
+        assert result == Decimal("262.5")
 
         result = bp.welford_calculate_sample_variance(1012.5, 123223)
-        assert result == Decimal('0.0082168768564055120027267858')
+        assert result == Decimal("0.0082168768564055120027267858")
 
         result = bp.welford_calculate_sample_variance(16200000000.0, 3)
-        assert result == Decimal('8100000000.0')
+        assert result == Decimal("8100000000.0")
 
         result = bp.welford_calculate_sample_variance(99999.9999, 23232)
-        assert result == Decimal('4.3045929964271878093926219276')
+        assert result == Decimal("4.3045929964271878093926219276")
 
     def test_welford_calculate_population_variance(self) -> None:
         # Test cases from Rust implementation
         result = bp.welford_calculate_population_variance(0.0, 1)
-        assert result == Decimal('0.0')
+        assert result == Decimal("0.0")
 
         result = bp.welford_calculate_population_variance(1050.0, 5)
-        assert result == Decimal('210.0')
+        assert result == Decimal("210.0")
 
         result = bp.welford_calculate_population_variance(1012.5, 123223)
-        assert result == Decimal('0.0082168101734254157097295148')
+        assert result == Decimal("0.0082168101734254157097295148")
 
         result = bp.welford_calculate_population_variance(16200000000.0, 3)
-        assert result == Decimal('5400000000.0')
+        assert result == Decimal("5400000000.0")
 
         result = bp.welford_calculate_population_variance(99999.9999, 23232)
-        assert result == Decimal('4.3044077091942148760330578512')
+        assert result == Decimal("4.3044077091942148760330578512")

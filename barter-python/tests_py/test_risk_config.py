@@ -38,7 +38,7 @@ def test_risk_limits_round_trip(example_paths, tmp_path):
     assert entries[1]["max_position_quantity"] == decimal.Decimal("1.5")
 
     json_repr = config.to_json()
-    assert "\"max_exposure_percent\": \"0.2\"" in json_repr
+    assert '"max_exposure_percent": "0.2"' in json_repr
 
     config.set_instrument_risk_limits(1, None)
     assert config.get_instrument_risk_limits(1) is None

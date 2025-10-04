@@ -101,7 +101,8 @@ class OrderBookL1:
         if self.best_ask is None or self.best_bid is None:
             return None
         return (
-            (self.best_bid.price * self.best_ask.amount) + (self.best_ask.price * self.best_bid.amount)
+            (self.best_bid.price * self.best_ask.amount)
+            + (self.best_ask.price * self.best_bid.amount)
         ) / (self.best_bid.amount + self.best_ask.amount)
 
     def __repr__(self) -> str:
@@ -174,15 +175,17 @@ class Candle:
         )
 
     def __hash__(self) -> int:
-        return hash((
-            self.close_time,
-            self.open,
-            self.high,
-            self.low,
-            self.close,
-            self.volume,
-            self.trade_count,
-        ))
+        return hash(
+            (
+                self.close_time,
+                self.open,
+                self.high,
+                self.low,
+                self.close,
+                self.volume,
+                self.trade_count,
+            )
+        )
 
 
 class Liquidation:
@@ -226,11 +229,13 @@ class Liquidation:
 
 class Bids:
     """Unit type to tag an OrderBookSide as the bid side (buyers) of an OrderBook."""
+
     pass
 
 
 class Asks:
     """Unit type to tag an OrderBookSide as the ask side (sellers) of an OrderBook."""
+
     pass
 
 
@@ -266,7 +271,9 @@ class OrderBookSide:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, OrderBookSide):
             return NotImplemented
-        return self.side.__class__ == other.side.__class__ and self.levels == other.levels
+        return (
+            self.side.__class__ == other.side.__class__ and self.levels == other.levels
+        )
 
 
 class OrderBook:
@@ -344,6 +351,7 @@ class OrderBook:
 
 class OrderBookEvent(Enum):
     """Barter OrderBookEvent enum."""
+
     SNAPSHOT = "snapshot"
     UPDATE = "update"
 
@@ -351,7 +359,9 @@ class OrderBookEvent(Enum):
         return self.value
 
 
-DataKindType = Union[PublicTrade, OrderBookL1, OrderBookEvent, Candle, Liquidation, None]
+DataKindType = Union[
+    PublicTrade, OrderBookL1, OrderBookEvent, Candle, Liquidation, None
+]
 
 
 class DataKind:
@@ -469,17 +479,21 @@ class MarketEvent(Generic[InstrumentKey, T]):
         )
 
     def __hash__(self) -> int:
-        return hash((
-            self.time_exchange,
-            self.time_received,
-            self.exchange,
-            self.instrument,
-            self.kind,
-        ))
+        return hash(
+            (
+                self.time_exchange,
+                self.time_received,
+                self.exchange,
+                self.instrument,
+                self.kind,
+            )
+        )
 
 
 # For convenience, define typed versions
-def as_public_trade(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, PublicTrade] | None:
+def as_public_trade(
+    event: MarketEvent[InstrumentKey, DataKind],
+) -> MarketEvent[InstrumentKey, PublicTrade] | None:
     """Return as PublicTrade if applicable."""
     if isinstance(event.kind.data, PublicTrade):
         return MarketEvent(
@@ -492,7 +506,9 @@ def as_public_trade(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[
     return None
 
 
-def as_order_book_l1(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, OrderBookL1] | None:
+def as_order_book_l1(
+    event: MarketEvent[InstrumentKey, DataKind],
+) -> MarketEvent[InstrumentKey, OrderBookL1] | None:
     """Return as OrderBookL1 if applicable."""
     if isinstance(event.kind.data, OrderBookL1):
         return MarketEvent(
@@ -505,7 +521,9 @@ def as_order_book_l1(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent
     return None
 
 
-def as_order_book(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, OrderBookEvent] | None:
+def as_order_book(
+    event: MarketEvent[InstrumentKey, DataKind],
+) -> MarketEvent[InstrumentKey, OrderBookEvent] | None:
     """Return as OrderBookEvent if applicable."""
     if isinstance(event.kind.data, OrderBookEvent):
         return MarketEvent(
@@ -518,7 +536,9 @@ def as_order_book(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[In
     return None
 
 
-def as_candle(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, Candle] | None:
+def as_candle(
+    event: MarketEvent[InstrumentKey, DataKind],
+) -> MarketEvent[InstrumentKey, Candle] | None:
     """Return as Candle if applicable."""
     if isinstance(event.kind.data, Candle):
         return MarketEvent(
@@ -531,7 +551,9 @@ def as_candle(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[Instru
     return None
 
 
-def as_liquidation(event: MarketEvent[InstrumentKey, DataKind]) -> MarketEvent[InstrumentKey, Liquidation] | None:
+def as_liquidation(
+    event: MarketEvent[InstrumentKey, DataKind],
+) -> MarketEvent[InstrumentKey, Liquidation] | None:
     """Return as Liquidation if applicable."""
     if isinstance(event.kind.data, Liquidation):
         return MarketEvent(

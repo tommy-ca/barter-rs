@@ -15,7 +15,13 @@ class TestMarketDataInMemory:
 
     def test_from_json_file(self, repo_root):
         """Test loading market data from JSON file."""
-        json_path = repo_root / "barter-python" / "tests_py" / "data" / "synthetic_market_data.json"
+        json_path = (
+            repo_root
+            / "barter-python"
+            / "tests_py"
+            / "data"
+            / "synthetic_market_data.json"
+        )
         market_data = backtest.MarketDataInMemory.from_json_file(json_path)
 
         assert len(market_data.events) > 0
@@ -30,18 +36,14 @@ class TestMarketDataInMemory:
                 time_received=datetime(2023, 1, 1, 12, 0, 1),
                 exchange="binance",
                 instrument=0,
-                kind=DataKind.trade(PublicTrade(
-                    id="1",
-                    price=50000.0,
-                    amount=1.0,
-                    side=Side.BUY
-                ))
+                kind=DataKind.trade(
+                    PublicTrade(id="1", price=50000.0, amount=1.0, side=Side.BUY)
+                ),
             )
         ]
 
         market_data = backtest.MarketDataInMemory(
-            _time_first_event=datetime(2023, 1, 1, 12, 0, 0),
-            events=events
+            _time_first_event=datetime(2023, 1, 1, 12, 0, 0), events=events
         )
 
         async def collect_events():
@@ -58,8 +60,7 @@ class TestMarketDataInMemory:
         """Test getting first event time."""
         first_time = datetime(2023, 1, 1, 12, 0, 0)
         market_data = backtest.MarketDataInMemory(
-            _time_first_event=first_time,
-            events=[]
+            _time_first_event=first_time, events=[]
         )
 
         async def get_time():
@@ -78,13 +79,13 @@ class TestBacktestSummary:
             time_engine_start=datetime(2023, 1, 1),
             time_engine_end=datetime(2023, 1, 2),
             instruments={},
-            assets={}
+            assets={},
         )
 
         summary = backtest.BacktestSummary(
             id="test_backtest",
             risk_free_return=Decimal("0.02"),
-            trading_summary=trading_summary
+            trading_summary=trading_summary,
         )
 
         assert summary.id == "test_backtest"
@@ -104,13 +105,12 @@ class TestMultiBacktestSummary:
                 trading_summary=backtest.TradingSummary(
                     time_engine_start=datetime(2023, 1, 1),
                     time_engine_end=datetime(2023, 1, 2),
-                )
+                ),
             )
         ]
 
         multi_summary = backtest.MultiBacktestSummary(
-            total_duration=1.5,
-            summaries=summaries
+            total_duration=1.5, summaries=summaries
         )
 
         assert multi_summary.total_duration == 1.5
@@ -126,8 +126,7 @@ class TestBacktestArgs:
         instruments = backtest.IndexedInstruments.new([])
         executions = [backtest.ExecutionConfig.mock(backtest.MockExecutionConfig())]
         market_data = backtest.MarketDataInMemory(
-            _time_first_event=datetime(2023, 1, 1),
-            events=[]
+            _time_first_event=datetime(2023, 1, 1), events=[]
         )
         summary_interval = Annual365()
         engine_state = backtest.EngineEngineState()
@@ -137,7 +136,7 @@ class TestBacktestArgs:
             executions=executions,
             market_data=market_data,
             summary_interval=summary_interval,
-            engine_state=engine_state
+            engine_state=engine_state,
         )
 
         assert args.instruments == instruments
@@ -152,7 +151,7 @@ class TestBacktestArgs:
             id="test",
             risk_free_return=Decimal("0.02"),
             strategy=None,  # Placeholder
-            risk=None  # Placeholder
+            risk=None,  # Placeholder
         )
 
         assert args.id == "test"
@@ -175,8 +174,8 @@ class TestIndexedInstruments:
             name_exchange="BTCUSDT",
             underlying=Underlying(
                 base=Asset.new_from_exchange("btc"),
-                quote=Asset.new_from_exchange("usdt")
-            )
+                quote=Asset.new_from_exchange("usdt"),
+            ),
         )
 
         indexed = backtest.IndexedInstruments.new([instrument])
@@ -198,10 +197,10 @@ class TestBalance:
 
     def test_creation(self):
         """Test creating a Balance."""
-        balance = backtest.Balance(total=Decimal('1000'), free=Decimal('800'))
-        assert balance.total == Decimal('1000')
-        assert balance.free == Decimal('800')
-        assert balance.used == Decimal('200')
+        balance = backtest.Balance(total=Decimal("1000"), free=Decimal("800"))
+        assert balance.total == Decimal("1000")
+        assert balance.free == Decimal("800")
+        assert balance.used == Decimal("200")
 
 
 class TestAssetBalance:
@@ -209,11 +208,9 @@ class TestAssetBalance:
 
     def test_creation(self):
         """Test creating an AssetBalance."""
-        balance = backtest.Balance(total=Decimal('1000'), free=Decimal('800'))
+        balance = backtest.Balance(total=Decimal("1000"), free=Decimal("800"))
         asset_balance = backtest.AssetBalance(
-            asset="BTC",
-            balance=balance,
-            time_exchange=datetime(2023, 1, 1, 12, 0, 0)
+            asset="BTC", balance=balance, time_exchange=datetime(2023, 1, 1, 12, 0, 0)
         )
         assert asset_balance.asset == "BTC"
         assert asset_balance.balance == balance
@@ -228,11 +225,9 @@ class TestDrawdown:
         start_time = datetime(2023, 1, 1, 12, 0, 0)
         end_time = datetime(2023, 1, 1, 13, 0, 0)
         drawdown = backtest.Drawdown(
-            value=Decimal('-0.05'),
-            time_start=start_time,
-            time_end=end_time
+            value=Decimal("-0.05"), time_start=start_time, time_end=end_time
         )
-        assert drawdown.value == Decimal('-0.05')
+        assert drawdown.value == Decimal("-0.05")
         assert drawdown.time_start == start_time
         assert drawdown.time_end == end_time
         assert drawdown.duration == timedelta(hours=1)
@@ -244,10 +239,10 @@ class TestMeanDrawdown:
     def test_creation(self):
         """Test creating a MeanDrawdown."""
         mean_drawdown = backtest.MeanDrawdown(
-            mean_drawdown=Decimal('-0.03'),
-            mean_drawdown_ms=3600000  # 1 hour in milliseconds
+            mean_drawdown=Decimal("-0.03"),
+            mean_drawdown_ms=3600000,  # 1 hour in milliseconds
         )
-        assert mean_drawdown.mean_drawdown == Decimal('-0.03')
+        assert mean_drawdown.mean_drawdown == Decimal("-0.03")
         assert mean_drawdown.mean_drawdown_ms == 3600000
 
 
@@ -257,9 +252,9 @@ class TestMaxDrawdown:
     def test_creation(self):
         """Test creating a MaxDrawdown."""
         drawdown = backtest.Drawdown(
-            value=Decimal('-0.1'),
+            value=Decimal("-0.1"),
             time_start=datetime(2023, 1, 1, 10, 0, 0),
-            time_end=datetime(2023, 1, 1, 11, 0, 0)
+            time_end=datetime(2023, 1, 1, 11, 0, 0),
         )
         max_drawdown = backtest.MaxDrawdown(drawdown)
         assert max_drawdown.drawdown == drawdown
@@ -270,9 +265,9 @@ class TestRange:
 
     def test_creation(self):
         """Test creating a Range."""
-        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
-        assert range_obj.min == Decimal('0')
-        assert range_obj.max == Decimal('100')
+        range_obj = backtest.Range(min=Decimal("0"), max=Decimal("100"))
+        assert range_obj.min == Decimal("0")
+        assert range_obj.max == Decimal("100")
 
 
 class TestDispersion:
@@ -280,17 +275,17 @@ class TestDispersion:
 
     def test_creation(self):
         """Test creating a Dispersion."""
-        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
+        range_obj = backtest.Range(min=Decimal("0"), max=Decimal("100"))
         dispersion = backtest.Dispersion(
             range=range_obj,
-            recurrence_relation_m=Decimal('50'),
-            variance=Decimal('25'),
-            std_dev=Decimal('5')
+            recurrence_relation_m=Decimal("50"),
+            variance=Decimal("25"),
+            std_dev=Decimal("5"),
         )
         assert dispersion.range == range_obj
-        assert dispersion.recurrence_relation_m == Decimal('50')
-        assert dispersion.variance == Decimal('25')
-        assert dispersion.std_dev == Decimal('5')
+        assert dispersion.recurrence_relation_m == Decimal("50")
+        assert dispersion.variance == Decimal("25")
+        assert dispersion.std_dev == Decimal("5")
 
 
 class TestDataSetSummary:
@@ -298,22 +293,22 @@ class TestDataSetSummary:
 
     def test_creation(self):
         """Test creating a DataSetSummary."""
-        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
+        range_obj = backtest.Range(min=Decimal("0"), max=Decimal("100"))
         dispersion = backtest.Dispersion(
             range=range_obj,
-            recurrence_relation_m=Decimal('50'),
-            variance=Decimal('25'),
-            std_dev=Decimal('5')
+            recurrence_relation_m=Decimal("50"),
+            variance=Decimal("25"),
+            std_dev=Decimal("5"),
         )
         summary = backtest.DataSetSummary(
-            count=Decimal('10'),
-            sum=Decimal('500'),
-            mean=Decimal('50'),
-            dispersion=dispersion
+            count=Decimal("10"),
+            sum=Decimal("500"),
+            mean=Decimal("50"),
+            dispersion=dispersion,
         )
-        assert summary.count == Decimal('10')
-        assert summary.sum == Decimal('500')
-        assert summary.mean == Decimal('50')
+        assert summary.count == Decimal("10")
+        assert summary.sum == Decimal("500")
+        assert summary.mean == Decimal("50")
         assert summary.dispersion == dispersion
 
 
@@ -322,31 +317,29 @@ class TestPnLReturns:
 
     def test_creation(self):
         """Test creating PnLReturns."""
-        range_obj = backtest.Range(min=Decimal('0'), max=Decimal('100'))
+        range_obj = backtest.Range(min=Decimal("0"), max=Decimal("100"))
         dispersion = backtest.Dispersion(
             range=range_obj,
-            recurrence_relation_m=Decimal('50'),
-            variance=Decimal('25'),
-            std_dev=Decimal('5')
+            recurrence_relation_m=Decimal("50"),
+            variance=Decimal("25"),
+            std_dev=Decimal("5"),
         )
         total_summary = backtest.DataSetSummary(
-            count=Decimal('10'),
-            sum=Decimal('500'),
-            mean=Decimal('50'),
-            dispersion=dispersion
+            count=Decimal("10"),
+            sum=Decimal("500"),
+            mean=Decimal("50"),
+            dispersion=dispersion,
         )
         losses_summary = backtest.DataSetSummary(
-            count=Decimal('3'),
-            sum=Decimal('-100'),
-            mean=Decimal('-33.33'),
-            dispersion=dispersion
+            count=Decimal("3"),
+            sum=Decimal("-100"),
+            mean=Decimal("-33.33"),
+            dispersion=dispersion,
         )
         pnl_returns = backtest.PnLReturns(
-            pnl_raw=Decimal('400'),
-            total=total_summary,
-            losses=losses_summary
+            pnl_raw=Decimal("400"), total=total_summary, losses=losses_summary
         )
-        assert pnl_returns.pnl_raw == Decimal('400')
+        assert pnl_returns.pnl_raw == Decimal("400")
         assert pnl_returns.total == total_summary
         assert pnl_returns.losses == losses_summary
 
@@ -368,18 +361,24 @@ class TestTearSheet:
 
         interval = Annual365()
         tear_sheet = backtest.TearSheet(
-            pnl=Decimal('100'),
-            pnl_return=RateOfReturn.calculate(Decimal('0.1'), interval),
-            sharpe_ratio=SharpeRatio.calculate(Decimal('0.02'), Decimal('0.1'), Decimal('0.05'), interval),
-            sortino_ratio=SortinoRatio.calculate(Decimal('0.02'), Decimal('0.1'), Decimal('0.03'), interval),
-            calmar_ratio=CalmarRatio.calculate(Decimal('0.02'), Decimal('0.1'), Decimal('0.02'), interval),
+            pnl=Decimal("100"),
+            pnl_return=RateOfReturn.calculate(Decimal("0.1"), interval),
+            sharpe_ratio=SharpeRatio.calculate(
+                Decimal("0.02"), Decimal("0.1"), Decimal("0.05"), interval
+            ),
+            sortino_ratio=SortinoRatio.calculate(
+                Decimal("0.02"), Decimal("0.1"), Decimal("0.03"), interval
+            ),
+            calmar_ratio=CalmarRatio.calculate(
+                Decimal("0.02"), Decimal("0.1"), Decimal("0.02"), interval
+            ),
             pnl_drawdown=None,
             pnl_drawdown_mean=None,
             pnl_drawdown_max=None,
-            win_rate=WinRate.calculate(Decimal('7'), Decimal('10')),
-            profit_factor=ProfitFactor.calculate(Decimal('200'), Decimal('100'))
+            win_rate=WinRate.calculate(Decimal("7"), Decimal("10")),
+            profit_factor=ProfitFactor.calculate(Decimal("200"), Decimal("100")),
         )
-        assert tear_sheet.pnl == Decimal('100')
+        assert tear_sheet.pnl == Decimal("100")
         assert tear_sheet.pnl_drawdown is None
         assert tear_sheet.pnl_drawdown_mean is None
         assert tear_sheet.pnl_drawdown_max is None
@@ -392,20 +391,17 @@ class TestTearSheetAsset:
 
     def test_creation(self):
         """Test creating a TearSheetAsset."""
-        balance = backtest.Balance(total=Decimal('1000'), free=Decimal('900'))
+        balance = backtest.Balance(total=Decimal("1000"), free=Decimal("900"))
         asset_balance = backtest.AssetBalance(
-            asset="USDT",
-            balance=balance,
-            time_exchange=datetime(2023, 1, 1, 12, 0, 0)
+            asset="USDT", balance=balance, time_exchange=datetime(2023, 1, 1, 12, 0, 0)
         )
         drawdown = backtest.Drawdown(
-            value=Decimal('-0.02'),
+            value=Decimal("-0.02"),
             time_start=datetime(2023, 1, 1, 10, 0, 0),
-            time_end=datetime(2023, 1, 1, 11, 0, 0)
+            time_end=datetime(2023, 1, 1, 11, 0, 0),
         )
         mean_drawdown = backtest.MeanDrawdown(
-            mean_drawdown=Decimal('-0.015'),
-            mean_drawdown_ms=1800000
+            mean_drawdown=Decimal("-0.015"), mean_drawdown_ms=1800000
         )
         max_drawdown = backtest.MaxDrawdown(drawdown)
 
@@ -413,7 +409,7 @@ class TestTearSheetAsset:
             balance_end=asset_balance,
             drawdown=drawdown,
             drawdown_mean=mean_drawdown,
-            drawdown_max=max_drawdown
+            drawdown_max=max_drawdown,
         )
         assert tear_sheet.balance_end == asset_balance
         assert tear_sheet.drawdown == drawdown
@@ -442,23 +438,29 @@ class TestTradingSummary:
 
         # Create a tear sheet
         tear_sheet = backtest.TearSheet(
-            pnl=Decimal('50'),
-            pnl_return=RateOfReturn.calculate(Decimal('0.05'), interval),
-            sharpe_ratio=SharpeRatio.calculate(Decimal('0.02'), Decimal('0.05'), Decimal('0.03'), interval),
-            sortino_ratio=SortinoRatio.calculate(Decimal('0.02'), Decimal('0.05'), Decimal('0.02'), interval),
-            calmar_ratio=CalmarRatio.calculate(Decimal('0.02'), Decimal('0.05'), Decimal('0.01'), interval),
+            pnl=Decimal("50"),
+            pnl_return=RateOfReturn.calculate(Decimal("0.05"), interval),
+            sharpe_ratio=SharpeRatio.calculate(
+                Decimal("0.02"), Decimal("0.05"), Decimal("0.03"), interval
+            ),
+            sortino_ratio=SortinoRatio.calculate(
+                Decimal("0.02"), Decimal("0.05"), Decimal("0.02"), interval
+            ),
+            calmar_ratio=CalmarRatio.calculate(
+                Decimal("0.02"), Decimal("0.05"), Decimal("0.01"), interval
+            ),
             pnl_drawdown=None,
             pnl_drawdown_mean=None,
             pnl_drawdown_max=None,
-            win_rate=WinRate.calculate(Decimal('6'), Decimal('10')),
-            profit_factor=ProfitFactor.calculate(Decimal('150'), Decimal('100'))
+            win_rate=WinRate.calculate(Decimal("6"), Decimal("10")),
+            profit_factor=ProfitFactor.calculate(Decimal("150"), Decimal("100")),
         )
 
         summary = backtest.TradingSummary(
             time_engine_start=start_time,
             time_engine_end=end_time,
             instruments={"instrument_0": tear_sheet},
-            assets={}
+            assets={},
         )
 
         assert summary.time_engine_start == start_time

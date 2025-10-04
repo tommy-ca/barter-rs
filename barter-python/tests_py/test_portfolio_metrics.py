@@ -144,10 +144,13 @@ def test_calculate_profit_factor_typical_case() -> None:
 
 
 def test_calculate_profit_factor_returns_none_when_no_activity() -> None:
-    assert bp.calculate_profit_factor(
-        profits_gross_abs=0.0,
-        losses_gross_abs=0.0,
-    ) is None
+    assert (
+        bp.calculate_profit_factor(
+            profits_gross_abs=0.0,
+            losses_gross_abs=0.0,
+        )
+        is None
+    )
 
 
 def test_calculate_profit_factor_handles_perfect_performance() -> None:
@@ -282,10 +285,7 @@ def test_calculate_mean_drawdown_returns_average_value_and_duration() -> None:
     quant = Decimal("1E-28")
     expected_mean = sum(expected_values) / Decimal(len(expected_values))
 
-    assert (
-        mean.mean_drawdown.quantize(quant)
-        == expected_mean.quantize(quant)
-    )
+    assert mean.mean_drawdown.quantize(quant) == expected_mean.quantize(quant)
     assert mean.mean_duration == dt.timedelta(days=2)
 
 

@@ -50,9 +50,7 @@ def test_start_system_with_seeded_balances(example_paths: dict[str, Path]) -> No
     assert balance_end.used == seeded_total - seeded_free
 
 
-def test_start_system_rejects_unknown_exchange(
-    example_paths: dict[str, Path]
-) -> None:
+def test_start_system_rejects_unknown_exchange(example_paths: dict[str, Path]) -> None:
     """Unknown exchanges should be rejected with a descriptive error."""
 
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
@@ -75,9 +73,7 @@ def test_start_system_rejects_unknown_exchange(
         )
 
 
-def test_start_system_rejects_free_above_total(
-    example_paths: dict[str, Path]
-) -> None:
+def test_start_system_rejects_free_above_total(example_paths: dict[str, Path]) -> None:
     """A free balance greater than total should raise a ValueError."""
 
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
@@ -100,7 +96,9 @@ def test_start_system_rejects_free_above_total(
         )
 
 
-def test_run_historic_backtest_with_seeded_balances(example_paths: dict[str, Path]) -> None:
+def test_run_historic_backtest_with_seeded_balances(
+    example_paths: dict[str, Path],
+) -> None:
     """Seeding balances should surface in the resulting trading summary."""
 
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))

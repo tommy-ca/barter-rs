@@ -37,6 +37,7 @@ class ExchangeFilter:
     def matches(self, exchange, instrument) -> bool:
         return exchange == self.exchange
 
+
 # Type variables for generic engine interfaces
 ExchangeKey = TypeVar("ExchangeKey")
 AssetKey = TypeVar("AssetKey")
@@ -95,7 +96,9 @@ class InstrumentState:
     instrument: InstrumentIndex
     exchange: ExchangeId
     position: Position | None = None
-    market_data: DefaultInstrumentMarketData = field(default_factory=DefaultInstrumentMarketData)
+    market_data: DefaultInstrumentMarketData = field(
+        default_factory=DefaultInstrumentMarketData
+    )
     orders: dict[OrderKey, Order] = field(default_factory=dict)
 
     @property
@@ -107,8 +110,12 @@ class InstrumentState:
     def position_quantity(self) -> Decimal:
         """Get the position quantity (positive for long, negative for short)."""
         if self.position is None:
-            return Decimal('0')
-        return self.position.quantity_abs if self.position.side == "buy" else -self.position.quantity_abs
+            return Decimal("0")
+        return (
+            self.position.quantity_abs
+            if self.position.side == "buy"
+            else -self.position.quantity_abs
+        )
 
 
 @dataclass
@@ -132,14 +139,20 @@ class EngineState:
 
     global_data: DefaultGlobalData = field(default_factory=DefaultGlobalData)
     instruments: dict[InstrumentIndex, InstrumentState] = field(default_factory=dict)
-    trading_state: TradingState = field(default_factory=lambda: TradingState(enabled=True))
+    trading_state: TradingState = field(
+        default_factory=lambda: TradingState(enabled=True)
+    )
     balances: dict[str, AssetBalance] = field(default_factory=dict)
 
-    def get_instrument_state(self, instrument: InstrumentIndex) -> InstrumentState | None:
+    def get_instrument_state(
+        self, instrument: InstrumentIndex
+    ) -> InstrumentState | None:
         """Get the state for a specific instrument."""
         return self.instruments.get(instrument)
 
-    def update_instrument_state(self, instrument: InstrumentIndex, state: InstrumentState) -> None:
+    def update_instrument_state(
+        self, instrument: InstrumentIndex, state: InstrumentState
+    ) -> None:
         """Update the state for a specific instrument."""
         self.instruments[instrument] = state
 
@@ -164,7 +177,9 @@ class GenerateAlgoOrders(Generic[State]):
     strategy: AlgoStrategy
     state: State
 
-    def execute(self, engine_state: EngineState) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    def execute(
+        self, engine_state: EngineState
+    ) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate algorithmic orders."""
         cancels, opens = self.strategy.generate_algo_orders(self.state)
         return (list(cancels), list(opens))
@@ -178,9 +193,13 @@ class ClosePositions(Generic[State]):
     state: State
     instrument_filter: InstrumentFilter | None = None
 
-    def execute(self, engine_state: EngineState) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    def execute(
+        self, engine_state: EngineState
+    ) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate orders to close positions."""
-        cancels, opens = self.strategy.close_positions_requests(self.state, self.instrument_filter)
+        cancels, opens = self.strategy.close_positions_requests(
+            self.state, self.instrument_filter
+        )
         return (list(cancels), list(opens))
 
 
@@ -207,10 +226,12 @@ class CancelOrders:
         """Generate cancel requests for orders matching the filter."""
         cancel_requests = []
         for inst_state in engine_state.instruments.values():
-            if self.instrument_filter is None or self.instrument_filter.matches(inst_state.exchange, inst_state.instrument):
+            if self.instrument_filter is None or self.instrument_filter.matches(
+                inst_state.exchange, inst_state.instrument
+            ):
                 for order_key, order in inst_state.orders.items():
                     # Get order ID if available
-                    order_id = getattr(order.state.state, 'id', None)
+                    order_id = getattr(order.state.state, "id", None)
                     # Create cancel request for this order
                     cancel_request = OrderRequestCancel(key=order_key, state=order_id)
                     cancel_requests.append(cancel_request)
@@ -281,14 +302,18 @@ class Engine(Generic[State]):
         # TODO: Update balances, orders, positions from account event
         pass
 
-    def generate_algo_orders(self) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    def generate_algo_orders(
+        self,
+    ) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate algorithmic orders using the strategy."""
         action = GenerateAlgoOrders(self.strategy, self.state)
         return action.execute(self.state)
 
-    def close_positions(self, instrument_filter: InstrumentFilter | None = None) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+    def close_positions(
+        self, instrument_filter: InstrumentFilter | None = None
+    ) -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
         """Generate orders to close positions."""
-        if hasattr(self.strategy, 'close_positions_requests'):
+        if hasattr(self.strategy, "close_positions_requests"):
             action = ClosePositions(self.strategy, self.state, instrument_filter)
             return action.execute(self.state)
         return ([], [])
@@ -296,7 +321,7 @@ class Engine(Generic[State]):
     def send_requests(
         self,
         open_requests: list[OrderRequestOpen],
-        cancel_requests: list[OrderRequestCancel]
+        cancel_requests: list[OrderRequestCancel],
     ) -> None:
         """Send order requests after risk checking."""
         # Apply risk management

@@ -57,10 +57,10 @@ class TestDefaultInstrumentMarketData:
         """Test creation with values."""
         time = datetime(2023, 1, 1)
         data = DefaultInstrumentMarketData(
-            last_price=Decimal('100.5'),
+            last_price=Decimal("100.5"),
             last_update_time=time,
         )
-        assert data.last_price == Decimal('100.5')
+        assert data.last_price == Decimal("100.5")
         assert data.last_update_time == time
 
 
@@ -185,7 +185,7 @@ class TestEngine:
         # Check that market data was updated
         updated_state = engine.state.get_instrument_state(1)  # type: ignore
         assert updated_state is not None
-        assert updated_state.market_data.last_price == Decimal('100.5')
+        assert updated_state.market_data.last_price == Decimal("100.5")
         assert updated_state.market_data.last_update_time == time_exchange
 
     def test_process_market_event_candle(self):
@@ -223,7 +223,7 @@ class TestEngine:
         # Check that market data was updated
         updated_state = engine.state.get_instrument_state(1)  # type: ignore
         assert updated_state is not None
-        assert updated_state.market_data.last_price == Decimal('100.5')
+        assert updated_state.market_data.last_price == Decimal("100.5")
         assert updated_state.market_data.last_update_time == time_exchange
         assert updated_state.market_data.recent_candle == candle
 

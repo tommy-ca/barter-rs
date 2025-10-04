@@ -1,6 +1,5 @@
 """Unit tests for pure Python instrument data structures."""
 
-
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -170,7 +169,9 @@ class TestInstrumentNameInternal:
         assert name.name == "btc_usdt"
 
     def test_new_from_exchange(self):
-        name = InstrumentNameInternal.new_from_exchange(ExchangeId.BINANCE_SPOT, "BTCUSDT")
+        name = InstrumentNameInternal.new_from_exchange(
+            ExchangeId.BINANCE_SPOT, "BTCUSDT"
+        )
         assert name.name == "binance_spot-btcusdt"
 
     def test_equality(self):
@@ -292,13 +293,28 @@ class TestOptionContract:
     def test_equality(self):
         expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
         c1 = OptionContract(
-            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+            Decimal("1"),
+            "usdt",
+            OptionKind.CALL,
+            OptionExercise.AMERICAN,
+            expiry,
+            Decimal("50000"),
         )
         c2 = OptionContract(
-            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+            Decimal("1"),
+            "usdt",
+            OptionKind.CALL,
+            OptionExercise.AMERICAN,
+            expiry,
+            Decimal("50000"),
         )
         c3 = OptionContract(
-            Decimal("1"), "usdt", OptionKind.PUT, OptionExercise.AMERICAN, expiry, Decimal("50000")
+            Decimal("1"),
+            "usdt",
+            OptionKind.PUT,
+            OptionExercise.AMERICAN,
+            expiry,
+            Decimal("50000"),
         )
         assert c1 == c2
         assert c1 != c3
@@ -306,7 +322,12 @@ class TestOptionContract:
     def test_repr(self):
         expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
         contract = OptionContract(
-            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+            Decimal("1"),
+            "usdt",
+            OptionKind.CALL,
+            OptionExercise.AMERICAN,
+            expiry,
+            Decimal("50000"),
         )
         assert "OptionContract(" in repr(contract)
 
@@ -339,7 +360,12 @@ class TestInstrumentKind:
     def test_option(self):
         expiry = datetime(2025, 12, 31, tzinfo=timezone.utc)
         contract = OptionContract(
-            Decimal("1"), "usdt", OptionKind.CALL, OptionExercise.AMERICAN, expiry, Decimal("50000")
+            Decimal("1"),
+            "usdt",
+            OptionKind.CALL,
+            OptionExercise.AMERICAN,
+            expiry,
+            Decimal("50000"),
         )
         kind = InstrumentKind.option(contract)
         assert kind.kind == "option"

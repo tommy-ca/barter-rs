@@ -10,7 +10,13 @@ import pytest
 def test_backtest_cli_outputs_summary(capsys: pytest.CaptureFixture[str]) -> None:
     from barter_python_cli import backtest
 
-    config_path = Path(__file__).parents[2] / "barter" / "examples" / "config" / "system_config.json"
+    config_path = (
+        Path(__file__).parents[2]
+        / "barter"
+        / "examples"
+        / "config"
+        / "system_config.json"
+    )
     data_path = (
         Path(__file__).parents[2]
         / "barter"
@@ -43,7 +49,13 @@ def test_backtest_cli_outputs_summary(capsys: pytest.CaptureFixture[str]) -> Non
 def test_backtest_cli_interval_option(capsys: pytest.CaptureFixture[str]) -> None:
     from barter_python_cli import backtest
 
-    config_path = Path(__file__).parents[2] / "barter" / "examples" / "config" / "system_config.json"
+    config_path = (
+        Path(__file__).parents[2]
+        / "barter"
+        / "examples"
+        / "config"
+        / "system_config.json"
+    )
     data_path = (
         Path(__file__).parents[2]
         / "barter"

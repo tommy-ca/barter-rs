@@ -235,9 +235,13 @@ class InstrumentNameInternal:
         return self._name
 
     @classmethod
-    def new_from_exchange(cls, exchange: ExchangeId, name_exchange: str | InstrumentNameExchange) -> InstrumentNameInternal:
+    def new_from_exchange(
+        cls, exchange: ExchangeId, name_exchange: str | InstrumentNameExchange
+    ) -> InstrumentNameInternal:
         """Create from exchange and exchange name."""
-        name_exchange = name_exchange if isinstance(name_exchange, str) else name_exchange.name
+        name_exchange = (
+            name_exchange if isinstance(name_exchange, str) else name_exchange.name
+        )
         return cls(f"{exchange.value}-{name_exchange}")
 
     def __str__(self) -> str:
@@ -355,7 +359,9 @@ class PerpetualContract(Generic[AssetKey]):
 class FutureContract(Generic[AssetKey]):
     """Future contract specification."""
 
-    def __init__(self, contract_size: Decimal, settlement_asset: AssetKey, expiry: datetime) -> None:
+    def __init__(
+        self, contract_size: Decimal, settlement_asset: AssetKey, expiry: datetime
+    ) -> None:
         self.contract_size = contract_size
         self.settlement_asset = settlement_asset
         self.expiry = expiry
@@ -420,14 +426,16 @@ class OptionContract(Generic[AssetKey]):
         )
 
     def __hash__(self) -> int:
-        return hash((
-            self.contract_size,
-            self.settlement_asset,
-            self.kind,
-            self.exercise,
-            self.expiry,
-            self.strike,
-        ))
+        return hash(
+            (
+                self.contract_size,
+                self.settlement_asset,
+                self.kind,
+                self.exercise,
+                self.expiry,
+                self.strike,
+            )
+        )
 
 
 InstrumentKindType = Union[
@@ -441,7 +449,9 @@ InstrumentKindType = Union[
 class InstrumentKind(Generic[AssetKey]):
     """Instrument kind enum."""
 
-    def __init__(self, kind: str, data: InstrumentKindType[AssetKey] | None = None) -> None:
+    def __init__(
+        self, kind: str, data: InstrumentKindType[AssetKey] | None = None
+    ) -> None:
         self._kind = kind
         self._data = data
 
@@ -450,7 +460,9 @@ class InstrumentKind(Generic[AssetKey]):
         return cls("spot")
 
     @classmethod
-    def perpetual(cls, contract: PerpetualContract[AssetKey]) -> InstrumentKind[AssetKey]:
+    def perpetual(
+        cls, contract: PerpetualContract[AssetKey]
+    ) -> InstrumentKind[AssetKey]:
         return cls("perpetual", contract)
 
     @classmethod
@@ -597,15 +609,17 @@ class Instrument(Generic[AssetKey]):
         )
 
     def __hash__(self) -> int:
-        return hash((
-            self.exchange,
-            self.name_internal,
-            self.name_exchange,
-            self.underlying,
-            self.quote,
-            self.kind,
-            self.spec,
-        ))
+        return hash(
+            (
+                self.exchange,
+                self.name_internal,
+                self.name_exchange,
+                self.underlying,
+                self.quote,
+                self.kind,
+                self.spec,
+            )
+        )
 
 
 class MarketDataFutureContract:
@@ -675,7 +689,9 @@ MarketDataInstrumentKindType = Union[
 class MarketDataInstrumentKind:
     """Instrument kind enum for market data."""
 
-    def __init__(self, kind: str, data: MarketDataInstrumentKindType | None = None) -> None:
+    def __init__(
+        self, kind: str, data: MarketDataInstrumentKindType | None = None
+    ) -> None:
         self._kind = kind
         self._data = data
 
@@ -739,12 +755,21 @@ class MarketDataInstrument:
         quote: str | AssetNameInternal,
         kind: MarketDataInstrumentKind,
     ) -> None:
-        self.base = base if isinstance(base, AssetNameInternal) else AssetNameInternal(base)
-        self.quote = quote if isinstance(quote, AssetNameInternal) else AssetNameInternal(quote)
+        self.base = (
+            base if isinstance(base, AssetNameInternal) else AssetNameInternal(base)
+        )
+        self.quote = (
+            quote if isinstance(quote, AssetNameInternal) else AssetNameInternal(quote)
+        )
         self.kind = kind
 
     @classmethod
-    def new(cls, base: str | AssetNameInternal, quote: str | AssetNameInternal, kind: MarketDataInstrumentKind) -> MarketDataInstrument:
+    def new(
+        cls,
+        base: str | AssetNameInternal,
+        quote: str | AssetNameInternal,
+        kind: MarketDataInstrumentKind,
+    ) -> MarketDataInstrument:
         return cls(base, quote, kind)
 
     def __str__(self) -> str:
@@ -756,7 +781,11 @@ class MarketDataInstrument:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, MarketDataInstrument):
             return NotImplemented
-        return self.base == other.base and self.quote == other.quote and self.kind == other.kind
+        return (
+            self.base == other.base
+            and self.quote == other.quote
+            and self.kind == other.kind
+        )
 
     def __hash__(self) -> int:
         return hash((self.base, self.quote, self.kind))
@@ -861,8 +890,3 @@ class ExchangeAsset:
 
     def __hash__(self) -> int:
         return hash((self.exchange, self.asset))
-
-
-
-
-

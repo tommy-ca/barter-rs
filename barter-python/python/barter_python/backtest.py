@@ -51,9 +51,11 @@ SummaryInterval = TypeVar("SummaryInterval", bound=TimeInterval)
 
 # Supporting structures for TradingSummary
 
+
 @dataclass(frozen=True)
 class Balance:
     """Asset balance with total and free amounts."""
+
     total: Decimal
     free: Decimal
 
@@ -65,6 +67,7 @@ class Balance:
 @dataclass(frozen=True)
 class AssetBalance:
     """Asset balance with metadata."""
+
     asset: str  # Simplified to string for now
     balance: Balance
     time_exchange: datetime
@@ -73,6 +76,7 @@ class AssetBalance:
 @dataclass(frozen=True)
 class Drawdown:
     """Drawdown measurement."""
+
     value: Decimal
     time_start: datetime
     time_end: datetime
@@ -85,6 +89,7 @@ class Drawdown:
 @dataclass(frozen=True)
 class MeanDrawdown:
     """Mean drawdown measurement."""
+
     mean_drawdown: Decimal
     mean_drawdown_ms: int
 
@@ -92,12 +97,14 @@ class MeanDrawdown:
 @dataclass(frozen=True)
 class MaxDrawdown:
     """Maximum drawdown wrapper."""
+
     drawdown: Drawdown
 
 
 @dataclass(frozen=True)
 class Range:
     """Value range."""
+
     min: Decimal
     max: Decimal
 
@@ -105,6 +112,7 @@ class Range:
 @dataclass(frozen=True)
 class Dispersion:
     """Statistical dispersion measures."""
+
     range: Range
     recurrence_relation_m: Decimal
     variance: Decimal
@@ -114,6 +122,7 @@ class Dispersion:
 @dataclass(frozen=True)
 class DataSetSummary:
     """Statistical summary of a dataset."""
+
     count: Decimal
     sum: Decimal
     mean: Decimal
@@ -123,6 +132,7 @@ class DataSetSummary:
 @dataclass(frozen=True)
 class PnLReturns:
     """PnL returns with statistical summaries."""
+
     pnl_raw: Decimal
     total: DataSetSummary
     losses: DataSetSummary
@@ -131,6 +141,7 @@ class PnLReturns:
 @dataclass(frozen=True)
 class TearSheet(Generic[SummaryInterval]):
     """Tear sheet summarizing trading performance for an instrument."""
+
     pnl: Decimal
     pnl_return: RateOfReturn[SummaryInterval]
     sharpe_ratio: SharpeRatio[SummaryInterval]
@@ -146,6 +157,7 @@ class TearSheet(Generic[SummaryInterval]):
 @dataclass(frozen=True)
 class TearSheetAsset:
     """Tear sheet summarizing asset changes."""
+
     balance_end: AssetBalance | None
     drawdown: Drawdown | None
     drawdown_mean: MeanDrawdown | None
@@ -198,51 +210,51 @@ class MarketDataInMemory:
 
         for event_data in data:
             # Parse the market event from JSON - handle the Item/Ok wrapper
-            if 'Item' in event_data and 'Ok' in event_data['Item']:
-                inner_data = event_data['Item']['Ok']
+            if "Item" in event_data and "Ok" in event_data["Item"]:
+                inner_data = event_data["Item"]["Ok"]
             else:
                 # Skip non-Item/Ok events (like Reconnecting)
                 continue
 
-            time_exchange = datetime.fromisoformat(inner_data['time_exchange'])
-            time_received = datetime.fromisoformat(inner_data['time_received'])
-            exchange = inner_data['exchange']
-            instrument = inner_data['instrument']
-            kind_data = inner_data['kind']
+            time_exchange = datetime.fromisoformat(inner_data["time_exchange"])
+            time_received = datetime.fromisoformat(inner_data["time_received"])
+            exchange = inner_data["exchange"]
+            instrument = inner_data["instrument"]
+            kind_data = inner_data["kind"]
 
             # Parse the data kind
-            if 'Trade' in kind_data:
-                trade_data = kind_data['Trade']
+            if "Trade" in kind_data:
+                trade_data = kind_data["Trade"]
                 trade = PublicTrade(
-                    id=trade_data['id'],
-                    price=trade_data['price'],
-                    amount=trade_data['amount'],
-                    side=trade_data['side']
+                    id=trade_data["id"],
+                    price=trade_data["price"],
+                    amount=trade_data["amount"],
+                    side=trade_data["side"],
                 )
                 kind = DataKind.trade(trade)
-            elif 'OrderBookL1' in kind_data:
+            elif "OrderBookL1" in kind_data:
                 # Handle OrderBookL1 parsing
                 # This would need more implementation
                 continue  # Skip for now
-            elif 'Candle' in kind_data:
-                candle_data = kind_data['Candle']
+            elif "Candle" in kind_data:
+                candle_data = kind_data["Candle"]
                 candle = Candle(
-                    close_time=datetime.fromisoformat(candle_data['close_time']),
-                    open=candle_data['open'],
-                    high=candle_data['high'],
-                    low=candle_data['low'],
-                    close=candle_data['close'],
-                    volume=candle_data['volume'],
-                    trade_count=candle_data['trade_count']
+                    close_time=datetime.fromisoformat(candle_data["close_time"]),
+                    open=candle_data["open"],
+                    high=candle_data["high"],
+                    low=candle_data["low"],
+                    close=candle_data["close"],
+                    volume=candle_data["volume"],
+                    trade_count=candle_data["trade_count"],
                 )
                 kind = DataKind.candle(candle)
-            elif 'Liquidation' in kind_data:
-                liq_data = kind_data['Liquidation']
+            elif "Liquidation" in kind_data:
+                liq_data = kind_data["Liquidation"]
                 liquidation = Liquidation(
-                    side=liq_data['side'],
-                    price=liq_data['price'],
-                    quantity=liq_data['quantity'],
-                    time=datetime.fromisoformat(liq_data['time'])
+                    side=liq_data["side"],
+                    price=liq_data["price"],
+                    quantity=liq_data["quantity"],
+                    time=datetime.fromisoformat(liq_data["time"]),
                 )
                 kind = DataKind.liquidation(liquidation)
             else:
@@ -253,7 +265,7 @@ class MarketDataInMemory:
                 time_received=time_received,
                 exchange=exchange,
                 instrument=instrument,
-                kind=kind
+                kind=kind,
             )
             events.append(event)
 
@@ -267,9 +279,11 @@ class MarketDataInMemory:
 
     def stream(self) -> AsyncIterable[MarketEvent[int, DataKind]]:
         """Return an async iterable of market events."""
+
         async def _gen():
             for event in self.events:
                 yield event
+
         return _gen()
 
     async def time_first_event(self) -> datetime:
@@ -294,7 +308,9 @@ class MultiBacktestSummary(Generic[SummaryInterval]):
     summaries: list[BacktestSummary[SummaryInterval]]
 
     @classmethod
-    def new(cls, duration: float, summaries: list[BacktestSummary[SummaryInterval]]) -> MultiBacktestSummary[SummaryInterval]:
+    def new(
+        cls, duration: float, summaries: list[BacktestSummary[SummaryInterval]]
+    ) -> MultiBacktestSummary[SummaryInterval]:
         """Create a new MultiBacktestSummary."""
         return cls(total_duration=duration, summaries=summaries)
 
@@ -337,8 +353,7 @@ async def run_backtests(
 
     # Run all backtests concurrently
     tasks = [
-        backtest(args_constant, args_dynamic)
-        for args_dynamic in args_dynamic_iter
+        backtest(args_constant, args_dynamic) for args_dynamic in args_dynamic_iter
     ]
 
     summaries = await asyncio.gather(*tasks)
@@ -365,7 +380,9 @@ async def backtest(
     time_start = await args_constant.market_data.time_first_event()
 
     # Initialize simulator
-    simulator = BacktestEngineSimulator(args_constant.engine_state, args_dynamic.strategy, args_dynamic.risk)
+    simulator = BacktestEngineSimulator(
+        args_constant.engine_state, args_dynamic.strategy, args_dynamic.risk
+    )
     simulator.start_time = time_start
 
     # Process market events
@@ -377,7 +394,9 @@ async def backtest(
         # TODO: Process orders and account events
 
     # Generate trading summary
-    trading_summary = simulator.get_trading_summary(args_dynamic.risk_free_return, args_constant.summary_interval)
+    trading_summary = simulator.get_trading_summary(
+        args_dynamic.risk_free_return, args_constant.summary_interval
+    )
 
     return BacktestSummary(
         id=args_dynamic.id,
@@ -417,6 +436,7 @@ class MockExecutionConfig:
     def __init__(self, initial_balances=None):
         self.initial_balances = initial_balances or {}
 
+
 class ExecutionConfig:
     """Configuration for execution links."""
 
@@ -431,7 +451,12 @@ class ExecutionConfig:
 class BacktestEngineSimulator:
     """Simple engine simulator for backtesting."""
 
-    def __init__(self, initial_engine_state: EngineEngineState, strategy: Any, risk_manager: RiskManager):
+    def __init__(
+        self,
+        initial_engine_state: EngineEngineState,
+        strategy: Any,
+        risk_manager: RiskManager,
+    ):
         self.engine: Engine = Engine(initial_engine_state, strategy, risk_manager)
         self.current_time: datetime | None = None
         self.start_time: datetime | None = None
@@ -454,7 +479,9 @@ class BacktestEngineSimulator:
             trade_event = as_public_trade(event)
             if trade_event:
                 # Update price for the instrument
-                inst_state = self.engine.state.get_instrument_state(InstrumentIndex(event.instrument))
+                inst_state = self.engine.state.get_instrument_state(
+                    InstrumentIndex(event.instrument)
+                )
                 if inst_state:
                     # Note: InstrumentState doesn't have price, so we store in a dict or something
                     pass  # TODO: Add price tracking to InstrumentState
@@ -462,7 +489,9 @@ class BacktestEngineSimulator:
             candle_event = as_candle(event)
             if candle_event:
                 # Update price with candle close
-                inst_state = self.engine.state.get_instrument_state(InstrumentIndex(event.instrument))
+                inst_state = self.engine.state.get_instrument_state(
+                    InstrumentIndex(event.instrument)
+                )
                 if inst_state:
                     pass  # TODO: Add price tracking
 
@@ -471,34 +500,53 @@ class BacktestEngineSimulator:
             cancel_requests, open_requests = self.engine.generate_algo_orders()
             self.simulate_order_execution(open_requests, cancel_requests)
 
-    def record_trade(self, instrument: int, side: Side, quantity: Decimal, price: Decimal, pnl: Decimal = Decimal('0')):
+    def record_trade(
+        self,
+        instrument: int,
+        side: Side,
+        quantity: Decimal,
+        price: Decimal,
+        pnl: Decimal = Decimal("0"),
+    ):
         """Record a trade for tracking."""
-        self.trades.append({
-            'instrument': instrument,
-            'side': side,
-            'quantity': quantity,
-            'price': price,
-            'pnl': pnl,
-            'time': self.current_time
-        })
+        self.trades.append(
+            {
+                "instrument": instrument,
+                "side": side,
+                "quantity": quantity,
+                "price": price,
+                "pnl": pnl,
+                "time": self.current_time,
+            }
+        )
 
         # Update PnL tracking
         if instrument not in self.pnl_by_instrument:
-            self.pnl_by_instrument[instrument] = Decimal('0')
+            self.pnl_by_instrument[instrument] = Decimal("0")
         self.pnl_by_instrument[instrument] += pnl
 
-    def simulate_order_execution(self, open_requests: list[OrderRequestOpen], cancel_requests: list[OrderRequestCancel]) -> None:
+    def simulate_order_execution(
+        self,
+        open_requests: list[OrderRequestOpen],
+        cancel_requests: list[OrderRequestCancel],
+    ) -> None:
         """Simulate order execution for backtesting."""
         # For simplicity, assume all market orders fill immediately at current price
         for request in open_requests:
             if request.state.kind.value == "market":  # Assuming kind has value
                 # Get current price (simplified - would need to get from market data)
-                current_price = Decimal('100')  # Placeholder
+                current_price = Decimal("100")  # Placeholder
                 # Create a fill
                 fill_quantity = request.state.quantity
                 fill_price = current_price
-                pnl = Decimal('0')  # Calculate based on position
-                self.record_trade(request.key.instrument, request.state.side, fill_quantity, fill_price, pnl)
+                pnl = Decimal("0")  # Calculate based on position
+                self.record_trade(
+                    request.key.instrument,
+                    request.state.side,
+                    fill_quantity,
+                    fill_price,
+                    pnl,
+                )
                 # Update position
                 # TODO: Update engine state positions
 
@@ -507,7 +555,9 @@ class BacktestEngineSimulator:
             # TODO: Update order state to cancelled
             pass
 
-    def get_trading_summary(self, risk_free_return: Decimal, summary_interval: TimeInterval) -> TradingSummary:
+    def get_trading_summary(
+        self, risk_free_return: Decimal, summary_interval: TimeInterval
+    ) -> TradingSummary:
         """Generate a trading summary from current state."""
         start_time = self.start_time or datetime.now()
         end_time = self.current_time or datetime.now()
@@ -516,20 +566,30 @@ class BacktestEngineSimulator:
         instruments = {}
         for inst_index, _inst_state in self.engine.state.instruments.items():
             instrument_name = f"instrument_{inst_index}"
-            pnl = self.pnl_by_instrument.get(inst_index.index, Decimal('0'))
+            pnl = self.pnl_by_instrument.get(inst_index.index, Decimal("0"))
 
             # Create basic tear sheet with placeholder values
             tear_sheet = TearSheet(
                 pnl=pnl,
                 pnl_return=RateOfReturn.calculate(pnl, summary_interval),
-                sharpe_ratio=SharpeRatio.calculate(risk_free_return, pnl, Decimal('0.1'), summary_interval),
-                sortino_ratio=SortinoRatio.calculate(risk_free_return, pnl, Decimal('0.05'), summary_interval),
-                calmar_ratio=CalmarRatio.calculate(risk_free_return, pnl, Decimal('0.1'), summary_interval),
+                sharpe_ratio=SharpeRatio.calculate(
+                    risk_free_return, pnl, Decimal("0.1"), summary_interval
+                ),
+                sortino_ratio=SortinoRatio.calculate(
+                    risk_free_return, pnl, Decimal("0.05"), summary_interval
+                ),
+                calmar_ratio=CalmarRatio.calculate(
+                    risk_free_return, pnl, Decimal("0.1"), summary_interval
+                ),
                 pnl_drawdown=None,  # Would need drawdown calculation
                 pnl_drawdown_mean=None,
                 pnl_drawdown_max=None,
-                win_rate=WinRate.calculate(Decimal('5'), Decimal('10')) if self.trades else None,  # 50% win rate if trades exist
-                profit_factor=ProfitFactor.calculate(Decimal('100'), Decimal('50')) if pnl > 0 else None
+                win_rate=WinRate.calculate(Decimal("5"), Decimal("10"))
+                if self.trades
+                else None,  # 50% win rate if trades exist
+                profit_factor=ProfitFactor.calculate(Decimal("100"), Decimal("50"))
+                if pnl > 0
+                else None,
             )
             instruments[instrument_name] = tear_sheet
 

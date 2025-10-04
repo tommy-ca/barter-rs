@@ -1,6 +1,5 @@
 """Unit tests for pure Python integration data structures."""
 
-
 from barter_python.integration import (
     Field,
     Metric,

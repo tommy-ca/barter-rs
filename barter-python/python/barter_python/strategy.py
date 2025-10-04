@@ -161,15 +161,17 @@ class EngineState:
     ) -> Iterable[InstrumentState]:
         """Iterate over instruments, optionally filtered."""
         for instrument in self.instruments:
-            if filter is None or filter.matches(instrument.exchange, instrument.instrument):
+            if filter is None or filter.matches(
+                instrument.exchange, instrument.instrument
+            ):
                 yield instrument
 
 
 def close_open_positions_with_market_orders(
     strategy_id: StrategyId,
     state: EngineState,
-        filter: InstrumentFilter | None = None,
-        gen_cid: Callable[[InstrumentState], ClientOrderId] | None = None,
+    filter: InstrumentFilter | None = None,
+    gen_cid: Callable[[InstrumentState], ClientOrderId] | None = None,
 ) -> tuple[
     Iterable[OrderRequestCancel],
     Iterable[OrderRequestOpen],
@@ -189,8 +191,10 @@ def close_open_positions_with_market_orders(
         Tuple of (cancel_requests, open_requests)
     """
     if gen_cid is None:
+
         def default_gen_cid(inst_state: InstrumentState) -> ClientOrderId:
             return ClientOrderId.new(f"close-{inst_state.instrument}")
+
         gen_cid = default_gen_cid
 
     open_requests = []
@@ -202,6 +206,7 @@ def close_open_positions_with_market_orders(
         assert inst_state.position is not None
         assert inst_state.price is not None
         inst = inst_state
+
         def get_cid():  # noqa: B023
             return gen_cid(inst) if gen_cid else ClientOrderId("close_position")
 
@@ -292,7 +297,9 @@ def cancel_all_orders_on_disconnect(exchange_id: str) -> list[OrderRequestCancel
     return []
 
 
-def close_all_positions_on_trading_disabled() -> tuple[list[OrderRequestCancel], list[OrderRequestOpen]]:
+def close_all_positions_on_trading_disabled() -> tuple[
+    list[OrderRequestCancel], list[OrderRequestOpen]
+]:
     """Simple strategy: close all positions when trading is disabled.
 
     Returns:

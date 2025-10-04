@@ -17,7 +17,9 @@ from barter_python.strategy import (
 class TestClosePositionsStrategy:
     def test_build_ioc_market_order_to_close_long_position(self):
         """Test building IOC market order to close a long position."""
-        position = Position(instrument=1, side=Side.BUY, quantity_abs=100.0, entry_price=50000.0)
+        position = Position(
+            instrument=1, side=Side.BUY, quantity_abs=100.0, entry_price=50000.0
+        )
         strategy_id = StrategyId.new("test-strategy")
 
         def gen_cid():
@@ -43,7 +45,9 @@ class TestClosePositionsStrategy:
 
     def test_build_ioc_market_order_to_close_short_position(self):
         """Test building IOC market order to close a short position."""
-        position = Position(instrument=2, side=Side.SELL, quantity_abs=50.0, entry_price=30000.0)
+        position = Position(
+            instrument=2, side=Side.SELL, quantity_abs=50.0, entry_price=30000.0
+        )
         strategy_id = StrategyId.new("test-strategy")
 
         def gen_cid():
@@ -96,7 +100,9 @@ class TestClosePositionsStrategy:
         ]
 
         state = EngineState(instruments)
-        cancel_requests, open_requests = close_open_positions_with_market_orders(strategy_id, state)
+        cancel_requests, open_requests = close_open_positions_with_market_orders(
+            strategy_id, state
+        )
 
         # Should have no cancel requests
         assert list(cancel_requests) == []
@@ -127,7 +133,9 @@ class TestClosePositionsStrategy:
         ]
 
         state = EngineState(instruments)
-        cancel_requests, open_requests = close_open_positions_with_market_orders(strategy_id, state)
+        cancel_requests, open_requests = close_open_positions_with_market_orders(
+            strategy_id, state
+        )
 
         assert list(cancel_requests) == []
         assert list(open_requests) == []

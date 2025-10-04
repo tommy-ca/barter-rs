@@ -1,6 +1,5 @@
 """Unit tests for pure Python execution data structures."""
 
-
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -127,14 +126,31 @@ class TestOrderKey:
         assert key.cid == cid
 
     def test_equality(self):
-        key1 = OrderKey(ExchangeId.BINANCE_SPOT, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-123"))
-        key2 = OrderKey(ExchangeId.BINANCE_SPOT, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-123"))
-        key3 = OrderKey(ExchangeId.KRAKEN, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-123"))
+        key1 = OrderKey(
+            ExchangeId.BINANCE_SPOT,
+            42,
+            StrategyId.new("alpha"),
+            ClientOrderId.new("cid-123"),
+        )
+        key2 = OrderKey(
+            ExchangeId.BINANCE_SPOT,
+            42,
+            StrategyId.new("alpha"),
+            ClientOrderId.new("cid-123"),
+        )
+        key3 = OrderKey(
+            ExchangeId.KRAKEN, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-123")
+        )
         assert key1 == key2
         assert key1 != key3
 
     def test_str_repr(self):
-        key = OrderKey(ExchangeId.BINANCE_SPOT, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-123"))
+        key = OrderKey(
+            ExchangeId.BINANCE_SPOT,
+            42,
+            StrategyId.new("alpha"),
+            ClientOrderId.new("cid-123"),
+        )
         assert str(key) == "binance_spot:42:alpha:cid-123"
         assert "OrderKey(" in repr(key)
 
@@ -246,8 +262,7 @@ class TestTrade:
         fees = AssetFees(QuoteAsset(), Decimal("0.005"))
 
         trade = Trade(
-            tid, oid, instrument, strategy, time_exchange,
-            side, price, quantity, fees
+            tid, oid, instrument, strategy, time_exchange, side, price, quantity, fees
         )
         assert trade.id == tid
         assert trade.order_id == oid
@@ -269,7 +284,7 @@ class TestTrade:
             Side.BUY,
             Decimal("50000.0"),
             Decimal("0.1"),
-            AssetFees(QuoteAsset(), Decimal("0.005"))
+            AssetFees(QuoteAsset(), Decimal("0.005")),
         )
         assert trade.value_quote() == Decimal("5000.0")
 
@@ -284,7 +299,7 @@ class TestTrade:
             Side.BUY,
             Decimal("50000.0"),
             Decimal("0.1"),
-            AssetFees(QuoteAsset(), Decimal("0.005"))
+            AssetFees(QuoteAsset(), Decimal("0.005")),
         )
         trade2 = Trade(
             TradeId.new("trade-123"),
@@ -295,7 +310,7 @@ class TestTrade:
             Side.BUY,
             Decimal("50000.0"),
             Decimal("0.1"),
-            AssetFees(QuoteAsset(), Decimal("0.005"))
+            AssetFees(QuoteAsset(), Decimal("0.005")),
         )
         trade3 = Trade(
             TradeId.new("trade-456"),
@@ -306,7 +321,7 @@ class TestTrade:
             Side.BUY,
             Decimal("50000.0"),
             Decimal("0.1"),
-            AssetFees(QuoteAsset(), Decimal("0.005"))
+            AssetFees(QuoteAsset(), Decimal("0.005")),
         )
         assert trade1 == trade2
         assert trade1 != trade3
@@ -321,7 +336,7 @@ class TestTrade:
             Side.BUY,
             Decimal("50000.0"),
             Decimal("0.1"),
-            AssetFees(QuoteAsset(), Decimal("0.005"))
+            AssetFees(QuoteAsset(), Decimal("0.005")),
         )
         assert "Trade(" in repr(trade)
 
@@ -352,7 +367,7 @@ class TestOpen:
         open_state = Open(
             OrderId.new("order-123"),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            Decimal("0.05")
+            Decimal("0.05"),
         )
         assert open_state.quantity_remaining(Decimal("0.1")) == Decimal("0.05")
 
@@ -371,7 +386,7 @@ class TestOpen:
         open_state = Open(
             OrderId.new("order-123"),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            Decimal("0.05")
+            Decimal("0.05"),
         )
         assert "Open(" in repr(open_state)
 
@@ -385,7 +400,7 @@ class TestCancelInFlight:
         open_state = Open(
             OrderId.new("order-123"),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            Decimal("0.05")
+            Decimal("0.05"),
         )
         cif = CancelInFlight.new(open_state)
         assert cif.order == open_state
@@ -396,7 +411,7 @@ class TestCancelInFlight:
         open_state = Open(
             OrderId.new("order-123"),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            Decimal("0.05")
+            Decimal("0.05"),
         )
         cif3 = CancelInFlight.new(open_state)
         assert cif1 == cif2
@@ -429,7 +444,7 @@ class TestCancelled:
     def test_str_repr(self):
         cancelled = Cancelled(
             OrderId.new("order-123"),
-            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
         assert "Cancelled(" in repr(cancelled)
 
@@ -450,7 +465,7 @@ class TestInactiveOrderState:
     def test_cancelled(self):
         cancelled = Cancelled(
             OrderId.new("order-123"),
-            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
         ios = InactiveOrderState.cancelled(cancelled)
         assert ios.is_cancelled()
@@ -502,7 +517,7 @@ class TestOrderState:
         open_state = Open(
             OrderId.new("order-123"),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            Decimal("0.05")
+            Decimal("0.05"),
         )
         os = OrderState.active(open_state)
         assert os.is_active()
@@ -513,7 +528,7 @@ class TestOrderState:
         open_state = Open(
             OrderId.new("order-123"),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            Decimal("0.05")
+            Decimal("0.05"),
         )
         cif = CancelInFlight.new(open_state)
         os = OrderState.active(cif)
@@ -524,7 +539,7 @@ class TestOrderState:
     def test_inactive_cancelled(self):
         cancelled = Cancelled(
             OrderId.new("order-123"),
-            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
         ios = InactiveOrderState.cancelled(cancelled)
         os = OrderState.inactive(ios)
@@ -562,7 +577,7 @@ class TestOrder:
             ExchangeId.BINANCE_SPOT,
             42,
             StrategyId.new("strategy-alpha"),
-            ClientOrderId.new("cid-123")
+            ClientOrderId.new("cid-123"),
         )
         side = Side.BUY
         price = Decimal("50000.0")
@@ -585,21 +600,36 @@ class TestOrder:
             ExchangeId.BINANCE_SPOT,
             42,
             StrategyId.new("strategy-alpha"),
-            ClientOrderId.new("cid-123")
+            ClientOrderId.new("cid-123"),
         )
         state = OrderState.fully_filled()
 
         order1 = Order(
-            key, Side.BUY, Decimal("50000.0"), Decimal("0.1"),
-            OrderKind.LIMIT, TimeInForce.GOOD_UNTIL_CANCELLED, state
+            key,
+            Side.BUY,
+            Decimal("50000.0"),
+            Decimal("0.1"),
+            OrderKind.LIMIT,
+            TimeInForce.GOOD_UNTIL_CANCELLED,
+            state,
         )
         order2 = Order(
-            key, Side.BUY, Decimal("50000.0"), Decimal("0.1"),
-            OrderKind.LIMIT, TimeInForce.GOOD_UNTIL_CANCELLED, state
+            key,
+            Side.BUY,
+            Decimal("50000.0"),
+            Decimal("0.1"),
+            OrderKind.LIMIT,
+            TimeInForce.GOOD_UNTIL_CANCELLED,
+            state,
         )
         order3 = Order(
-            key, Side.SELL, Decimal("50000.0"), Decimal("0.1"),
-            OrderKind.LIMIT, TimeInForce.GOOD_UNTIL_CANCELLED, state
+            key,
+            Side.SELL,
+            Decimal("50000.0"),
+            Decimal("0.1"),
+            OrderKind.LIMIT,
+            TimeInForce.GOOD_UNTIL_CANCELLED,
+            state,
         )
         assert order1 == order2
         assert order1 != order3
@@ -609,13 +639,18 @@ class TestOrder:
             ExchangeId.BINANCE_SPOT,
             42,
             StrategyId.new("strategy-alpha"),
-            ClientOrderId.new("cid-123")
+            ClientOrderId.new("cid-123"),
         )
         state = OrderState.fully_filled()
 
         order = Order(
-            key, Side.BUY, Decimal("50000.0"), Decimal("0.1"),
-            OrderKind.LIMIT, TimeInForce.GOOD_UNTIL_CANCELLED, state
+            key,
+            Side.BUY,
+            Decimal("50000.0"),
+            Decimal("0.1"),
+            OrderKind.LIMIT,
+            TimeInForce.GOOD_UNTIL_CANCELLED,
+            state,
         )
         assert "Order(" in repr(order)
 
@@ -626,11 +661,11 @@ class TestOrderResponseCancel:
             ExchangeId.BINANCE_SPOT,
             42,
             StrategyId.new("strategy-alpha"),
-            ClientOrderId.new("cid-123")
+            ClientOrderId.new("cid-123"),
         )
         cancelled = Cancelled(
             OrderId.new("order-123"),
-            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
 
         response = OrderResponseCancel(key, cancelled)
@@ -642,11 +677,11 @@ class TestOrderResponseCancel:
             ExchangeId.BINANCE_SPOT,
             42,
             StrategyId.new("strategy-alpha"),
-            ClientOrderId.new("cid-123")
+            ClientOrderId.new("cid-123"),
         )
         cancelled = Cancelled(
             OrderId.new("order-123"),
-            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
 
         response = OrderResponseCancel(key, cancelled)
@@ -658,9 +693,18 @@ class TestInstrumentAccountSnapshot:
         instrument = 42
         orders = [
             Order(
-                OrderKey(ExchangeId.BINANCE_SPOT, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-1")),
-                Side.BUY, Decimal("50000.0"), Decimal("0.1"),
-                OrderKind.LIMIT, TimeInForce.GOOD_UNTIL_CANCELLED, OrderState.fully_filled()
+                OrderKey(
+                    ExchangeId.BINANCE_SPOT,
+                    42,
+                    StrategyId.new("alpha"),
+                    ClientOrderId.new("cid-1"),
+                ),
+                Side.BUY,
+                Decimal("50000.0"),
+                Decimal("0.1"),
+                OrderKind.LIMIT,
+                TimeInForce.GOOD_UNTIL_CANCELLED,
+                OrderState.fully_filled(),
             )
         ]
 
@@ -689,12 +733,13 @@ class TestAccountSnapshot:
     def test_creation(self):
         exchange = ExchangeId.BINANCE_SPOT
         balances = [
-            AssetBalance.new("btc", Balance(Decimal("1.0"), Decimal("0.9")),
-                           datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
+            AssetBalance.new(
+                "btc",
+                Balance(Decimal("1.0"), Decimal("0.9")),
+                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            )
         ]
-        instruments = [
-            InstrumentAccountSnapshot.new(42)
-        ]
+        instruments = [InstrumentAccountSnapshot.new(42)]
 
         snapshot = AccountSnapshot.new(exchange, balances, instruments)
         assert snapshot.exchange == exchange
@@ -709,14 +754,27 @@ class TestAccountSnapshot:
             AssetBalance.new("btc", Balance(Decimal("1.0"), Decimal("0.9")), time1)
         ]
         instruments = [
-            InstrumentAccountSnapshot.new(42, [
-                Order(
-                    OrderKey(ExchangeId.BINANCE_SPOT, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-1")),
-                    Side.BUY, Decimal("50000.0"), Decimal("0.1"),
-                    OrderKind.LIMIT, TimeInForce.GOOD_UNTIL_CANCELLED,
-                    OrderState.active(Open(OrderId.new("order-123"), time2, Decimal("0.0")))
-                )
-            ])
+            InstrumentAccountSnapshot.new(
+                42,
+                [
+                    Order(
+                        OrderKey(
+                            ExchangeId.BINANCE_SPOT,
+                            42,
+                            StrategyId.new("alpha"),
+                            ClientOrderId.new("cid-1"),
+                        ),
+                        Side.BUY,
+                        Decimal("50000.0"),
+                        Decimal("0.1"),
+                        OrderKind.LIMIT,
+                        TimeInForce.GOOD_UNTIL_CANCELLED,
+                        OrderState.active(
+                            Open(OrderId.new("order-123"), time2, Decimal("0.0"))
+                        ),
+                    )
+                ],
+            )
         ]
 
         snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, balances, instruments)
@@ -724,14 +782,20 @@ class TestAccountSnapshot:
 
     def test_assets_instruments_iter(self):
         balances = [
-            AssetBalance.new("btc", Balance(Decimal("1.0"), Decimal("0.9")),
-                           datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)),
-            AssetBalance.new("eth", Balance(Decimal("10.0"), Decimal("9.0")),
-                           datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
+            AssetBalance.new(
+                "btc",
+                Balance(Decimal("1.0"), Decimal("0.9")),
+                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            ),
+            AssetBalance.new(
+                "eth",
+                Balance(Decimal("10.0"), Decimal("9.0")),
+                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            ),
         ]
         instruments = [
             InstrumentAccountSnapshot.new(42),
-            InstrumentAccountSnapshot.new(43)
+            InstrumentAccountSnapshot.new(43),
         ]
 
         snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, balances, instruments)
@@ -764,17 +828,29 @@ class TestAccountEventKind:
         assert aek.data == snapshot
 
     def test_balance_snapshot(self):
-        balance = AssetBalance.new("btc", Balance(Decimal("1.0"), Decimal("0.9")),
-                                 datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
+        balance = AssetBalance.new(
+            "btc",
+            Balance(Decimal("1.0"), Decimal("0.9")),
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
         aek = AccountEventKind.balance_snapshot(balance)
         assert aek.kind == "balance_snapshot"
         assert aek.data == balance
 
     def test_order_snapshot(self):
         order = Order(
-            OrderKey(ExchangeId.BINANCE_SPOT, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-1")),
-            Side.BUY, Decimal("50000.0"), Decimal("0.1"),
-            OrderKind.LIMIT, TimeInForce.GOOD_UNTIL_CANCELLED, OrderState.fully_filled()
+            OrderKey(
+                ExchangeId.BINANCE_SPOT,
+                42,
+                StrategyId.new("alpha"),
+                ClientOrderId.new("cid-1"),
+            ),
+            Side.BUY,
+            Decimal("50000.0"),
+            Decimal("0.1"),
+            OrderKind.LIMIT,
+            TimeInForce.GOOD_UNTIL_CANCELLED,
+            OrderState.fully_filled(),
         )
         aek = AccountEventKind.order_snapshot(order)
         assert aek.kind == "order_snapshot"
@@ -782,8 +858,16 @@ class TestAccountEventKind:
 
     def test_order_cancelled(self):
         response = OrderResponseCancel(
-            OrderKey(ExchangeId.BINANCE_SPOT, 42, StrategyId.new("alpha"), ClientOrderId.new("cid-1")),
-            Cancelled(OrderId.new("order-123"), datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
+            OrderKey(
+                ExchangeId.BINANCE_SPOT,
+                42,
+                StrategyId.new("alpha"),
+                ClientOrderId.new("cid-1"),
+            ),
+            Cancelled(
+                OrderId.new("order-123"),
+                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            ),
         )
         aek = AccountEventKind.order_cancelled(response)
         assert aek.kind == "order_cancelled"
@@ -799,7 +883,7 @@ class TestAccountEventKind:
             Side.BUY,
             Decimal("50000.0"),
             Decimal("0.1"),
-            AssetFees(QuoteAsset(), Decimal("0.005"))
+            AssetFees(QuoteAsset(), Decimal("0.005")),
         )
         aek = AccountEventKind.trade(trade)
         assert aek.kind == "trade"
@@ -809,8 +893,11 @@ class TestAccountEventKind:
         snapshot = AccountSnapshot.new(ExchangeId.BINANCE_SPOT, [], [])
         aek1 = AccountEventKind.snapshot(snapshot)
         aek2 = AccountEventKind.snapshot(snapshot)
-        balance = AssetBalance.new("btc", Balance(Decimal("1.0"), Decimal("0.9")),
-                                 datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
+        balance = AssetBalance.new(
+            "btc",
+            Balance(Decimal("1.0"), Decimal("0.9")),
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
         aek3 = AccountEventKind.balance_snapshot(balance)
         assert aek1 == aek2
         assert aek1 != aek3

@@ -191,7 +191,9 @@ class AssetBalance(Generic[AssetKey]):
     time_exchange: datetime
 
     @classmethod
-    def new(cls, asset: AssetKey, balance: Balance, time_exchange: datetime) -> AssetBalance[AssetKey]:
+    def new(
+        cls, asset: AssetKey, balance: Balance, time_exchange: datetime
+    ) -> AssetBalance[AssetKey]:
         return cls(asset, balance, time_exchange)
 
     def __str__(self) -> str:
@@ -330,17 +332,19 @@ class Trade(Generic[AssetKey, InstrumentKey]):
         )
 
     def __hash__(self) -> int:
-        return hash((
-            self.id,
-            self.order_id,
-            self.instrument,
-            self.strategy,
-            self.time_exchange,
-            self.side,
-            self.price,
-            self.quantity,
-            self.fees,
-        ))
+        return hash(
+            (
+                self.id,
+                self.order_id,
+                self.instrument,
+                self.strategy,
+                self.time_exchange,
+                self.side,
+                self.price,
+                self.quantity,
+                self.fees,
+            )
+        )
 
 
 # Order states
@@ -462,7 +466,9 @@ class InactiveOrderState(Generic[AssetKey, InstrumentKey]):
         self._state = state
 
     @classmethod
-    def cancelled(cls, cancelled: Cancelled) -> InactiveOrderState[AssetKey, InstrumentKey]:
+    def cancelled(
+        cls, cancelled: Cancelled
+    ) -> InactiveOrderState[AssetKey, InstrumentKey]:
         return cls(cancelled)
 
     @classmethod
@@ -474,7 +480,9 @@ class InactiveOrderState(Generic[AssetKey, InstrumentKey]):
         return cls("Expired")
 
     @classmethod
-    def open_failed(cls, error: OrderError) -> InactiveOrderState[AssetKey, InstrumentKey]:
+    def open_failed(
+        cls, error: OrderError
+    ) -> InactiveOrderState[AssetKey, InstrumentKey]:
         return cls(error)
 
     @property
@@ -511,7 +519,9 @@ class InactiveOrderState(Generic[AssetKey, InstrumentKey]):
 class OrderState(Generic[AssetKey, InstrumentKey]):
     """Order state enum."""
 
-    def __init__(self, state: ActiveOrderState | InactiveOrderState[AssetKey, InstrumentKey]):
+    def __init__(
+        self, state: ActiveOrderState | InactiveOrderState[AssetKey, InstrumentKey]
+    ):
         self._state = state
 
     @classmethod
@@ -519,7 +529,9 @@ class OrderState(Generic[AssetKey, InstrumentKey]):
         return cls(state)
 
     @classmethod
-    def inactive(cls, state: InactiveOrderState[AssetKey, InstrumentKey]) -> OrderState[AssetKey, InstrumentKey]:
+    def inactive(
+        cls, state: InactiveOrderState[AssetKey, InstrumentKey]
+    ) -> OrderState[AssetKey, InstrumentKey]:
         return cls(state)
 
     @classmethod
@@ -619,15 +631,17 @@ class Order(Generic[ExchangeKey, InstrumentKey, AssetKey]):
         )
 
     def __hash__(self) -> int:
-        return hash((
-            self.key,
-            self.side,
-            self.price,
-            self.quantity,
-            self.kind,
-            self.time_in_force,
-            self.state,
-        ))
+        return hash(
+            (
+                self.key,
+                self.side,
+                self.price,
+                self.quantity,
+                self.kind,
+                self.time_in_force,
+                self.state,
+            )
+        )
 
 
 # Order request types
@@ -675,7 +689,9 @@ class RequestOpen:
         )
 
     def __hash__(self) -> int:
-        return hash((self.side, self.price, self.quantity, self.kind, self.time_in_force))
+        return hash(
+            (self.side, self.price, self.quantity, self.kind, self.time_in_force)
+        )
 
 
 @dataclass(frozen=True)
@@ -731,7 +747,11 @@ class AccountEvent(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     kind: AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]
 
     @classmethod
-    def new(cls, exchange: ExchangeKey, kind: AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]) -> AccountEvent[ExchangeKey, AssetKey, InstrumentKey]:
+    def new(
+        cls,
+        exchange: ExchangeKey,
+        kind: AccountEventKind[ExchangeKey, AssetKey, InstrumentKey],
+    ) -> AccountEvent[ExchangeKey, AssetKey, InstrumentKey]:
         return cls(exchange, kind)
 
     def __str__(self) -> str:
@@ -761,28 +781,42 @@ AccountEventKindType = Union[
 class AccountEventKind(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     """Account event kind."""
 
-    def __init__(self, kind: str, data: AccountEventKindType[ExchangeKey, AssetKey, InstrumentKey]):
+    def __init__(
+        self,
+        kind: str,
+        data: AccountEventKindType[ExchangeKey, AssetKey, InstrumentKey],
+    ):
         self._kind = kind
         self._data = data
 
     @classmethod
-    def snapshot(cls, snapshot: AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def snapshot(
+        cls, snapshot: AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]
+    ) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("snapshot", snapshot)
 
     @classmethod
-    def balance_snapshot(cls, balance: AssetBalance[AssetKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def balance_snapshot(
+        cls, balance: AssetBalance[AssetKey]
+    ) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("balance_snapshot", balance)
 
     @classmethod
-    def order_snapshot(cls, order: Order[ExchangeKey, InstrumentKey, AssetKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def order_snapshot(
+        cls, order: Order[ExchangeKey, InstrumentKey, AssetKey]
+    ) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("order_snapshot", order)
 
     @classmethod
-    def order_cancelled(cls, response: OrderResponseCancel[ExchangeKey, AssetKey, InstrumentKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def order_cancelled(
+        cls, response: OrderResponseCancel[ExchangeKey, AssetKey, InstrumentKey]
+    ) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("order_cancelled", response)
 
     @classmethod
-    def trade(cls, trade: Trade[AssetKey, InstrumentKey]) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
+    def trade(
+        cls, trade: Trade[AssetKey, InstrumentKey]
+    ) -> AccountEventKind[ExchangeKey, AssetKey, InstrumentKey]:
         return cls("trade", trade)
 
     @property
@@ -816,7 +850,11 @@ class InstrumentAccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
     orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]]
 
     @classmethod
-    def new(cls, instrument: InstrumentKey, orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]] | None = None) -> InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
+    def new(
+        cls,
+        instrument: InstrumentKey,
+        orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]] | None = None,
+    ) -> InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
         return cls(instrument, orders or [])
 
     def __str__(self) -> str:
@@ -847,7 +885,9 @@ class AccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
         cls,
         exchange: ExchangeKey,
         balances: list[AssetBalance[AssetKey]],
-        instruments: list[InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]]
+        instruments: list[
+            InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]
+        ],
     ) -> AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
         return cls(exchange, balances, instruments)
 
@@ -906,6 +946,7 @@ class AccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
 
 # Type aliases for convenience
 OrderSnapshot = Order
+
 
 # Placeholder for request types (to be implemented later)
 @dataclass(frozen=True)

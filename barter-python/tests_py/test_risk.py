@@ -57,8 +57,8 @@ class TestDefaultRiskManager:
         cancels = [MockOrderRequest()]
         opens = [MockOrderRequest()]
 
-        approved_cancels, approved_opens, refused_cancels, refused_opens = manager.check(
-            None, cancels, opens
+        approved_cancels, approved_opens, refused_cancels, refused_opens = (
+            manager.check(None, cancels, opens)
         )
 
         assert len(list(approved_cancels)) == 1

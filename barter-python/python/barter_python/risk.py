@@ -12,7 +12,9 @@ from .execution import OrderRequestCancel, OrderRequestOpen
 ExchangeKey = TypeVar("ExchangeKey")
 InstrumentKey = TypeVar("InstrumentKey")
 State = TypeVar("State")
-OrderRequestType = TypeVar("OrderRequestType", bound=Union[OrderRequestCancel, OrderRequestOpen])
+OrderRequestType = TypeVar(
+    "OrderRequestType", bound=Union[OrderRequestCancel, OrderRequestOpen]
+)
 
 
 class RiskApproved(Generic[OrderRequestType]):
@@ -45,12 +47,16 @@ class RiskApproved(Generic[OrderRequestType]):
 class RiskRefused(Generic[OrderRequestType]):
     """Type that wraps order requests that have failed RiskManager checks, including the failure reason."""
 
-    def __init__(self, item: OrderRequestCancel | OrderRequestOpen, reason: str) -> None:
+    def __init__(
+        self, item: OrderRequestCancel | OrderRequestOpen, reason: str
+    ) -> None:
         self.item = item
         self.reason = reason
 
     @classmethod
-    def new(cls, item: OrderRequestCancel | OrderRequestOpen, reason: str) -> RiskRefused:
+    def new(
+        cls, item: OrderRequestCancel | OrderRequestOpen, reason: str
+    ) -> RiskRefused:
         """Create a new RiskRefused with the given item and reason."""
         return cls(item, reason)
 
@@ -119,9 +125,17 @@ class DefaultRiskManager(Generic[State]):
         Iterable[RiskRefused[OrderRequestOpen[ExchangeKey, InstrumentKey]]],
     ]:
         """Approve all orders without any checks."""
-        approved_cancels: list[RiskApproved[OrderRequestCancel[ExchangeKey, InstrumentKey]]] = [RiskApproved(cancel) for cancel in cancels]
-        approved_opens: list[RiskApproved[OrderRequestOpen[ExchangeKey, InstrumentKey]]] = [RiskApproved(open_req) for open_req in opens]
-        refused_cancels: list[RiskRefused[OrderRequestCancel[ExchangeKey, InstrumentKey]]] = []
-        refused_opens: list[RiskRefused[OrderRequestOpen[ExchangeKey, InstrumentKey]]] = []
+        approved_cancels: list[
+            RiskApproved[OrderRequestCancel[ExchangeKey, InstrumentKey]]
+        ] = [RiskApproved(cancel) for cancel in cancels]
+        approved_opens: list[
+            RiskApproved[OrderRequestOpen[ExchangeKey, InstrumentKey]]
+        ] = [RiskApproved(open_req) for open_req in opens]
+        refused_cancels: list[
+            RiskRefused[OrderRequestCancel[ExchangeKey, InstrumentKey]]
+        ] = []
+        refused_opens: list[
+            RiskRefused[OrderRequestOpen[ExchangeKey, InstrumentKey]]
+        ] = []
 
         return approved_cancels, approved_opens, refused_cancels, refused_opens

@@ -1,6 +1,5 @@
 """Unit tests for pure Python data structures."""
 
-
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -293,6 +292,7 @@ class TestDataKind:
 
     def test_candle(self):
         from barter_python.data import Candle
+
         time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         candle = Candle(time, 50000.0, 51000.0, 49000.0, 50500.0, 100.0, 50)
         dk = DataKind.candle(candle)
@@ -302,6 +302,7 @@ class TestDataKind:
 
     def test_liquidation(self):
         from barter_python.data import Liquidation
+
         time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         liquidation = Liquidation(Side.BUY, 50000.0, 0.1, time)
         dk = DataKind.liquidation(liquidation)
@@ -313,7 +314,9 @@ class TestDataKind:
         trade = PublicTrade("123", 50000.0, 0.1, Side.BUY)
         dk1 = DataKind.trade(trade)
         dk2 = DataKind.trade(trade)
-        dk3 = DataKind.order_book_l1(OrderBookL1(datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)))
+        dk3 = DataKind.order_book_l1(
+            OrderBookL1(datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
+        )
         assert dk1 == dk2
         assert dk1 != dk3
 
@@ -327,7 +330,9 @@ class TestMarketEvent:
     def test_creation(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         trade = PublicTrade("123", 50000.0, 0.1, Side.BUY)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, trade)
         assert event.time_exchange == time_ex
@@ -339,7 +344,9 @@ class TestMarketEvent:
     def test_map_kind(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         trade = PublicTrade("123", 50000.0, 0.1, Side.BUY)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, trade)
 
@@ -352,7 +359,9 @@ class TestMarketEvent:
     def test_equality(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         trade = PublicTrade("123", 50000.0, 0.1, Side.BUY)
         event1 = MarketEvent(time_ex, time_rec, "binance", instrument, trade)
         event2 = MarketEvent(time_ex, time_rec, "binance", instrument, trade)
@@ -363,7 +372,9 @@ class TestMarketEvent:
     def test_repr(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         trade = PublicTrade("123", 50000.0, 0.1, Side.BUY)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, trade)
         assert "MarketEvent(" in repr(event)
@@ -373,7 +384,9 @@ class TestAsFunctions:
     def test_as_public_trade(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         trade = PublicTrade("123", 50000.0, 0.1, Side.BUY)
         dk = DataKind.trade(trade)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, dk)
@@ -385,7 +398,9 @@ class TestAsFunctions:
     def test_as_public_trade_none(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         obl1 = OrderBookL1(time_ex)
         dk = DataKind.order_book_l1(obl1)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, dk)
@@ -396,7 +411,9 @@ class TestAsFunctions:
     def test_as_order_book_l1(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         obl1 = OrderBookL1(time_ex)
         dk = DataKind.order_book_l1(obl1)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, dk)
@@ -408,7 +425,9 @@ class TestAsFunctions:
     def test_as_candle(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         candle = Candle(time_ex, 50000.0, 51000.0, 49000.0, 50500.0, 100.0, 50)
         dk = DataKind.candle(candle)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, dk)
@@ -420,7 +439,9 @@ class TestAsFunctions:
     def test_as_candle_none(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         trade = PublicTrade("123", 50000.0, 0.1, Side.BUY)
         dk = DataKind.trade(trade)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, dk)
@@ -431,7 +452,9 @@ class TestAsFunctions:
     def test_as_liquidation(self):
         time_ex = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         time_rec = datetime(2024, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
-        instrument = MarketDataInstrument.new("btc", "usdt", MarketDataInstrumentKind.spot())
+        instrument = MarketDataInstrument.new(
+            "btc", "usdt", MarketDataInstrumentKind.spot()
+        )
         liquidation = Liquidation(Side.BUY, 50000.0, 0.1, time_ex)
         dk = DataKind.liquidation(liquidation)
         event = MarketEvent(time_ex, time_rec, "binance", instrument, dk)

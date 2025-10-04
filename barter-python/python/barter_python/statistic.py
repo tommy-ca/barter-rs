@@ -108,7 +108,7 @@ class SharpeRatio(Generic[IntervalT]):
         """Calculate the SharpeRatio over the provided time interval."""
         if std_dev_returns.is_zero():
             # Use a very large Decimal to represent MAX (similar to Decimal::MAX in Rust)
-            return cls(value=Decimal('1e1000'), interval=returns_period)
+            return cls(value=Decimal("1e1000"), interval=returns_period)
         else:
             excess_returns = mean_return - risk_free_return
             ratio = excess_returns / std_dev_returns
@@ -155,11 +155,11 @@ class SortinoRatio(Generic[IntervalT]):
         if std_dev_loss_returns.is_zero():
             excess_returns = mean_return - risk_free_return
             if excess_returns > 0:
-                value = Decimal('1e1000')  # Very large positive (like Decimal::MAX)
+                value = Decimal("1e1000")  # Very large positive (like Decimal::MAX)
             elif excess_returns < 0:
-                value = Decimal('-1e1000')  # Very large negative (like Decimal::MIN)
+                value = Decimal("-1e1000")  # Very large negative (like Decimal::MIN)
             else:
-                value = Decimal('0')
+                value = Decimal("0")
             return cls(value=value, interval=returns_period)
         else:
             excess_returns = mean_return - risk_free_return
@@ -210,11 +210,11 @@ class CalmarRatio(Generic[IntervalT]):
         if max_drawdown.is_zero():
             excess_returns = mean_return - risk_free_return
             if excess_returns > 0:
-                value = Decimal('1e1000')  # Very large positive (like Decimal::MAX)
+                value = Decimal("1e1000")  # Very large positive (like Decimal::MAX)
             elif excess_returns < 0:
-                value = Decimal('-1e1000')  # Very large negative (like Decimal::MIN)
+                value = Decimal("-1e1000")  # Very large negative (like Decimal::MIN)
             else:
-                value = Decimal('0')
+                value = Decimal("0")
             return cls(value=value, interval=returns_period)
         else:
             excess_returns = mean_return - risk_free_return
@@ -255,15 +255,17 @@ class ProfitFactor:
     value: Decimal
 
     @classmethod
-    def calculate(cls, profits_gross_abs: Decimal, losses_gross_abs: Decimal) -> ProfitFactor | None:
+    def calculate(
+        cls, profits_gross_abs: Decimal, losses_gross_abs: Decimal
+    ) -> ProfitFactor | None:
         """Calculate the ProfitFactor given the provided gross profits and losses."""
         if profits_gross_abs.is_zero() and losses_gross_abs.is_zero():
             return None
 
         if losses_gross_abs.is_zero():
-            value = Decimal('1e1000')  # Very large positive (like Decimal::MAX)
+            value = Decimal("1e1000")  # Very large positive (like Decimal::MAX)
         elif profits_gross_abs.is_zero():
-            value = Decimal('-1e1000')  # Very large negative (like Decimal::MIN)
+            value = Decimal("-1e1000")  # Very large negative (like Decimal::MIN)
         else:
             value = abs(profits_gross_abs) / abs(losses_gross_abs)
 
@@ -284,7 +286,7 @@ class WinRate:
     @classmethod
     def calculate(cls, wins: Decimal, total: Decimal) -> WinRate | None:
         """Calculate the WinRate given the provided number of wins and total positions."""
-        if total == Decimal('0'):
+        if total == Decimal("0"):
             return None
         else:
             value = abs(wins) / abs(total)
@@ -303,7 +305,9 @@ class RateOfReturn(Generic[IntervalT]):
     interval: IntervalT
 
     @classmethod
-    def calculate(cls, mean_return: Decimal, returns_period: IntervalT) -> RateOfReturn[IntervalT]:
+    def calculate(
+        cls, mean_return: Decimal, returns_period: IntervalT
+    ) -> RateOfReturn[IntervalT]:
         """Calculate the RateOfReturn over the provided time interval."""
         return cls(value=mean_return, interval=returns_period)
 
@@ -378,7 +382,7 @@ class DrawdownGenerator:
     """
 
     peak: Decimal | None = None
-    drawdown_max: Decimal = Decimal('0')
+    drawdown_max: Decimal = Decimal("0")
     time_peak: datetime | None = None
     time_now: datetime = datetime.min
 
@@ -388,7 +392,7 @@ class DrawdownGenerator:
         time, value = point
         return cls(
             peak=value,
-            drawdown_max=Decimal('0'),
+            drawdown_max=Decimal("0"),
             time_peak=time,
             time_now=time,
         )
@@ -411,7 +415,7 @@ class DrawdownGenerator:
             # Reset parameters
             self.peak = value
             self.time_peak = time
-            self.drawdown_max = Decimal('0')
+            self.drawdown_max = Decimal("0")
 
             return ended_drawdown
         else:
@@ -473,7 +477,7 @@ class MeanDrawdownGenerator:
             mean_drawdown=MeanDrawdown(
                 mean_drawdown=drawdown.value,
                 mean_drawdown_ms=Decimal(str(drawdown.duration.total_seconds() * 1000)),
-            )
+            ),
         )
 
     def update(self, drawdown: Drawdown) -> None:
@@ -531,7 +535,9 @@ def build_drawdown_series(points: list[tuple[datetime, Decimal]]) -> list[Drawdo
     return drawdowns
 
 
-def generate_drawdown_series(points: Sequence[tuple[datetime, float | Decimal]]) -> list[Drawdown]:
+def generate_drawdown_series(
+    points: Sequence[tuple[datetime, float | Decimal]],
+) -> list[Drawdown]:
     """Generate a series of drawdowns from equity points.
 
     Args:
@@ -552,7 +558,9 @@ def generate_drawdown_series(points: Sequence[tuple[datetime, float | Decimal]])
     return build_drawdown_series(parsed_points)
 
 
-def calculate_max_drawdown(points: Sequence[tuple[datetime, float | Decimal]]) -> MaxDrawdown | None:
+def calculate_max_drawdown(
+    points: Sequence[tuple[datetime, float | Decimal]],
+) -> MaxDrawdown | None:
     """Calculate the maximum drawdown from equity points.
 
     Args:
@@ -572,7 +580,9 @@ def calculate_max_drawdown(points: Sequence[tuple[datetime, float | Decimal]]) -
     return generator.generate()
 
 
-def calculate_mean_drawdown(points: Sequence[tuple[datetime, float | Decimal]]) -> MeanDrawdown | None:
+def calculate_mean_drawdown(
+    points: Sequence[tuple[datetime, float | Decimal]],
+) -> MeanDrawdown | None:
     """Calculate the mean drawdown from equity points.
 
     Args:
