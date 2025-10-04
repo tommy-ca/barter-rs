@@ -1,6 +1,5 @@
 """Unit tests for pure Python data structures."""
 
-import pytest
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -15,7 +14,7 @@ from barter_python.data import (
     as_order_book_l1,
     as_public_trade,
 )
-from barter_python.instrument import ExchangeId, MarketDataInstrument, MarketDataInstrumentKind, Side
+from barter_python.instrument import MarketDataInstrument, MarketDataInstrumentKind, Side
 
 
 class TestPublicTrade:

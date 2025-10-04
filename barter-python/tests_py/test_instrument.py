@@ -1,6 +1,5 @@
 """Unit tests for pure Python instrument data structures."""
 
-import pytest
 
 from datetime import datetime, timezone
 from decimal import Decimal

@@ -8,7 +8,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Generic, Optional, TypeVar, Union
 
-from .instrument import MarketDataInstrument, Side
+from .instrument import Side
 
 InstrumentKey = TypeVar("InstrumentKey")
 
