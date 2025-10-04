@@ -57,23 +57,65 @@ and back-testing systems. It is made up of several easy-to-use, extensible crate
 
 ## Python Bindings
 The `barter-python` crate provides official Python bindings for the trading engine via
-[PyO3](https://pyo3.rs/). This repository already includes everything needed to build and exercise
-the extension locally:
+[PyO3](https://pyo3.rs/). This enables Python developers to leverage Barter's high-performance
+Rust core for live trading, backtesting, and algorithmic strategies.
+
+### Quickstart
+Install the build tool and develop the extension:
 
 ```
 pip install maturin
 maturin develop
 python -c "import barter_python as bp; print(bp.shutdown_event().is_terminal())"
+```
 
-# Run the packaged backtest CLI once the extension is built
+### Basic Usage
+Load a system configuration and run a backtest:
+
+```python
+import barter_python as bp
+
+# Load configuration
+config = bp.SystemConfig.from_json("barter/examples/config/system_config.json")
+
+# Run historic backtest
+summary = bp.run_historic_backtest(
+    config=config,
+    market_data_path="barter/examples/data/binance_spot_market_data_with_disconnect_events.json",
+    interval="daily"
+)
+
+print(f"Total PnL: {summary.pnl}")
+print(f"Sharpe Ratio: {summary.sharpe_ratio.value}")
+```
+
+Start a live trading system:
+
+```python
+import barter_python as bp
+
+config = bp.SystemConfig.from_json("barter/examples/config/system_config.json")
+handle = bp.start_system(config, trading_enabled=False)
+
+# Enable trading
+handle.set_trading_enabled(True)
+
+# Shutdown and get summary
+summary = handle.shutdown_with_summary(interval="annual_365")
+print(f"Instruments traded: {len(summary.instruments)}")
+```
+
+### CLI Tool
+Run backtests from the command line:
+
+```
 barter-backtest \
   --config barter/examples/config/system_config.json \
   --market-data barter/examples/data/binance_spot_market_data_with_disconnect_events.json \
   --pretty
 ```
 
-See `barter-python/README.md` for additional examples, integration guidance, and release process
-details.
+See `barter-python/README.md` for comprehensive examples, API reference, integration guidance, and release process details.
 
 ## Examples
 * See [here][barter-examples] for the compilable example including imports.
