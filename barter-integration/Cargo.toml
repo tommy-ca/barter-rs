@@ -13,7 +13,6 @@ categories = ["accessibility", "simulation"]
 
 [dev-dependencies]
 tokio-test = { workspace = true }
-sha2 = { workspace = true }
 
 [dependencies]
 # Barter Ecosystem
