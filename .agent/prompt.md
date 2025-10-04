@@ -5,7 +5,7 @@ You have access to the current barter-rs repository as well as the barter-python
 Make a commit and push your changes after every atomic change.
 
 ## Scope
-* focus on barter-python package
+* focus on barter-python bindings to other rust packages
 
 ## Principles
 * TDD

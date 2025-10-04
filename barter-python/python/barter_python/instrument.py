@@ -205,11 +205,23 @@ class Keyed(Generic[KeyType, ValueType]):
         self.key = key
         self.value = value
 
+    @classmethod
+    def new(cls, key: KeyType, value: ValueType) -> Keyed[KeyType, ValueType]:
+        return cls(key, value)
+
     def __str__(self) -> str:
         return f"{self.key}, {self.value}"
 
     def __repr__(self) -> str:
         return f"Keyed(key={self.key!r}, value={self.value!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Keyed):
+            return NotImplemented
+        return self.key == other.key and self.value == other.value
+
+    def __hash__(self) -> int:
+        return hash((self.key, self.value))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Keyed):
@@ -500,6 +512,10 @@ class InstrumentKind(Generic[AssetKey]):
 
     def __hash__(self) -> int:
         return hash((self._kind, self._data))
+
+
+ExchangeKey = TypeVar("ExchangeKey")
+AssetKey = TypeVar("AssetKey")
 
 
 class Instrument(Generic[AssetKey]):
@@ -854,3 +870,8 @@ class ExchangeAsset:
 
     def __hash__(self) -> int:
         return hash((self.exchange, self.asset))
+
+
+
+
+
