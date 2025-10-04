@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
-from typing import Protocol
+from typing import Generic, Protocol, TypeVar
 
 
 class TimeInterval(Protocol):
@@ -77,3 +78,53 @@ class TimeDeltaInterval:
     @property
     def interval(self) -> timedelta:
         return self.delta
+
+
+IntervalT = TypeVar("IntervalT", bound=TimeInterval)
+
+
+@dataclass(frozen=True)
+class SharpeRatio(Generic[IntervalT]):
+    """Sharpe Ratio value over a specific time interval.
+
+    Sharpe Ratio measures the risk-adjusted return of an investment by comparing
+    its excess returns (over risk-free rate) to its standard deviation.
+
+    See docs: https://www.investopedia.com/articles/07/sharpe_ratio.asp
+    """
+
+    value: Decimal
+    interval: IntervalT
+
+    @classmethod
+    def calculate(
+        cls,
+        risk_free_return: Decimal,
+        mean_return: Decimal,
+        std_dev_returns: Decimal,
+        returns_period: IntervalT,
+    ) -> SharpeRatio[IntervalT]:
+        """Calculate the SharpeRatio over the provided time interval."""
+        if std_dev_returns.is_zero():
+            # Use a very large Decimal to represent MAX (similar to Decimal::MAX in Rust)
+            return cls(value=Decimal('1e1000'), interval=returns_period)
+        else:
+            excess_returns = mean_return - risk_free_return
+            ratio = excess_returns / std_dev_returns
+            return cls(value=ratio, interval=returns_period)
+
+    def scale(self, target: TimeInterval) -> SharpeRatio[TimeInterval]:
+        """Scale the SharpeRatio from current interval to target interval.
+
+        This scaling assumes returns are independently and identically distributed (IID).
+        """
+        # Determine scale factor: square root of number of Self Intervals in Target Intervals
+        target_secs = Decimal(str(target.interval.total_seconds()))
+        current_secs = Decimal(str(self.interval.interval.total_seconds()))
+
+        scale_ratio = target_secs / current_secs
+        scale = Decimal(str(math.sqrt(float(scale_ratio))))
+
+        new_value = self.value * scale
+
+        return SharpeRatio(value=new_value, interval=target)
