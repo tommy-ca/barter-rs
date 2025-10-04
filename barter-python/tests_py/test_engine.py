@@ -1,6 +1,6 @@
 """Tests for the pure Python engine module."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from barter_python.data import Candle, DataKind, MarketEvent, PublicTrade
@@ -12,6 +12,32 @@ from barter_python.engine import (
     ExchangeFilter,
     InstrumentState,
     TradingState,
+)
+from barter_python.execution import (
+    AccountEvent,
+    AccountEventKind,
+    AccountSnapshot,
+    AssetFees,
+    Cancelled,
+    ClientOrderId,
+    InstrumentAccountSnapshot,
+    OpenInFlight,
+    Order,
+    OrderId,
+    OrderKey,
+    OrderKind,
+    OrderResponseCancel,
+    OrderState,
+    StrategyId,
+    TimeInForce,
+    Trade,
+    TradeId,
+)
+from barter_python.execution import (
+    AssetBalance as ExecutionAssetBalance,
+)
+from barter_python.execution import (
+    Balance as ExecutionBalance,
 )
 from barter_python.instrument import Side
 from barter_python.risk import DefaultRiskManager
@@ -239,3 +265,172 @@ class TestEngine:
 
         engine.set_trading_enabled(True)
         assert engine.state.is_trading_enabled()
+
+    def test_process_account_event_snapshot_updates_balances_and_orders(self):
+        """Snapshot events should refresh balances and instrument orders."""
+        initial_state = EngineState()
+        inst_state = InstrumentState(instrument=1, exchange=0)
+        initial_state.update_instrument_state(1, inst_state)  # type: ignore[arg-type]
+
+        engine = Engine(initial_state, DefaultStrategy(), DefaultRiskManager())
+
+        # Prepare account snapshot with one balance and one order
+        balance = ExecutionAssetBalance.new(
+            asset="USDT",
+            balance=ExecutionBalance.new(Decimal("1000"), Decimal("400")),
+            time_exchange=datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
+        )
+
+        order_key = OrderKey(
+            exchange=0,  # type: ignore[arg-type]
+            instrument=1,  # type: ignore[arg-type]
+            strategy=StrategyId.new("strat-1"),
+            cid=ClientOrderId.new("order-1"),
+        )
+        order = Order(
+            key=order_key,
+            side=Side.BUY,
+            price=Decimal("25000"),
+            quantity=Decimal("0.1"),
+            kind=OrderKind.LIMIT,
+            time_in_force=TimeInForce.GOOD_UNTIL_CANCELLED,
+            state=OrderState.active(OpenInFlight()),  # type: ignore[arg-type]
+        )
+
+        instrument_snapshot = InstrumentAccountSnapshot.new(  # type: ignore[arg-type]
+            instrument=1, orders=[order]
+        )
+        snapshot = AccountSnapshot.new(
+            exchange=0,  # type: ignore[arg-type]
+            balances=[balance],
+            instruments=[instrument_snapshot],
+        )
+        account_event = AccountEvent.new(
+            exchange=0,  # type: ignore[arg-type]
+            kind=AccountEventKind.snapshot(snapshot),
+        )
+
+        engine.process_account_event(account_event)
+
+        assert "USDT" in engine.state.balances
+        balance_state = engine.state.balances["USDT"]
+        assert balance_state.balance.total == Decimal("1000")
+        assert balance_state.balance.free == Decimal("400")
+
+        inst_state_after = engine.state.get_instrument_state(1)  # type: ignore[arg-type]
+        assert inst_state_after is not None
+        assert order_key in inst_state_after.orders
+        assert inst_state_after.orders[order_key].price == Decimal("25000")
+
+    def test_process_account_event_order_snapshot_updates_single_order(self):
+        """Order snapshot event should upsert order in instrument state."""
+        initial_state = EngineState()
+        inst_state = InstrumentState(instrument=1, exchange=0)
+        initial_state.update_instrument_state(1, inst_state)  # type: ignore[arg-type]
+
+        engine = Engine(initial_state, DefaultStrategy(), DefaultRiskManager())
+
+        order_key = OrderKey(
+            exchange=0,  # type: ignore[arg-type]
+            instrument=1,  # type: ignore[arg-type]
+            strategy=StrategyId.new("strat-1"),
+            cid=ClientOrderId.new("order-2"),
+        )
+        order = Order(
+            key=order_key,
+            side=Side.SELL,
+            price=Decimal("26000"),
+            quantity=Decimal("0.2"),
+            kind=OrderKind.LIMIT,
+            time_in_force=TimeInForce.GOOD_UNTIL_CANCELLED,
+            state=OrderState.active(OpenInFlight()),  # type: ignore[arg-type]
+        )
+
+        account_event = AccountEvent.new(
+            exchange=0,  # type: ignore[arg-type]
+            kind=AccountEventKind.order_snapshot(order),
+        )
+
+        engine.process_account_event(account_event)
+
+        inst_state_after = engine.state.get_instrument_state(1)  # type: ignore[arg-type]
+        assert inst_state_after is not None
+        assert order_key in inst_state_after.orders
+        assert inst_state_after.orders[order_key].quantity == Decimal("0.2")
+
+    def test_process_account_event_order_cancelled_removes_order(self):
+        """Order cancellation should remove the order from instrument state."""
+        initial_state = EngineState()
+
+        order_key = OrderKey(
+            exchange=0,  # type: ignore[arg-type]
+            instrument=1,  # type: ignore[arg-type]
+            strategy=StrategyId.new("strat-2"),
+            cid=ClientOrderId.new("order-3"),
+        )
+
+        order = Order(
+            key=order_key,
+            side=Side.BUY,
+            price=Decimal("25500"),
+            quantity=Decimal("0.05"),
+            kind=OrderKind.LIMIT,
+            time_in_force=TimeInForce.GOOD_UNTIL_CANCELLED,
+            state=OrderState.active(OpenInFlight()),  # type: ignore[arg-type]
+        )
+
+        inst_state = InstrumentState(instrument=1, exchange=0, orders={order_key: order})
+        initial_state.update_instrument_state(1, inst_state)  # type: ignore[arg-type]
+
+        engine = Engine(initial_state, DefaultStrategy(), DefaultRiskManager())
+
+        cancel_response = OrderResponseCancel(
+            key=order_key,
+            state=Cancelled(
+                id=OrderId.new("ex-order-3"),
+                time_exchange=datetime(2024, 1, 1, 12, 5, tzinfo=timezone.utc),
+            ),
+        )
+        account_event = AccountEvent.new(
+            exchange=0,  # type: ignore[arg-type]
+            kind=AccountEventKind.order_cancelled(cancel_response),
+        )
+
+        engine.process_account_event(account_event)
+
+        inst_state_after = engine.state.get_instrument_state(1)  # type: ignore[arg-type]
+        assert inst_state_after is not None
+        assert order_key not in inst_state_after.orders
+
+    def test_process_account_event_trade_updates_position(self):
+        """Trades should update instrument position quantity and side."""
+        initial_state = EngineState()
+        inst_state = InstrumentState(instrument=1, exchange=0)
+        initial_state.update_instrument_state(1, inst_state)  # type: ignore[arg-type]
+
+        engine = Engine(initial_state, DefaultStrategy(), DefaultRiskManager())
+
+        trade_event = Trade(
+            id=TradeId.new("trade-1"),
+            order_id=OrderId.new("order-1"),
+            instrument=1,  # type: ignore[arg-type]
+            strategy=StrategyId.new("strat-1"),
+            time_exchange=datetime(2024, 1, 1, 12, 10, tzinfo=timezone.utc),
+            side=Side.BUY,
+            price=Decimal("25000"),
+            quantity=Decimal("0.1"),
+            fees=AssetFees.quote_fees(Decimal("5")),
+        )
+        account_event = AccountEvent.new(
+            exchange=0,  # type: ignore[arg-type]
+            kind=AccountEventKind.trade(trade_event),
+        )
+
+        engine.process_account_event(account_event)
+
+        inst_state_after = engine.state.get_instrument_state(1)  # type: ignore[arg-type]
+        assert inst_state_after is not None
+        assert inst_state_after.position is not None
+        assert inst_state_after.position.side == "buy"
+        assert inst_state_after.position.quantity_abs == Decimal("0.1")
+        assert inst_state_after.position.entry_price == Decimal("25000")

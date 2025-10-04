@@ -10,11 +10,15 @@ from typing import Any, Generic, Protocol, TypeVar
 
 from .data import Candle, MarketEvent, OrderBookL1, as_candle, as_public_trade
 from .execution import (
+    AccountEvent,
+    AccountSnapshot,
     AssetBalance,
     Order,
     OrderKey,
     OrderRequestCancel,
     OrderRequestOpen,
+    OrderResponseCancel,
+    Trade,
 )
 from .instrument import ExchangeId, InstrumentIndex
 from .risk import RiskManager
@@ -297,10 +301,168 @@ class Engine(Generic[State]):
             )
             self.state.update_instrument_state(event.instrument, updated_inst_state)
 
-    def process_account_event(self, event: object) -> None:  # TODO: Define AccountEvent
+    def process_account_event(
+        self,
+        event: AccountEvent[ExchangeKey, AssetKey, InstrumentKey],
+    ) -> None:
         """Process an account event and update engine state."""
-        # TODO: Update balances, orders, positions from account event
-        pass
+
+        kind = event.kind.kind
+        data = event.kind.data
+
+        if kind == "snapshot" and isinstance(data, AccountSnapshot):
+            self._apply_account_snapshot(event.exchange, data)
+        elif kind == "balance_snapshot" and isinstance(data, AssetBalance):
+            self._apply_balance_snapshot(data)
+        elif kind == "order_snapshot" and isinstance(data, Order):
+            self._apply_order_snapshot(event.exchange, data)
+        elif kind == "order_cancelled" and isinstance(data, OrderResponseCancel):
+            self._apply_order_cancelled(data)
+        elif kind == "trade" and isinstance(data, Trade):
+            self._apply_trade(event.exchange, data)
+        else:
+            raise ValueError(f"Unsupported account event kind: {kind}")
+
+    def _apply_account_snapshot(
+        self,
+        exchange: ExchangeKey,
+        snapshot: AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey],
+    ) -> None:
+        """Refresh balances and orders from a full account snapshot."""
+
+        self.state.balances = {
+            str(balance.asset): balance for balance in snapshot.balances
+        }
+
+        for instrument_snapshot in snapshot.instruments:
+            instrument_id = instrument_snapshot.instrument
+            existing_state = self.state.get_instrument_state(instrument_id)
+
+            if existing_state is None:
+                existing_state = InstrumentState(
+                    instrument=instrument_id,
+                    exchange=exchange,
+                )
+
+            existing_state.orders = {
+                order.key: order for order in instrument_snapshot.orders
+            }
+
+            self.state.update_instrument_state(instrument_id, existing_state)
+
+    def _apply_balance_snapshot(self, balance: AssetBalance[AssetKey]) -> None:
+        """Update a single balance snapshot."""
+
+        self.state.balances[str(balance.asset)] = balance
+
+    def _apply_order_snapshot(
+        self,
+        exchange: ExchangeKey,
+        order: Order[ExchangeKey, InstrumentKey, AssetKey],
+    ) -> None:
+        """Upsert a single order snapshot into engine state."""
+
+        instrument_id = order.key.instrument
+        inst_state = self.state.get_instrument_state(instrument_id)
+
+        if inst_state is None:
+            inst_state = InstrumentState(
+                instrument=instrument_id,
+                exchange=exchange,
+            )
+
+        inst_state.orders[order.key] = order
+        self.state.update_instrument_state(instrument_id, inst_state)
+
+    def _apply_order_cancelled(
+        self,
+        response: OrderResponseCancel[ExchangeKey, AssetKey, InstrumentKey],
+    ) -> None:
+        """Remove cancelled order from engine state."""
+
+        instrument_id = response.key.instrument
+        inst_state = self.state.get_instrument_state(instrument_id)
+
+        if inst_state is None:
+            return
+
+        inst_state.orders.pop(response.key, None)
+        self.state.update_instrument_state(instrument_id, inst_state)
+
+    def _apply_trade(
+        self,
+        exchange: ExchangeKey,
+        trade: Trade[AssetKey, InstrumentKey],
+    ) -> None:
+        """Update instrument position from a trade event."""
+
+        instrument_id = trade.instrument
+        inst_state = self.state.get_instrument_state(instrument_id)
+
+        if inst_state is None:
+            inst_state = InstrumentState(
+                instrument=instrument_id,
+                exchange=exchange,
+            )
+
+        current_position = inst_state.position
+        trade_signed_qty = (
+            trade.quantity if trade.side.value == "buy" else -trade.quantity
+        )
+
+        if current_position is None:
+            inst_state.position = Position(
+                instrument=inst_state.instrument,
+                side=trade.side.value,
+                quantity_abs=abs(trade_signed_qty),
+                entry_price=trade.price,
+            )
+        else:
+            current_signed_qty = (
+                current_position.quantity_abs
+                if current_position.side == "buy"
+                else -current_position.quantity_abs
+            )
+            new_signed_qty = current_signed_qty + trade_signed_qty
+
+            if new_signed_qty == 0:
+                inst_state.position = None
+            else:
+                if (current_signed_qty >= 0 and trade_signed_qty >= 0) or (
+                    current_signed_qty <= 0 and trade_signed_qty <= 0
+                ):
+                    total_quantity = abs(current_signed_qty) + abs(trade_signed_qty)
+                    weighted_price = (
+                        (abs(current_signed_qty) * current_position.entry_price)
+                        + (abs(trade_signed_qty) * trade.price)
+                    ) / total_quantity
+                    inst_state.position = Position(
+                        instrument=inst_state.instrument,
+                        side="buy" if new_signed_qty > 0 else "sell",
+                        quantity_abs=abs(new_signed_qty),
+                        entry_price=weighted_price,
+                    )
+                else:
+                    if abs(trade_signed_qty) >= abs(current_signed_qty):
+                        inst_state.position = (
+                            None
+                            if new_signed_qty == 0
+                            else Position(
+                                instrument=inst_state.instrument,
+                                side="buy" if new_signed_qty > 0 else "sell",
+                                quantity_abs=abs(new_signed_qty),
+                                entry_price=trade.price,
+                            )
+                        )
+                    else:
+                        inst_state.position = Position(
+                            instrument=inst_state.instrument,
+                            side="buy" if current_signed_qty > 0 else "sell",
+                            quantity_abs=abs(new_signed_qty),
+                            entry_price=current_position.entry_price,
+                        )
+
+        self.state.update_instrument_state(instrument_id, inst_state)
 
     def generate_algo_orders(
         self,
