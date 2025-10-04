@@ -12,10 +12,10 @@ from decimal import Decimal
 from pathlib import Path
 from typing import AsyncIterable, Generic, Iterable, Protocol, TypeVar
 
-from .data import MarketEvent, DataKind, PublicTrade, OrderBookL1, Candle, Liquidation
+from .data import MarketEvent, DataKind, PublicTrade, OrderBookL1, Candle, Liquidation, as_public_trade, as_candle
 from .execution import AccountEvent
 from .statistic import TimeInterval
-from .strategy import AlgoStrategy, ClosePositionsStrategy, OnDisconnectStrategy, OnTradingDisabledStrategy
+from .strategy import AlgoStrategy, ClosePositionsStrategy, OnDisconnectStrategy, OnTradingDisabledStrategy, EngineState, InstrumentState, Position
 from . import TradingSummary
 
 # Type variables for generic backtest interfaces
@@ -161,7 +161,7 @@ class BacktestArgsConstant(Generic[MarketEventKind, SummaryInterval]):
     executions: list[ExecutionConfig]  # TODO: Define this
     market_data: BacktestMarketData[MarketEventKind]
     summary_interval: SummaryInterval
-    engine_state: EngineState  # TODO: Define this
+    engine_state: EngineState
 
 
 @dataclass(frozen=True)
@@ -215,8 +215,8 @@ async def backtest(
     Returns:
         Summary of the backtest results
     """
-    # Initialize engine state
-    engine_state = args_constant.engine_state
+    # Initialize engine simulator
+    simulator = BacktestEngineSimulator(args_constant.engine_state)
 
     # Track start time
     time_start = await args_constant.market_data.time_first_event()
@@ -225,24 +225,16 @@ async def backtest(
     market_stream = await args_constant.market_data.stream()
     async for market_event in market_stream:
         # Update engine state with market data
-        # This is a simplified implementation - in a real engine this would be more complex
-        pass
+        await simulator.process_market_event(market_event)
 
         # Generate orders using strategy
-        # cancel_requests, open_requests = args_dynamic.strategy.generate_algo_orders(engine_state)
+        # cancel_requests, open_requests = args_dynamic.strategy.generate_algo_orders(simulator.state)
 
         # Process orders and account events
         # This would update positions, balances, etc.
 
     # Generate trading summary
-    # This is a placeholder - real implementation would calculate actual metrics
-    trading_summary = TradingSummary(
-        time_engine_start=time_start,
-        time_engine_end=datetime.now(),
-        instrument_tear_sheets=[],
-        asset_tear_sheets=[],
-        portfolio_tear_sheet=None,
-    )
+    trading_summary = simulator.get_trading_summary(args_dynamic.risk_free_return, args_constant.summary_interval)
 
     return BacktestSummary(
         id=args_dynamic.id,
@@ -262,6 +254,45 @@ class ExecutionConfig:
     pass
 
 
-class EngineState:
-    """Placeholder for engine state."""
-    pass
+class BacktestEngineSimulator:
+    """Simple engine simulator for backtesting."""
+
+    def __init__(self, initial_state: EngineState):
+        self.state = initial_state
+        self.current_time = None
+
+    async def process_market_event(self, event: MarketEvent[int, DataKind]) -> None:
+        """Process a market event and update engine state."""
+        self.current_time = event.time_exchange
+
+        # Update instrument prices based on market data
+        if event.kind.kind == "trade":
+            trade_event = as_public_trade(event)
+            if trade_event:
+                trade = trade_event.kind
+                # Update price for the instrument
+                for inst_state in self.state.instruments:
+                    if inst_state.instrument == trade_event.instrument:
+                        inst_state.price = trade.price
+                        break
+        elif event.kind.kind == "candle":
+            candle_event = as_candle(event)
+            if candle_event:
+                candle = candle_event.kind
+                # Update price with candle close
+                for inst_state in self.state.instruments:
+                    if inst_state.instrument == candle_event.instrument:
+                        inst_state.price = candle.close
+                        break
+
+    def get_trading_summary(self, risk_free_return: Decimal, summary_interval: TimeInterval) -> TradingSummary:
+        """Generate a trading summary from current state."""
+        # This is a placeholder implementation
+        # In a real implementation, this would calculate actual metrics
+        return TradingSummary(
+            time_engine_start=self.current_time or datetime.now(),
+            time_engine_end=self.current_time or datetime.now(),
+            instrument_tear_sheets=[],
+            asset_tear_sheets=[],
+            portfolio_tear_sheet=None,
+        )
