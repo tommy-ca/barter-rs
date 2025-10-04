@@ -2,13 +2,12 @@ name: "Barter CI"
 
 on:
   push:
-    paths-ignore:
-      - "**.md"
-    branches: ["develop"]
+    branches: ["main"]
   pull_request:
-    branches: ["develop"]
-    paths-ignore:
-      - "**.md"
+    branches: ["main"]
+  merge_group:
+    branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   check:
@@ -16,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -37,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -58,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -85,11 +84,11 @@ jobs:
           args: -- -D warnings
 
   python-tests:
-    name: python integration tests
+    name: python tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -111,8 +110,12 @@ jobs:
           python -m pip install maturin pytest
         working-directory: barter-python
 
-      - name: Run pytest integration suite
-        run: pytest -m integration --maxfail=1 tests_py
+      - name: Run pytest suite
+        run: pytest -q tests_py
         working-directory: barter-python
         env:
           BARTER_PYTHON_BUILD_RELEASE: "1"
+
+      - name: Build wheel artifact smoke test
+        run: maturin build --release --no-sdist
+        working-directory: barter-python
