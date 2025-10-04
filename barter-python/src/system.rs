@@ -2,12 +2,14 @@ use crate::{
     PyEngineEvent,
     command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen, parse_decimal},
     config::PySystemConfig,
+    integration::{PySnapUpdates, PySnapshot},
     summary::{PyTradingSummary, summary_to_py},
 };
 use barter::{
     EngineEvent,
     engine::{
-        Engine,
+        Engine, Processor,
+        audit::{AuditTick, EngineAudit, context::EngineContext},
         clock::{HistoricalClock, LiveClock},
         execution_tx::MultiExchangeTxMap,
         state::{
@@ -39,7 +41,10 @@ use barter_instrument::{
     index::IndexedInstruments,
     instrument::InstrumentIndex,
 };
-use barter_integration::channel::Tx;
+use barter_integration::{
+    channel::{Tx, UnboundedRx},
+    snapshot::{SnapUpdates, Snapshot},
+};
 use futures::{Stream, StreamExt, stream};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyDict};
 use rust_decimal::Decimal;
@@ -49,8 +54,10 @@ use std::{
     io::Read,
     path::Path,
     sync::{Arc, Mutex, MutexGuard},
+    time::Duration,
 };
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
+use tokio::sync::mpsc::error::TryRecvError;
 use tracing::{info, warn};
 
 type DefaultEngineState = EngineState<DefaultGlobalData, DefaultInstrumentMarketData>;
@@ -62,6 +69,97 @@ type TradingEngine = Engine<
     DefaultRiskManager<DefaultEngineState>,
 >;
 type RunningSystem = System<TradingEngine, EngineEvent>;
+type TradingSnapshotTick = AuditTick<DefaultEngineState, EngineContext>;
+type TradingEngineAudit = <TradingEngine as Processor<EngineEvent<DataKind>>>::Audit;
+type TradingAuditTick = AuditTick<TradingEngineAudit, EngineContext>;
+type TradingAuditSnapUpdates = SnapUpdates<TradingSnapshotTick, UnboundedRx<TradingAuditTick>>;
+
+#[pyclass(module = "barter_python", name = "AuditUpdates", unsendable)]
+pub struct PyAuditUpdates {
+    runtime: Arc<Runtime>,
+    receiver: Mutex<Option<UnboundedRx<TradingAuditTick>>>,
+}
+
+impl PyAuditUpdates {
+    fn new(runtime: Arc<Runtime>, receiver: UnboundedRx<TradingAuditTick>) -> Self {
+        Self {
+            runtime,
+            receiver: Mutex::new(Some(receiver)),
+        }
+    }
+
+    fn with_receiver<R, T>(&self, func: R) -> PyResult<T>
+    where
+        R: FnOnce(&mut UnboundedRx<TradingAuditTick>) -> PyResult<T>,
+    {
+        let mut guard = self
+            .receiver
+            .lock()
+            .map_err(|_| PyValueError::new_err("audit updates receiver poisoned"))?;
+
+        let receiver = guard
+            .as_mut()
+            .ok_or_else(|| PyValueError::new_err("audit updates stream exhausted"))?;
+
+        func(receiver)
+    }
+}
+
+#[pymethods]
+impl PyAuditUpdates {
+    #[pyo3(signature = (timeout=None))]
+    pub fn recv(&self, py: Python<'_>, timeout: Option<f64>) -> PyResult<Option<PyObject>> {
+        self.with_receiver(|receiver| {
+            let runtime = Arc::clone(&self.runtime);
+
+            let result = if let Some(secs) = timeout {
+                if secs.is_sign_negative() {
+                    return Err(PyValueError::new_err("timeout must be non-negative"));
+                }
+
+                let timeout_duration = Duration::from_secs_f64(secs);
+                let rx = &mut receiver.rx;
+                runtime
+                    .block_on(async { tokio::time::timeout(timeout_duration, rx.recv()).await })
+                    .map_err(|_| PyValueError::new_err("timeout elapsed awaiting audit update"))?
+            } else {
+                runtime.block_on(receiver.rx.recv())
+            };
+
+            match result {
+                Some(tick) => audit_tick_summary_to_py(py, &tick).map(Some),
+                None => Ok(None),
+            }
+        })
+    }
+
+    pub fn try_recv(&self, py: Python<'_>) -> PyResult<Option<PyObject>> {
+        self.with_receiver(|receiver| match receiver.rx.try_recv() {
+            Ok(tick) => audit_tick_summary_to_py(py, &tick).map(Some),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Ok(None),
+        })
+    }
+
+    pub fn is_closed(&self) -> PyResult<bool> {
+        let guard = self
+            .receiver
+            .lock()
+            .map_err(|_| PyValueError::new_err("audit updates receiver poisoned"))?;
+        Ok(guard
+            .as_ref()
+            .map(|receiver| receiver.rx.is_closed())
+            .unwrap_or(true))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(if self.is_closed()? {
+            "AuditUpdates(closed=True)".to_string()
+        } else {
+            "AuditUpdates(closed=False)".to_string()
+        })
+    }
+}
 
 #[pyclass(module = "barter_python", name = "SystemHandle", unsendable)]
 pub struct PySystemHandle {
@@ -119,6 +217,17 @@ impl PySystemHandle {
             self.send_event(&event_ref)?;
         }
         Ok(())
+    }
+
+    /// Take ownership of the audit snapshot and update stream if audit mode is enabled.
+    pub fn take_audit(&self, py: Python<'_>) -> PyResult<Option<Py<PySnapUpdates>>> {
+        let mut guard = self.lock_system()?;
+        let system = guard.as_mut().ok_or_else(Self::system_not_running_err)?;
+
+        match system.take_audit() {
+            Some(updates) => build_py_snapupdates(py, Arc::clone(&self.runtime), updates).map(Some),
+            None => Ok(None),
+        }
     }
 
     /// Send open order requests to the engine.
@@ -226,12 +335,13 @@ impl PySystemHandle {
 
 /// Start a live or paper trading system using the provided configuration.
 #[pyfunction]
-#[pyo3(signature = (config, *, trading_enabled = true, initial_balances = None))]
+#[pyo3(signature = (config, *, trading_enabled = true, initial_balances = None, audit = false))]
 pub fn start_system(
     py: Python<'_>,
     config: &PySystemConfig,
     trading_enabled: bool,
     initial_balances: Option<PyObject>,
+    audit: bool,
 ) -> PyResult<PySystemHandle> {
     let runtime = Arc::new(
         RuntimeBuilder::new_multi_thread()
@@ -241,6 +351,12 @@ pub fn start_system(
     );
 
     let seeded_balances = parse_initial_balances(py, initial_balances)?;
+
+    let audit_mode = if audit {
+        AuditMode::Enabled
+    } else {
+        AuditMode::Disabled
+    };
 
     let mut config_inner = config.clone_inner();
 
@@ -274,7 +390,7 @@ pub fn start_system(
 
     let system_build = SystemBuilder::new(args)
         .engine_feed_mode(EngineFeedMode::Stream)
-        .audit_mode(AuditMode::Disabled)
+        .audit_mode(audit_mode)
         .trading_state(trading_state)
         .balances(seeded_balances)
         .build::<EngineEvent, _>()
@@ -354,6 +470,79 @@ pub fn run_historic_backtest(
         SummaryInterval::Daily => summary_to_py(py, summary.generate(Daily)),
         SummaryInterval::Annual252 => summary_to_py(py, summary.generate(Annual252)),
         SummaryInterval::Annual365 => summary_to_py(py, summary.generate(Annual365)),
+    }
+}
+
+fn build_py_snapupdates(
+    py: Python<'_>,
+    runtime: Arc<Runtime>,
+    snap_updates: TradingAuditSnapUpdates,
+) -> PyResult<Py<PySnapUpdates>> {
+    let TradingAuditSnapUpdates { snapshot, updates } = snap_updates;
+
+    let snapshot_value = snapshot_summary_to_py(py, &snapshot)?;
+    let snapshot_inner = Snapshot::new(snapshot_value.clone_ref(py));
+    let py_snapshot = Py::new(py, PySnapshot::from_inner(snapshot_inner))?;
+
+    let py_updates = Py::new(py, PyAuditUpdates::new(runtime, updates))?;
+    let snap_updates_value =
+        PySnapUpdates::__new__(py, py_snapshot.clone_ref(py), py_updates.to_object(py))?;
+
+    Py::new(py, snap_updates_value)
+}
+
+fn snapshot_summary_to_py(py: Python<'_>, snapshot: &TradingSnapshotTick) -> PyResult<PyObject> {
+    let summary = PyDict::new_bound(py);
+    summary.set_item(
+        "trading_enabled",
+        matches!(snapshot.event.trading, TradingState::Enabled),
+    )?;
+    summary.set_item("asset_count", snapshot.event.assets.0.len())?;
+    summary.set_item("instrument_count", snapshot.event.instruments.0.len())?;
+
+    let root = PyDict::new_bound(py);
+    root.set_item("context", context_to_py(py, &snapshot.context)?)?;
+    root.set_item("state_summary", summary)?;
+
+    Ok(root.into_py(py))
+}
+
+fn audit_tick_summary_to_py(py: Python<'_>, tick: &TradingAuditTick) -> PyResult<PyObject> {
+    let event_dict = PyDict::new_bound(py);
+
+    match &tick.event {
+        EngineAudit::FeedEnded => {
+            event_dict.set_item("kind", "FeedEnded")?;
+        }
+        EngineAudit::Process(process) => {
+            event_dict.set_item("kind", "Process")?;
+            event_dict.set_item("event_type", engine_event_kind(&process.event))?;
+            event_dict.set_item("output_count", process.outputs.len())?;
+            event_dict.set_item("error_count", process.errors.len())?;
+        }
+    }
+
+    let root = PyDict::new_bound(py);
+    root.set_item("context", context_to_py(py, &tick.context)?)?;
+    root.set_item("event", event_dict)?;
+
+    Ok(root.into_py(py))
+}
+
+fn context_to_py(py: Python<'_>, context: &EngineContext) -> PyResult<Py<PyDict>> {
+    let dict = PyDict::new_bound(py);
+    dict.set_item("sequence", context.sequence.0)?;
+    dict.set_item("time", context.time.to_rfc3339())?;
+    Ok(dict.into())
+}
+
+fn engine_event_kind(event: &EngineEvent<DataKind>) -> &'static str {
+    match event {
+        EngineEvent::Shutdown(_) => "Shutdown",
+        EngineEvent::Command(_) => "Command",
+        EngineEvent::TradingStateUpdate(_) => "TradingStateUpdate",
+        EngineEvent::Account(_) => "Account",
+        EngineEvent::Market(_) => "Market",
     }
 }
 

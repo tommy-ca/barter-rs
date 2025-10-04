@@ -18,7 +18,7 @@
 
 - [x] Document new feature flag workflow in developer README once stabilised. (2025-10-03)
 
-- [ ] Expose audit snapshot streaming to Python API (spec, bindings, tests, docs). (2025-10-04)
+- [x] Expose audit snapshot streaming to Python API (spec, bindings, tests, docs). (2025-10-04)
 
 ## Active (2025-10-04)
 - [x] Bridge integration Snapshot types through Rust bindings and replace the pure Python fallback. (2025-10-04)

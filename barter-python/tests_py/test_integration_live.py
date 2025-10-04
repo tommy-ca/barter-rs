@@ -70,3 +70,44 @@ def test_live_system_lifecycle(example_paths: dict[str, Path]) -> None:
 
     summary_dict = summary.to_dict()
     assert name in summary_dict["instruments"]
+
+
+@pytest.mark.integration
+def test_take_audit_disabled_returns_none(example_paths: dict[str, Path]) -> None:
+    config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    handle = bp.start_system(config, trading_enabled=False)
+
+    try:
+        assert handle.take_audit() is None
+    finally:
+        handle.shutdown()
+
+
+@pytest.mark.integration
+def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
+    config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    handle = bp.start_system(config, trading_enabled=False, audit=True)
+
+    try:
+        snap_updates = handle.take_audit()
+        assert snap_updates is not None
+
+        snapshot = snap_updates.snapshot.value
+        assert "state_summary" in snapshot
+        assert "context" in snapshot
+        assert isinstance(snapshot["context"]["sequence"], int)
+        assert "asset_count" in snapshot["state_summary"]
+
+        updates = snap_updates.updates
+        assert updates.try_recv() is None
+
+        handle.send_event(bp.EngineEvent.trading_state(True))
+        next_tick = updates.recv(timeout=1.0)
+        assert next_tick is not None
+        assert next_tick["event"]["kind"] in {"Process", "FeedEnded"}
+        assert next_tick["context"]["sequence"] >= snapshot["context"]["sequence"]
+
+        # Audit channel is single-use; subsequent calls return None
+        assert handle.take_audit() is None
+    finally:
+        handle.shutdown()

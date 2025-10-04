@@ -191,6 +191,23 @@ handle.abort()
 print("Running after abort:", handle.is_running())
 PY
 
+# Enable audit streaming for live systems
+python - <<'PY'
+import barter_python as bp
+
+config = bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
+handle = bp.start_system(config, trading_enabled=False, audit=True)
+
+audit = handle.take_audit()
+print("Snapshot summary:", audit.snapshot.value)
+
+handle.send_event(bp.EngineEvent.trading_state(True))
+update = audit.updates.recv(timeout=1.0)
+print("First audit update:", update)
+
+handle.shutdown()
+PY
+
 # Run the packaged CLI to execute a historic backtest
 barter-backtest \
   --config ../barter/examples/config/system_config.json \
