@@ -1,5 +1,10 @@
 """Unit tests for the risk management module."""
 
+from decimal import Decimal
+
+import pytest
+
+import barter_python as bp
 from barter_python import risk
 
 
@@ -65,6 +70,75 @@ class TestDefaultRiskManager:
         assert len(list(approved_opens)) == 1
         assert len(list(refused_cancels)) == 0
         assert len(list(refused_opens)) == 0
+
+
+class TestRiskUtilities:
+    """Test bindings for risk utility helpers."""
+
+    def test_calculate_quote_notional(self):
+        """Should multiply quantity, price, and contract size."""
+
+        result = risk.calculate_quote_notional(
+            Decimal("2.5"), Decimal("102.5"), Decimal("1.5")
+        )
+
+        assert result == Decimal("384.375")
+
+    def test_calculate_quote_notional_overflow(self):
+        """Should return None when multiplication overflows."""
+
+        huge = Decimal("1e20")
+
+        result = risk.calculate_quote_notional(huge, huge, Decimal(1))
+
+        assert result is None
+
+    @pytest.mark.parametrize(
+        ("current", "other", "expected"),
+        [
+            (Decimal("105"), Decimal("100"), Decimal("0.05")),
+            (Decimal("95"), Decimal("100"), Decimal("0.05")),
+        ],
+    )
+    def test_calculate_abs_percent_difference(self, current, other, expected):
+        """Should calculate absolute percent difference."""
+
+        result = risk.calculate_abs_percent_difference(current, other)
+
+        assert result == expected
+
+    def test_calculate_abs_percent_difference_zero_other(self):
+        """Should return None when dividing by zero."""
+
+        result = risk.calculate_abs_percent_difference(
+            Decimal("10"), Decimal("0")
+        )
+
+        assert result is None
+
+    @pytest.mark.parametrize(
+        ("instrument_delta", "contract_size", "quantity", "side", "expected"),
+        [
+            (Decimal("1"), Decimal("1"), Decimal("5"), bp.Side.BUY, Decimal("5")),
+            (
+                Decimal("0.5"),
+                Decimal("100"),
+                Decimal("2"),
+                bp.Side.SELL,
+                Decimal("-100"),
+            ),
+        ],
+    )
+    def test_calculate_delta(
+        self, instrument_delta, contract_size, quantity, side, expected
+    ):
+        """Should honour directional exposure sign."""
+
+        result = risk.calculate_delta(
+            instrument_delta, contract_size, side, quantity
+        )
+
+        assert result == expected
 
 
 class MockOrderRequest:

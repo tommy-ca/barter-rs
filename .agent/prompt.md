@@ -6,6 +6,7 @@ Make a commit and push your changes after every atomic change.
 
 ## Scope
 * focus on barter-python bindings to other rust packages
+* barter-python bindings to all barter rust packages
 
 ## Principles
 * TDD

@@ -16,6 +16,7 @@ mod data;
 mod instrument;
 mod logging;
 mod metric;
+mod risk;
 mod summary;
 mod system;
 
@@ -72,6 +73,7 @@ use instrument::{PyAsset, PyAssetIndex, PySide};
 use logging::{init_json_logging_py, init_tracing};
 use metric::{PyField, PyMetric, PyTag, PyValue};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
+use risk::{calculate_abs_percent_difference, calculate_delta, calculate_quote_notional};
 use serde_json::Value as JsonValue;
 use summary::{
     PyAssetTearSheet, PyBacktestSummary, PyBalance, PyDrawdown, PyInstrumentTearSheet,
@@ -842,6 +844,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(welford_calculate_sample_variance, m)?)?;
     m.add_function(wrap_pyfunction!(welford_calculate_population_variance, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_quote_notional, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_abs_percent_difference, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_delta, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_mid_price, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_volume_weighted_mid_price, m)?)?;
 

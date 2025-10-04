@@ -6,6 +6,11 @@ from abc import abstractmethod
 from collections.abc import Iterable
 from typing import Generic, Protocol, TypeVar, Union
 
+from .barter_python import (
+    calculate_abs_percent_difference as _calculate_abs_percent_difference,
+    calculate_delta as _calculate_delta,
+    calculate_quote_notional as _calculate_quote_notional,
+)
 from .execution import OrderRequestCancel, OrderRequestOpen
 
 # Type variables for generic risk interfaces
@@ -15,6 +20,17 @@ State = TypeVar("State")
 OrderRequestType = TypeVar(
     "OrderRequestType", bound=Union[OrderRequestCancel, OrderRequestOpen]
 )
+
+
+__all__ = [
+    "RiskApproved",
+    "RiskRefused",
+    "RiskManager",
+    "DefaultRiskManager",
+    "calculate_quote_notional",
+    "calculate_abs_percent_difference",
+    "calculate_delta",
+]
 
 
 class RiskApproved(Generic[OrderRequestType]):
@@ -139,3 +155,21 @@ class DefaultRiskManager(Generic[State]):
         ] = []
 
         return approved_cancels, approved_opens, refused_cancels, refused_opens
+
+
+def calculate_quote_notional(quantity, price, contract_size):
+    """Calculate quote notional via Rust bindings."""
+
+    return _calculate_quote_notional(quantity, price, contract_size)
+
+
+def calculate_abs_percent_difference(current, other):
+    """Calculate absolute percent difference via Rust bindings."""
+
+    return _calculate_abs_percent_difference(current, other)
+
+
+def calculate_delta(instrument_delta, contract_size, side, quantity_in_kind):
+    """Calculate directional delta via Rust bindings."""
+
+    return _calculate_delta(instrument_delta, contract_size, side, quantity_in_kind)

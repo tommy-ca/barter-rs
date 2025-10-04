@@ -89,6 +89,12 @@ impl PySide {
     }
 }
 
+impl PySide {
+    pub(crate) fn inner(&self) -> Side {
+        self.inner
+    }
+}
+
 /// Wrapper around [`AssetIndex`] for Python exposure.
 #[pyclass(module = "barter_python", name = "AssetIndex", eq, hash, frozen)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
