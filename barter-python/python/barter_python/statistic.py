@@ -181,3 +181,59 @@ class SortinoRatio(Generic[IntervalT]):
         new_value = self.value * scale
 
         return SortinoRatio(value=new_value, interval=target)
+
+
+@dataclass(frozen=True)
+class CalmarRatio(Generic[IntervalT]):
+    """Calmar Ratio value over a specific time interval.
+
+    The Calmar Ratio is a risk-adjusted return measure that divides the excess return
+    (over risk-free rate) by the Maximum Drawdown risk. It's similar to the Sharpe and Sortino
+    ratios, but uses Maximum Drawdown as the risk measure instead of standard deviation.
+
+    See docs: https://corporatefinanceinstitute.com/resources/career-map/sell-side/capital-markets/calmar-ratio/
+    """
+
+    value: Decimal
+    interval: IntervalT
+
+    @classmethod
+    def calculate(
+        cls,
+        risk_free_return: Decimal,
+        mean_return: Decimal,
+        max_drawdown: Decimal,
+        returns_period: IntervalT,
+    ) -> CalmarRatio[IntervalT]:
+        """Calculate the CalmarRatio over the provided time interval."""
+        if max_drawdown.is_zero():
+            excess_returns = mean_return - risk_free_return
+            if excess_returns > 0:
+                value = Decimal('1e1000')  # Very large positive (like Decimal::MAX)
+            elif excess_returns < 0:
+                value = Decimal('-1e1000')  # Very large negative (like Decimal::MIN)
+            else:
+                value = Decimal('0')
+            return cls(value=value, interval=returns_period)
+        else:
+            excess_returns = mean_return - risk_free_return
+            ratio = excess_returns / abs(max_drawdown)
+            return cls(value=ratio, interval=returns_period)
+
+    def scale(self, target: TimeInterval) -> CalmarRatio[TimeInterval]:
+        """Scale the CalmarRatio from current interval to target interval.
+
+        This scaling assumes returns are independently and identically distributed (IID).
+        However, this assumption is debatable since maximum drawdown may not scale with the square
+        root of time like, for example, volatility does.
+        """
+        # Determine scale factor: square root of number of Self Intervals in Target Intervals
+        target_secs = Decimal(str(target.interval.total_seconds()))
+        current_secs = Decimal(str(self.interval.interval.total_seconds()))
+
+        scale_ratio = target_secs / current_secs
+        scale = Decimal(str(math.sqrt(float(scale_ratio))))
+
+        new_value = self.value * scale
+
+        return CalmarRatio(value=new_value, interval=target)

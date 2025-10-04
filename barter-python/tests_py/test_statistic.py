@@ -6,6 +6,7 @@ from decimal import Decimal
 from barter_python.statistic import (
     Annual252,
     Annual365,
+    CalmarRatio,
     Daily,
     SharpeRatio,
     SortinoRatio,
@@ -233,6 +234,106 @@ class TestSortinoRatio:
         actual = daily.scale(Annual252())
 
         # 0.05 * √252 ≈ 0.7937
+        expected_value = Decimal('0.79372539331937720')
+        assert actual.value == expected_value
+        assert isinstance(actual.interval, Annual252)
+
+
+class TestCalmarRatio:
+    def test_calculate_normal_case(self):
+        risk_free_return = Decimal('0.0015')  # 0.15%
+        mean_return = Decimal('0.0025')  # 0.25%
+        max_drawdown = Decimal('0.02')  # 2%
+        time_period = Daily()
+
+        actual = CalmarRatio.calculate(
+            risk_free_return, mean_return, max_drawdown, time_period
+        )
+
+        expected_value = Decimal('0.05')  # (0.0025 - 0.0015) / 0.02
+        assert actual.value == expected_value
+        assert actual.interval == time_period
+
+    def test_calculate_zero_drawdown_positive_excess(self):
+        risk_free_return = Decimal('0.001')  # 0.1%
+        mean_return = Decimal('0.002')  # 0.2%
+        max_drawdown = Decimal('0.0')  # 0%
+        time_period = Daily()
+
+        actual = CalmarRatio.calculate(
+            risk_free_return, mean_return, max_drawdown, time_period
+        )
+
+        assert actual.value == Decimal('1e1000')
+        assert actual.interval == time_period
+
+    def test_calculate_zero_drawdown_negative_excess(self):
+        risk_free_return = Decimal('0.002')  # 0.2%
+        mean_return = Decimal('0.001')  # 0.1%
+        max_drawdown = Decimal('0.0')  # 0%
+        time_period = Daily()
+
+        actual = CalmarRatio.calculate(
+            risk_free_return, mean_return, max_drawdown, time_period
+        )
+
+        assert actual.value == Decimal('-1e1000')
+        assert actual.interval == time_period
+
+    def test_calculate_zero_drawdown_no_excess(self):
+        risk_free_return = Decimal('0.001')  # 0.1%
+        mean_return = Decimal('0.001')  # 0.1%
+        max_drawdown = Decimal('0.0')  # 0%
+        time_period = Daily()
+
+        actual = CalmarRatio.calculate(
+            risk_free_return, mean_return, max_drawdown, time_period
+        )
+
+        assert actual.value == Decimal('0.0')
+        assert actual.interval == time_period
+
+    def test_calculate_negative_returns(self):
+        risk_free_return = Decimal('0.001')  # 0.1%
+        mean_return = Decimal('-0.002')  # -0.2%
+        max_drawdown = Decimal('0.015')  # 1.5%
+        time_period = Daily()
+
+        actual = CalmarRatio.calculate(
+            risk_free_return, mean_return, max_drawdown, time_period
+        )
+
+        expected_value = Decimal('-0.2')  # (-0.002 - 0.001) / 0.015
+        assert actual.value == expected_value
+        assert actual.interval == time_period
+
+    def test_calculate_absolute_drawdown(self):
+        # Test that negative drawdown values are handled correctly (absolute value is used)
+        risk_free_return = Decimal('0.001')
+        mean_return = Decimal('0.002')
+        negative_drawdown = Decimal('-0.015')  # Should be treated same as positive 0.015
+        time_period = Daily()
+
+        actual = CalmarRatio.calculate(
+            risk_free_return,
+            mean_return,
+            negative_drawdown,
+            time_period,
+        )
+
+        expected_value = Decimal('0.06666666666666666666666666667')  # (0.002 - 0.001) / 0.015
+        assert actual.value == expected_value
+        assert actual.interval == time_period
+
+    def test_scale_daily_to_annual(self):
+        daily = CalmarRatio(
+            value=Decimal('0.05'),
+            interval=Daily(),
+        )
+
+        actual = daily.scale(Annual252())
+
+        # 0.05 * sqrt(252) ≈ 0.7937
         expected_value = Decimal('0.79372539331937720')
         assert actual.value == expected_value
         assert isinstance(actual.interval, Annual252)
