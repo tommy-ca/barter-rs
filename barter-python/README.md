@@ -170,3 +170,17 @@ running system.
   dedicated `Publish to PyPI` job.
 - Manual `workflow_dispatch` runs can be used to validate wheel builds before cutting a release; they
   will skip the publish step unless the run targets a `v*` tag and the secret is available.
+
+## Release Notes
+
+Track the highlights from each coordinated Rust and Python release here. Align the entries with the
+cadence defined in `.agent/specs/release-cadence.md` so both ecosystems stay in sync.
+
+### 0.1.0 — 2025-10-04
+
+- Initial PyO3-based bindings for the Barter engine alongside CLI backtest helper.
+- Python access to risk manager thresholds with JSON round-trip support.
+- Portfolio analytics helpers (Sharpe, Sortino) exposed for summary inspection.
+
+For future releases, add a new heading with the version, release date, and 3–5 bullet points
+highlighting the most impactful changes across both the Rust workspace and the Python package.

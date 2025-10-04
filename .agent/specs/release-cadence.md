@@ -69,7 +69,7 @@
 ## Changelog Coordination
 - Maintain individual crate changelogs via `release-plz`.
 - Aggregate key highlights (Rust + Python) in `barter-python/README.md` under a
-  "Release Notes" section (TODO).
+  "Release Notes" section (implemented 2025-10-04).
 - For Python post releases, append a short note to the README and `.agent/todo.md`
   describing the fix and referencing the corresponding GitHub issue.
 
@@ -86,4 +86,3 @@
 - `python-wheels` workflow (wheel build + PyPI publication)
 - `cargo-dist` (optional future integration for combined artifacts)
 - `.agent/specs/python-release-checklist.md` for granular validation steps
-
