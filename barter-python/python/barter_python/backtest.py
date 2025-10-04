@@ -7,10 +7,10 @@ import json
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import AsyncIterable, Generic, Iterable, Protocol, TypeVar
+from typing import AsyncIterable, Generic, Iterable, Optional, Protocol, TypeVar
 
 from .data import MarketEvent, DataKind, PublicTrade, OrderBookL1, Candle, Liquidation, as_public_trade, as_candle
 from .execution import AccountEvent
@@ -18,7 +18,7 @@ from .instrument import (
     Asset, AssetIndex, AssetNameInternal, ExchangeAsset, ExchangeId, ExchangeIndex,
     Instrument, InstrumentIndex, InstrumentNameInternal, Keyed, Underlying
 )
-from .statistic import TimeInterval
+from .statistic import TimeInterval, SharpeRatio, SortinoRatio, CalmarRatio, WinRate, ProfitFactor, RateOfReturn
 from .strategy import AlgoStrategy, ClosePositionsStrategy, OnDisconnectStrategy, OnTradingDisabledStrategy, EngineState, InstrumentState, Position
 
 # Type variables for generic backtest interfaces
@@ -30,15 +30,121 @@ Risk = TypeVar("Risk")
 SummaryInterval = TypeVar("SummaryInterval", bound=TimeInterval)
 
 
+# Supporting structures for TradingSummary
+
+@dataclass(frozen=True)
+class Balance:
+    """Asset balance with total and free amounts."""
+    total: Decimal
+    free: Decimal
+
+    @property
+    def used(self) -> Decimal:
+        return self.total - self.free
+
+
+@dataclass(frozen=True)
+class AssetBalance:
+    """Asset balance with metadata."""
+    asset: str  # Simplified to string for now
+    balance: Balance
+    time_exchange: datetime
+
+
+@dataclass(frozen=True)
+class Drawdown:
+    """Drawdown measurement."""
+    value: Decimal
+    time_start: datetime
+    time_end: datetime
+
+    @property
+    def duration(self) -> timedelta:
+        return self.time_end - self.time_start
+
+
+@dataclass(frozen=True)
+class MeanDrawdown:
+    """Mean drawdown measurement."""
+    mean_drawdown: Decimal
+    mean_drawdown_ms: int
+
+
+@dataclass(frozen=True)
+class MaxDrawdown:
+    """Maximum drawdown wrapper."""
+    drawdown: Drawdown
+
+
+@dataclass(frozen=True)
+class Range:
+    """Value range."""
+    min: Decimal
+    max: Decimal
+
+
+@dataclass(frozen=True)
+class Dispersion:
+    """Statistical dispersion measures."""
+    range: Range
+    recurrence_relation_m: Decimal
+    variance: Decimal
+    std_dev: Decimal
+
+
+@dataclass(frozen=True)
+class DataSetSummary:
+    """Statistical summary of a dataset."""
+    count: Decimal
+    sum: Decimal
+    mean: Decimal
+    dispersion: Dispersion
+
+
+@dataclass(frozen=True)
+class PnLReturns:
+    """PnL returns with statistical summaries."""
+    pnl_raw: Decimal
+    total: DataSetSummary
+    losses: DataSetSummary
+
+
+@dataclass(frozen=True)
+class TearSheet(Generic[SummaryInterval]):
+    """Tear sheet summarizing trading performance for an instrument."""
+    pnl: Decimal
+    pnl_return: "RateOfReturn[SummaryInterval]"
+    sharpe_ratio: "SharpeRatio[SummaryInterval]"
+    sortino_ratio: "SortinoRatio[SummaryInterval]"
+    calmar_ratio: "CalmarRatio[SummaryInterval]"
+    pnl_drawdown: Optional[Drawdown]
+    pnl_drawdown_mean: Optional[MeanDrawdown]
+    pnl_drawdown_max: Optional[MaxDrawdown]
+    win_rate: Optional["WinRate"]
+    profit_factor: Optional["ProfitFactor"]
+
+
+@dataclass(frozen=True)
+class TearSheetAsset:
+    """Tear sheet summarizing asset changes."""
+    balance_end: Optional[AssetBalance]
+    drawdown: Optional[Drawdown]
+    drawdown_mean: Optional[MeanDrawdown]
+    drawdown_max: Optional[MaxDrawdown]
+
+
 @dataclass(frozen=True)
 class TradingSummary(Generic[SummaryInterval]):
-    """Placeholder for TradingSummary - to be implemented with full statistics."""
+    """Complete trading summary with instrument and asset tear sheets."""
 
     time_engine_start: datetime
     time_engine_end: datetime
-    instrument_tear_sheets: list = field(default_factory=list)
-    asset_tear_sheets: list = field(default_factory=list)
-    portfolio_tear_sheet: object = None
+    instruments: dict[str, TearSheet[SummaryInterval]] = field(default_factory=dict)
+    assets: dict[str, TearSheetAsset] = field(default_factory=dict)
+
+    @property
+    def trading_duration(self) -> timedelta:
+        return self.time_engine_end - self.time_engine_start
 
 
 class BacktestMarketData(Protocol[MarketEventKind]):
@@ -336,10 +442,10 @@ class BacktestEngineSimulator:
         """Generate a trading summary from current state."""
         # Placeholder implementation - in a full implementation this would
         # calculate actual P&L, Sharpe ratios, etc. from trades and positions
+        # For now, return empty tear sheets
         return TradingSummary(
             time_engine_start=self.start_time or datetime.now(),
             time_engine_end=self.current_time or datetime.now(),
-            instrument_tear_sheets=[],
-            asset_tear_sheets=[],
-            portfolio_tear_sheet=None,
+            instruments={},
+            assets={},
         )
