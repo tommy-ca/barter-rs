@@ -77,6 +77,8 @@ class TestBacktestSummary:
         trading_summary = backtest.TradingSummary(
             time_engine_start=datetime(2023, 1, 1),
             time_engine_end=datetime(2023, 1, 2),
+            instruments={},
+            assets={}
         )
 
         summary = backtest.BacktestSummary(
