@@ -455,7 +455,7 @@ class BacktestEngineSimulator:
         # Generate orders using strategy
         if self.engine.state.is_trading_enabled():
             cancel_requests, open_requests = self.engine.generate_algo_orders()
-            self.engine.send_requests(open_requests, cancel_requests)
+            self.simulate_order_execution(open_requests, cancel_requests)
 
     def record_trade(self, instrument: int, side: Side, quantity: Decimal, price: Decimal, pnl: Decimal = Decimal('0')):
         """Record a trade for tracking."""
@@ -472,6 +472,26 @@ class BacktestEngineSimulator:
         if instrument not in self.pnl_by_instrument:
             self.pnl_by_instrument[instrument] = Decimal('0')
         self.pnl_by_instrument[instrument] += pnl
+
+    def simulate_order_execution(self, open_requests: list[OrderRequestOpen], cancel_requests: list[OrderRequestCancel]) -> None:
+        """Simulate order execution for backtesting."""
+        # For simplicity, assume all market orders fill immediately at current price
+        for request in open_requests:
+            if request.state.kind.value == "market":  # Assuming kind has value
+                # Get current price (simplified - would need to get from market data)
+                current_price = Decimal('100')  # Placeholder
+                # Create a fill
+                fill_quantity = request.state.quantity
+                fill_price = current_price
+                pnl = Decimal('0')  # Calculate based on position
+                self.record_trade(request.key.instrument, request.state.side, fill_quantity, fill_price, pnl)
+                # Update position
+                # TODO: Update engine state positions
+
+        # Cancel requests - just mark as cancelled
+        for cancel in cancel_requests:
+            # TODO: Update order state to cancelled
+            pass
 
     def get_trading_summary(self, risk_free_return: Decimal, summary_interval: TimeInterval) -> TradingSummary:
         """Generate a trading summary from current state."""
