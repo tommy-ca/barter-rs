@@ -60,5 +60,6 @@
 - [x] Add `calculate_rate_of_return` with optional target interval scaling (bindings + pytest coverage). (2025-10-04)
 - [x] Refresh package metadata (version bump + release notes) once analytics helpers land. (2025-10-04)
 
-## Completed (2025-10-04)
+ ## Completed (2025-10-04)
 - [x] Allow seeding initial balances when starting systems or running historic backtests from Python bindings. (2025-10-04)
+- [x] Complete pure Python port of barter-data structures (Candle, Liquidation, OrderBook, OrderBookSide) with comprehensive tests. (2025-10-04)
