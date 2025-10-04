@@ -1,4 +1,4 @@
-use barter_instrument::asset::Asset;
+use barter_instrument::{asset::Asset, Side};
 use pyo3::prelude::*;
 
 /// Wrapper around [`Asset`] for Python exposure.
@@ -51,5 +51,37 @@ impl PyAsset {
     /// Return the debug representation.
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("Asset(name_internal='{}', name_exchange='{}')", self.name_internal(), self.name_exchange()))
+    }
+}
+
+/// Wrapper around [`Side`] for Python exposure.
+#[pyclass(module = "barter_python", name = "Side", eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PySide {
+    inner: Side,
+}
+
+#[pymethods]
+impl PySide {
+    /// Buy side.
+    #[classattr]
+    const BUY: Self = Self {
+        inner: Side::Buy,
+    };
+
+    /// Sell side.
+    #[classattr]
+    const SELL: Self = Self {
+        inner: Side::Sell,
+    };
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        self.inner.to_string()
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("Side.{:?}", self.inner)
     }
 }

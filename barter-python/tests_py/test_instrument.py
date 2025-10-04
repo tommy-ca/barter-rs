@@ -463,3 +463,18 @@ class TestPyAsset:
         asset = bp.Asset("btc", "XBT")
         assert str(asset) == "Asset(name_internal='btc', name_exchange='XBT')"
         assert "Asset(" in repr(asset)
+
+
+class TestPySide:
+    def test_side_enum_values(self):
+        assert bp.Side.BUY == bp.Side.BUY
+        assert bp.Side.SELL == bp.Side.SELL
+        assert bp.Side.BUY != bp.Side.SELL
+
+    def test_side_str(self):
+        assert str(bp.Side.BUY) == "buy"
+        assert str(bp.Side.SELL) == "sell"
+
+    def test_side_repr(self):
+        assert repr(bp.Side.BUY) == "Side.Buy"
+        assert repr(bp.Side.SELL) == "Side.Sell"
