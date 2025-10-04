@@ -1,12 +1,8 @@
-"""Pure Python implementation of barter-integration data structures."""
+"""Pure Python compatibility layer for barter-integration data structures."""
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-SnapshotType = TypeVar("SnapshotType")
-UpdatesType = TypeVar("UpdatesType")
+from .barter_python import SnapUpdates as _SnapUpdates, Snapshot as _Snapshot
 
 
 class SubscriptionId:
@@ -185,64 +181,8 @@ class Value:
         return hash((self.kind, self.value))
 
 
-class Snapshot(Generic[T]):
-    """Snapshot wrapper."""
+Snapshot = _Snapshot
+Snapshot.new = classmethod(lambda cls, value: cls(value))
 
-    def __init__(self, value: T) -> None:
-        self._value = value
-
-    @property
-    def value(self) -> T:
-        return self._value
-
-    @classmethod
-    def new(cls, value: T) -> Snapshot[T]:
-        return cls(value)
-
-    def as_ref(self) -> Snapshot[T]:
-        return self
-
-    def map(self, op):
-        return Snapshot(op(self._value))
-
-    def __str__(self) -> str:
-        return f"Snapshot({self._value})"
-
-    def __repr__(self) -> str:
-        return f"Snapshot({self._value!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Snapshot):
-            return NotImplemented
-        return self._value == other._value
-
-    def __hash__(self) -> int:
-        return hash(self._value)
-
-
-class SnapUpdates(Generic[SnapshotType, UpdatesType]):
-    """Snapshot with updates."""
-
-    def __init__(self, snapshot: SnapshotType, updates: UpdatesType) -> None:
-        self.snapshot = snapshot
-        self.updates = updates
-
-    @classmethod
-    def new(
-        cls, snapshot: SnapshotType, updates: UpdatesType
-    ) -> SnapUpdates[SnapshotType, UpdatesType]:
-        return cls(snapshot, updates)
-
-    def __str__(self) -> str:
-        return f"SnapUpdates(snapshot={self.snapshot}, updates={self.updates})"
-
-    def __repr__(self) -> str:
-        return f"SnapUpdates(snapshot={self.snapshot!r}, updates={self.updates!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, SnapUpdates):
-            return NotImplemented
-        return self.snapshot == other.snapshot and self.updates == other.updates
-
-    def __hash__(self) -> int:
-        return hash((self.snapshot, self.updates))
+SnapUpdates = _SnapUpdates
+SnapUpdates.new = classmethod(lambda cls, snapshot, updates: cls(snapshot, updates))

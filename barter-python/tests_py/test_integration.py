@@ -1,10 +1,11 @@
-"""Unit tests for pure Python integration data structures."""
+"""Unit tests for Python integration data structures and bindings."""
 
+from barter_python import SnapUpdates, Snapshot
 from barter_python.integration import (
     Field,
     Metric,
-    Snapshot,
-    SnapUpdates,
+    SnapUpdates as IntegrationSnapUpdates,
+    Snapshot as IntegrationSnapshot,
     SubscriptionId,
     Tag,
     Value,
@@ -145,46 +146,62 @@ class TestValue:
 
 class TestSnapshot:
     def test_creation(self):
-        snapshot = Snapshot.new("test_value")
+        snapshot = Snapshot("test_value")
         assert snapshot.value == "test_value"
 
     def test_as_ref(self):
-        snapshot = Snapshot.new("test_value")
+        snapshot = Snapshot("test_value")
         ref = snapshot.as_ref()
         assert ref == snapshot
 
     def test_map(self):
-        snapshot = Snapshot.new(5)
+        snapshot = Snapshot(5)
         mapped = snapshot.map(lambda x: x * 2)
         assert mapped.value == 10
+        assert snapshot.value == 5
 
     def test_equality(self):
-        s1 = Snapshot.new("test")
-        s2 = Snapshot.new("test")
-        s3 = Snapshot.new("other")
+        s1 = Snapshot("test")
+        s2 = Snapshot("test")
+        s3 = Snapshot("other")
         assert s1 == s2
         assert s1 != s3
 
     def test_str_repr(self):
-        snapshot = Snapshot.new("test")
+        snapshot = Snapshot("test")
         assert "Snapshot(" in repr(snapshot)
+
+    def test_alias_from_integration_module(self):
+        assert IntegrationSnapshot is Snapshot
+        snapshot = IntegrationSnapshot.new("value")
+        assert isinstance(snapshot, Snapshot)
+        assert snapshot.value == "value"
 
 
 class TestSnapUpdates:
     def test_creation(self):
-        snapshot = "snapshot_data"
+        snapshot = Snapshot("snapshot_data")
         updates = ["update1", "update2"]
-        snap_updates = SnapUpdates.new(snapshot, updates)
-        assert snap_updates.snapshot == snapshot
+        snap_updates = SnapUpdates(snapshot, updates)
+        assert isinstance(snap_updates.snapshot, Snapshot)
+        assert snap_updates.snapshot.value == "snapshot_data"
         assert snap_updates.updates == updates
 
     def test_equality(self):
-        su1 = SnapUpdates.new("snap", ["u1"])
-        su2 = SnapUpdates.new("snap", ["u1"])
-        su3 = SnapUpdates.new("other", ["u1"])
+        base_snapshot = Snapshot("snap")
+        su1 = SnapUpdates.new(base_snapshot, ["u1"])
+        su2 = SnapUpdates.new(Snapshot("snap"), ["u1"])
+        su3 = SnapUpdates.new(Snapshot("other"), ["u1"])
         assert su1 == su2
         assert su1 != su3
 
     def test_str_repr(self):
-        su = SnapUpdates.new("snap", ["u1"])
+        su = SnapUpdates.new(Snapshot("snap"), ["u1"])
         assert "SnapUpdates(" in repr(su)
+
+    def test_updates_alias(self):
+        assert IntegrationSnapUpdates is SnapUpdates
+        su = IntegrationSnapUpdates.new(Snapshot("snap"), ["u1"])
+        assert isinstance(su.snapshot, Snapshot)
+        assert su.snapshot.value == "snap"
+        assert su.updates == ["u1"]

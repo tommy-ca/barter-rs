@@ -32,3 +32,11 @@
 ## Follow-Ups
 - Evaluate exposing typed aliases for common snapshot payloads (e.g. order book snapshots) once the
   base wrappers are in place.
+
+## Status (2025-10-04)
+- Implemented `PySnapshot` and `PySnapUpdates` wrappers storing `Py<PyAny>` payloads with Python-side
+  compatibility helpers.
+- Updated `python/barter_python/integration.py` to alias the Rust bindings while preserving the
+  previous `.new(...)` constructors for existing usage.
+- Added integration tests ensuring the re-exported classes are identical to the extension module
+  types and validating equality, mapping, and round-trip behaviour.

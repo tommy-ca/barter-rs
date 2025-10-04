@@ -14,6 +14,7 @@ mod command;
 mod config;
 mod data;
 mod instrument;
+mod integration;
 mod logging;
 mod metric;
 mod risk;
@@ -70,6 +71,7 @@ use data::{
     init_dynamic_streams,
 };
 use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PySide};
+use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
 use metric::{PyField, PyMetric, PyTag, PyValue};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
@@ -823,6 +825,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMultiBacktestSummary>()?;
     m.add_class::<PyLevel>()?;
     m.add_class::<PyOrderBook>()?;
+    m.add_class::<PySnapshot>()?;
+    m.add_class::<PySnapUpdates>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(init_json_logging_py, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;

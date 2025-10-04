@@ -19,10 +19,10 @@
 - [x] Document new feature flag workflow in developer README once stabilised. (2025-10-03)
 
 ## Active (2025-10-04)
-- [ ] Bridge integration Snapshot types through Rust bindings and replace the pure Python fallback.
-  - [ ] Implement `PySnapshot` and `PySnapUpdates` wrappers in the extension module.
-  - [ ] Update `python/barter_python/integration.py` to re-export the bindings.
-  - [ ] Extend pytest coverage for Snapshot round-trips.
+- [x] Bridge integration Snapshot types through Rust bindings and replace the pure Python fallback. (2025-10-04)
+  - [x] Implement `PySnapshot` and `PySnapUpdates` wrappers in the extension module.
+  - [x] Update `python/barter_python/integration.py` to re-export the bindings.
+  - [x] Extend pytest coverage for Snapshot round-trips.
 - [x] Implement Python engine account event processing to update balances, orders, and positions from execution events. (2025-10-04)
 - [x] Add pytest coverage for account event handling (snapshot, balance updates, order cancellations, trades). (2025-10-04)
 
