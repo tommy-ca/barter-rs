@@ -38,6 +38,11 @@ class TestMarketDataInMemory:
 
         assert len(market_data.events) > 0
         assert isinstance(market_data._time_first_event, datetime)
+        assert market_data._inner is not None
+        first_event = market_data.events[0]
+        assert isinstance(first_event, MarketEvent)
+        assert first_event.kind.kind == "trade"
+        assert market_data._inner.time_first_event == market_data._time_first_event
 
     def test_stream(self):
         """Test streaming market events."""

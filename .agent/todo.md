@@ -76,3 +76,4 @@
  - [x] Fix linting issues in Python and Rust codebases (unused imports, variables, clippy warnings). (2025-10-04)
  - [x] Update Python type annotations to use modern X | None syntax instead of Optional[X]. (2025-10-04)
  - [x] Add init_json_logging_py binding for JSON structured logging. (2025-10-04)
+  - [x] Replace Python JSON parsing with Rust-backed MarketDataInMemory bindings and integration tests. (2025-10-04)

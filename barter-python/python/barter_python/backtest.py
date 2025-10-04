@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from abc import abstractmethod
 from collections.abc import AsyncIterable, Iterable
@@ -12,6 +11,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar
+
+from .barter_python import MarketDataInMemory as _RustMarketDataInMemory
 
 from .data import (
     Candle,
@@ -193,90 +194,30 @@ class BacktestMarketData(Protocol):
         ...
 
 
-@dataclass(frozen=True)
 class MarketDataInMemory:
     """In-memory market data source for backtests."""
 
-    _time_first_event: datetime
-    events: list[MarketEvent[int, DataKind]]
+    def __init__(
+        self,
+        _time_first_event: datetime,
+        events: list[MarketEvent[int, DataKind]],
+        *,
+        _inner: _RustMarketDataInMemory | None = None,
+    ) -> None:
+        self._time_first_event = _time_first_event
+        self.events = events
+        self._inner = _inner
 
     @classmethod
     def from_json_file(cls, path: Path) -> MarketDataInMemory:
-        """Load market data from a JSON file."""
-        with open(path) as f:
-            data = json.load(f)
-
-        events = []
-        first_time = None
-
-        for event_data in data:
-            # Parse the market event from JSON - handle the Item/Ok wrapper
-            if "Item" in event_data and "Ok" in event_data["Item"]:
-                inner_data = event_data["Item"]["Ok"]
-            else:
-                # Skip non-Item/Ok events (like Reconnecting)
-                continue
-
-            time_exchange = datetime.fromisoformat(inner_data["time_exchange"])
-            time_received = datetime.fromisoformat(inner_data["time_received"])
-            exchange = inner_data["exchange"]
-            instrument = inner_data["instrument"]
-            kind_data = inner_data["kind"]
-
-            # Parse the data kind
-            if "Trade" in kind_data:
-                trade_data = kind_data["Trade"]
-                trade = PublicTrade(
-                    id=trade_data["id"],
-                    price=trade_data["price"],
-                    amount=trade_data["amount"],
-                    side=trade_data["side"],
-                )
-                kind = DataKind.trade(trade)
-            elif "OrderBookL1" in kind_data:
-                # Handle OrderBookL1 parsing
-                # This would need more implementation
-                continue  # Skip for now
-            elif "Candle" in kind_data:
-                candle_data = kind_data["Candle"]
-                candle = Candle(
-                    close_time=datetime.fromisoformat(candle_data["close_time"]),
-                    open=candle_data["open"],
-                    high=candle_data["high"],
-                    low=candle_data["low"],
-                    close=candle_data["close"],
-                    volume=candle_data["volume"],
-                    trade_count=candle_data["trade_count"],
-                )
-                kind = DataKind.candle(candle)
-            elif "Liquidation" in kind_data:
-                liq_data = kind_data["Liquidation"]
-                liquidation = Liquidation(
-                    side=liq_data["side"],
-                    price=liq_data["price"],
-                    quantity=liq_data["quantity"],
-                    time=datetime.fromisoformat(liq_data["time"]),
-                )
-                kind = DataKind.liquidation(liquidation)
-            else:
-                continue  # Skip unknown kinds
-
-            event = MarketEvent(
-                time_exchange=time_exchange,
-                time_received=time_received,
-                exchange=exchange,
-                instrument=instrument,
-                kind=kind,
-            )
-            events.append(event)
-
-            if first_time is None:
-                first_time = time_exchange
-
-        if not events:
-            raise ValueError("No valid market events found in JSON file")
-
-        return cls(_time_first_event=first_time, events=events)  # type: ignore
+        """Load market data from a JSON file using the Rust binding."""
+        inner = _RustMarketDataInMemory.from_json_file(str(path))
+        events = inner.events()
+        return cls(
+            _time_first_event=inner.time_first_event,
+            events=events,
+            _inner=inner,
+        )
 
     def stream(self) -> AsyncIterable[MarketEvent[int, DataKind]]:
         """Return an async iterable of market events."""
