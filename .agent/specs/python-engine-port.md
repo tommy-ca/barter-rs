@@ -41,6 +41,7 @@
 - Integrate with existing pure Python strategy and risk interfaces.
 - Maintain compatibility with existing backtest and live system workflows.
 - Use async/await for event processing where appropriate.
+- Ensure account events (snapshots, balance updates, order state changes, trades) mutate EngineState balances, positions, and orders consistently with Rust implementation.
 
 ## Testing
 - Port all Rust unit tests to Python equivalents.

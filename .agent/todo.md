@@ -18,6 +18,10 @@
 
 - [x] Document new feature flag workflow in developer README once stabilised. (2025-10-03)
 
+## Active (2025-10-04)
+- [ ] Implement Python engine account event processing to update balances, orders, and positions from execution events.
+- [ ] Add pytest coverage for account event handling (snapshot, balance updates, order cancellations, trades).
+
 ## Planned (2025-10-03)
 - [x] Update top-level README with Python quickstart guidance. (2025-10-04)
 - [x] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*
