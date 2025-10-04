@@ -8,9 +8,11 @@ from barter_python.statistic import (
     Annual365,
     CalmarRatio,
     Daily,
+    ProfitFactor,
     SharpeRatio,
     SortinoRatio,
     TimeDeltaInterval,
+    WinRate,
 )
 
 
@@ -337,3 +339,50 @@ class TestCalmarRatio:
         expected_value = Decimal('0.79372539331937720')
         assert actual.value == expected_value
         assert isinstance(actual.interval, Annual252)
+
+
+class TestProfitFactor:
+    def test_calculate_both_zero(self):
+        result = ProfitFactor.calculate(Decimal('0.0'), Decimal('0.0'))
+        assert result is None
+
+    def test_calculate_profits_zero(self):
+        result = ProfitFactor.calculate(Decimal('0.0'), Decimal('1.0'))
+        assert result is not None
+        assert result.value == Decimal('-1e1000')
+
+    def test_calculate_losses_zero(self):
+        result = ProfitFactor.calculate(Decimal('1.0'), Decimal('0.0'))
+        assert result is not None
+        assert result.value == Decimal('1e1000')
+
+    def test_calculate_normal_case(self):
+        result = ProfitFactor.calculate(Decimal('10.0'), Decimal('5.0'))
+        assert result is not None
+        assert result.value == Decimal('2.0')
+
+    def test_calculate_with_negative_inputs(self):
+        result = ProfitFactor.calculate(Decimal('10.0'), Decimal('-5.0'))
+        assert result is not None
+        assert result.value == Decimal('2.0')
+
+
+class TestWinRate:
+    def test_calculate_no_trades(self):
+        result = WinRate.calculate(Decimal('0'), Decimal('0'))
+        assert result is None
+
+    def test_calculate_all_wins(self):
+        result = WinRate.calculate(Decimal('10'), Decimal('10'))
+        assert result is not None
+        assert result.value == Decimal('1')
+
+    def test_calculate_no_wins(self):
+        result = WinRate.calculate(Decimal('0'), Decimal('10'))
+        assert result is not None
+        assert result.value == Decimal('0')
+
+    def test_calculate_mixed(self):
+        result = WinRate.calculate(Decimal('6'), Decimal('10'))
+        assert result is not None
+        assert result.value == Decimal('0.6')

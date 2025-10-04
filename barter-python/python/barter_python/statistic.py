@@ -237,3 +237,54 @@ class CalmarRatio(Generic[IntervalT]):
         new_value = self.value * scale
 
         return CalmarRatio(value=new_value, interval=target)
+
+
+@dataclass(frozen=True)
+class ProfitFactor:
+    """ProfitFactor is a performance metric that divides the absolute value of gross profits
+    by the absolute value of gross losses. A profit factor greater than 1 indicates a profitable
+    strategy.
+
+    Special cases:
+    - Returns None when both profits and losses are zero (neutral performance)
+    - Returns a very large positive value when there are profits but no losses (perfect performance)
+    - Returns a very large negative value when there are losses but no profits (worst performance)
+    """
+
+    value: Decimal
+
+    @classmethod
+    def calculate(cls, profits_gross_abs: Decimal, losses_gross_abs: Decimal) -> ProfitFactor | None:
+        """Calculate the ProfitFactor given the provided gross profits and losses."""
+        if profits_gross_abs.is_zero() and losses_gross_abs.is_zero():
+            return None
+
+        if losses_gross_abs.is_zero():
+            value = Decimal('1e1000')  # Very large positive (like Decimal::MAX)
+        elif profits_gross_abs.is_zero():
+            value = Decimal('-1e1000')  # Very large negative (like Decimal::MIN)
+        else:
+            value = abs(profits_gross_abs) / abs(losses_gross_abs)
+
+        return cls(value=value)
+
+
+@dataclass(frozen=True)
+class WinRate:
+    """Represents a win rate ratio between 0 and 1, calculated as wins/total.
+
+    The win rate is calculated as the absolute ratio of winning trades to total trades.
+
+    Returns None if there are no trades (total = 0).
+    """
+
+    value: Decimal
+
+    @classmethod
+    def calculate(cls, wins: Decimal, total: Decimal) -> WinRate | None:
+        """Calculate the WinRate given the provided number of wins and total positions."""
+        if total == Decimal('0'):
+            return None
+        else:
+            value = abs(wins) / abs(total)
+            return cls(value=value)
