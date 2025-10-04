@@ -1,11 +1,20 @@
 # Cross-Language Maintenance Workflow
 
-Last updated: 2025-10-03
+Last updated: 2025-10-04
 
 ## Goals
 - Keep Rust and Python codepaths delivering equivalent engine capabilities.
 - Ensure every new Rust API addition has a conscious binding decision (exported, deferred, or intentionally omitted).
 - Maintain fast feedback via unified CI that exercises Rust unit tests, Python unit tests, and packaging smoke checks.
+
+## Current Status (2025-10-04)
+- Core data structures (PublicTrade, OrderBook, Candle, Liquidation) ported to pure Python
+- Statistic module fully ported with comprehensive metrics (Sharpe, Sortino, Calmar, etc.)
+- Execution data structures ported to pure Python
+- Instrument and strategy modules ported
+- Basic backtest framework implemented with placeholders for full simulation
+- All analytics functions exposed via Python bindings
+- Integration tests covering live and backtest scenarios
 
 ## Branching & Release Cadence
 - `main` remains protected: all changes land via PR with CI green.
