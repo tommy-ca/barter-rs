@@ -262,7 +262,7 @@ pub fn start_system(
         DefaultStrategy::default(),
         DefaultRiskManager::default(),
         market_stream,
-        DefaultGlobalData::default(),
+        DefaultGlobalData,
         |_| DefaultInstrumentMarketData::default(),
     );
 
@@ -321,7 +321,7 @@ pub fn run_historic_backtest(
         DefaultStrategy::default(),
         DefaultRiskManager::default(),
         market_stream,
-        DefaultGlobalData::default(),
+        DefaultGlobalData,
         |_| DefaultInstrumentMarketData::default(),
     );
 

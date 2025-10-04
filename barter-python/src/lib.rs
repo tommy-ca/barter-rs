@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, rust_2024_compatibility)]
-#![allow(unsafe_op_in_unsafe_fn)]
+#![allow(unsafe_op_in_unsafe_fn, clippy::useless_conversion, clippy::needless_borrow)]
 
 //! Python bindings for the Barter trading engine.
 
@@ -50,7 +50,7 @@ use command::{
     clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
 use config::PySystemConfig;
-use data::{init_dynamic_streams, PyDynamicStreams, PyExchangeId, PySubKind, PySubscription};
+use data::{PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, init_dynamic_streams};
 use logging::init_tracing;
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
 use serde_json::Value;
@@ -503,12 +503,10 @@ impl PyEngineEvent {
 
         let order_id = OrderId::new(order_id);
 
-        if let Some(existing) = &inner.state.id {
-            if existing != &order_id {
-                return Err(PyValueError::new_err(
-                    "order_id does not match the identifier on the cancel request",
-                ));
-            }
+        if let Some(existing) = &inner.state.id && existing != &order_id {
+            return Err(PyValueError::new_err(
+                "order_id does not match the identifier on the cancel request",
+            ));
         }
 
         let cancelled = Cancelled::new(order_id.clone(), time_exchange);
@@ -552,12 +550,12 @@ impl PyEngineEvent {
             ));
         }
 
-        if let Some(fee_value) = fees {
-            if fee_value < 0.0 || !fee_value.is_finite() {
-                return Err(PyValueError::new_err(
-                    "fees must be a non-negative, finite numeric value",
-                ));
-            }
+        if let Some(fee_value) = fees
+            && (fee_value < 0.0 || !fee_value.is_finite())
+        {
+            return Err(PyValueError::new_err(
+                "fees must be a non-negative, finite numeric value",
+            ));
         }
 
         let side = parse_side(side)?;

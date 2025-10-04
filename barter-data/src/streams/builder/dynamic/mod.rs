@@ -779,6 +779,7 @@ impl<InstrumentKey> DynamicStreams<InstrumentKey> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn validate_batches<SubBatchIter, SubIter, Sub, Instrument>(
     batches: SubBatchIter,
 ) -> Result<Vec<Vec<Subscription<ExchangeId, Instrument, SubKind>>>, DataError>

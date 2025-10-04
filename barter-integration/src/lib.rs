@@ -29,6 +29,10 @@
 use crate::error::SocketError;
 use serde::{Deserialize, Serialize};
 
+// Suppress unused dev-dependency warning
+#[cfg(test)]
+use sha2 as _;
+
 /// All [`Error`](std::error::Error)s generated in Barter-Integration.
 pub mod error;
 

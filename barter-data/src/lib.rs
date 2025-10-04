@@ -109,6 +109,7 @@ where
 /// - [`BinanceSpotOrderBooksL2SnapshotFetcher`](exchange::binance::spot::l2::BinanceSpotOrderBooksL2SnapshotFetcher)
 /// - [`BinanceFuturesUsdOrderBooksL2SnapshotFetcher`](exchange::binance::futures::l2::BinanceFuturesUsdOrderBooksL2SnapshotFetcher)
 pub trait SnapshotFetcher<Exchange, Kind> {
+    #[allow(clippy::type_complexity)]
     fn fetch_snapshots<Instrument>(
         subscriptions: &[Subscription<Exchange, Instrument, Kind>],
     ) -> impl Future<Output = Result<Vec<MarketEvent<Instrument::Key, Kind::Event>>, SocketError>> + Send

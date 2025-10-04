@@ -109,6 +109,7 @@ pub fn generate_indexed_market_data_subscription_batches(
 /// # Arguments
 /// * `instruments` - Collection of `IndexedInstruments` used for indexing
 /// * `batches` - Iterator of `Subscription` batches to be indexed
+#[allow(clippy::type_complexity)]
 pub fn index_market_data_subscription_batches<SubBatchIter, SubIter, Sub>(
     instruments: &IndexedInstruments,
     batches: SubBatchIter,

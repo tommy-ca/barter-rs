@@ -4,12 +4,18 @@ You have access to the current barter-rs repository as well as the barter-python
 
 Make a commit and push your changes after every atomic change.
 
+## Scope
+* focus on barter-python package
+
 ## Principles
 * TDD
 * SOLID, KISS, DRY, YAGNI
 * NO MOCKS, NO LEGACY, NO COMPATIBILITY
 * START SMALL
 * LEAN ON E2E TESTS
+
+## Stack
+* modern python stack, uv, ruff
 
 ## Memory system
 * Use the .agent directory as a scratchpad for your work.

@@ -4,7 +4,13 @@ use barter_data::{
     streams::builder::dynamic::DynamicStreams,
     subscription::{SubKind, Subscription},
 };
-use barter_instrument::{exchange::ExchangeId, instrument::{market_data::{MarketDataInstrument, kind::MarketDataInstrumentKind}, InstrumentIndex}};
+use barter_instrument::{
+    exchange::ExchangeId,
+    instrument::{
+        InstrumentIndex,
+        market_data::{MarketDataInstrument, kind::MarketDataInstrumentKind},
+    },
+};
 use pyo3::prelude::*;
 
 /// Wrapper around [`ExchangeId`] for Python exposure.
@@ -183,22 +189,29 @@ impl PySubscription {
         let instrument_kind = match instrument_kind {
             Some("spot") | None => MarketDataInstrumentKind::Spot,
             Some("perpetual") => MarketDataInstrumentKind::Perpetual,
-            Some(kind) => return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Invalid instrument_kind '{}'. Currently only 'spot' and 'perpetual' are supported", kind)
-            )),
+            Some(kind) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Invalid instrument_kind '{}'. Currently only 'spot' and 'perpetual' are supported",
+                    kind
+                )));
+            }
         };
 
         let instrument = MarketDataInstrument::from((base, quote, instrument_kind));
 
         let subscription = Subscription::new(exchange.inner, instrument, kind.inner);
 
-        Ok(Self { inner: subscription })
+        Ok(Self {
+            inner: subscription,
+        })
     }
 
     /// Get the exchange.
     #[getter]
     fn exchange(&self) -> PyExchangeId {
-        PyExchangeId { inner: self.inner.exchange }
+        PyExchangeId {
+            inner: self.inner.exchange,
+        }
     }
 
     /// Get the instrument.
@@ -210,12 +223,15 @@ impl PySubscription {
     /// Get the subscription kind.
     #[getter]
     fn kind(&self) -> PySubKind {
-        PySubKind { inner: self.inner.kind }
+        PySubKind {
+            inner: self.inner.kind,
+        }
     }
 
     /// Return the string representation.
     fn __str__(&self) -> String {
-        format!("Subscription(exchange={}, instrument={}, kind={})",
+        format!(
+            "Subscription(exchange={}, instrument={}, kind={})",
             self.inner.exchange,
             self.instrument(),
             self.inner.kind

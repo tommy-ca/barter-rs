@@ -166,7 +166,7 @@ fn parse_optional_limits(py: Python<'_>, limits: Option<PyObject>) -> PyResult<O
     match limits {
         Some(value) if !value.is_none(py) => {
             let bound = value.bind(py);
-            Ok(Some(risk_limits_from_py(&bound)?))
+            Ok(Some(risk_limits_from_py(&bound.as_any())?))
         }
         _ => Ok(None),
     }

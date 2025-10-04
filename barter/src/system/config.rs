@@ -122,13 +122,11 @@ impl RiskLimits {
             value: &Option<Decimal>,
             field: &'static str,
         ) -> Result<(), RiskLimitsError> {
-            if let Some(value) = value {
-                if value <= &Decimal::ZERO {
-                    return Err(RiskLimitsError::NonPositive {
-                        field,
-                        value: *value,
-                    });
-                }
+            if let Some(value) = value && value <= &Decimal::ZERO {
+                return Err(RiskLimitsError::NonPositive {
+                    field,
+                    value: *value,
+                });
             }
 
             Ok(())
@@ -138,10 +136,10 @@ impl RiskLimits {
         ensure_positive(&self.max_position_quantity, "max_position_quantity")?;
         ensure_positive(&self.max_leverage, "max_leverage")?;
 
-        if let Some(exposure) = self.max_exposure_percent {
-            if exposure <= Decimal::ZERO || exposure > Decimal::ONE {
-                return Err(RiskLimitsError::ExposurePercentOutOfRange { exposure });
-            }
+        if let Some(exposure) = self.max_exposure_percent
+            && (exposure <= Decimal::ZERO || exposure > Decimal::ONE)
+        {
+            return Err(RiskLimitsError::ExposurePercentOutOfRange { exposure });
         }
 
         Ok(())
