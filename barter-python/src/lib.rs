@@ -82,7 +82,10 @@ use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
 use metric::{PyField, PyMetric, PyTag, PyValue};
 use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
-use risk::{calculate_abs_percent_difference, calculate_delta, calculate_quote_notional};
+use risk::{
+    PyDefaultRiskManager, PyRiskApproved, PyRiskRefused, calculate_abs_percent_difference,
+    calculate_delta, calculate_quote_notional,
+};
 use serde_json::Value as JsonValue;
 use strategy::build_ioc_market_order_to_close_position;
 use summary::{
@@ -845,6 +848,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExchangeIndex>()?;
     m.add_class::<PyInstrumentIndex>()?;
     m.add_class::<PySide>()?;
+    m.add_class::<PyRiskApproved>()?;
+    m.add_class::<PyRiskRefused>()?;
+    m.add_class::<PyDefaultRiskManager>()?;
     m.add_class::<PyMetric>()?;
     m.add_class::<PyTag>()?;
     m.add_class::<PyMarketDataInMemory>()?;

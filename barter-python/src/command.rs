@@ -204,6 +204,10 @@ impl PyOrderRequestOpen {
     pub(crate) fn clone_inner(&self) -> DefaultOrderRequestOpen {
         self.inner.clone()
     }
+
+    pub(crate) fn from_inner(inner: DefaultOrderRequestOpen) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]
@@ -297,6 +301,10 @@ pub struct PyOrderRequestCancel {
 impl PyOrderRequestCancel {
     pub(crate) fn clone_inner(&self) -> DefaultOrderRequestCancel {
         self.inner.clone()
+    }
+
+    pub(crate) fn from_inner(inner: DefaultOrderRequestCancel) -> Self {
+        Self { inner }
     }
 }
 

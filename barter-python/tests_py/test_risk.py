@@ -6,6 +6,7 @@ import pytest
 
 import barter_python as bp
 from barter_python import risk
+import barter_python.barter_python as core
 
 
 class TestRiskApproved:
@@ -13,17 +14,19 @@ class TestRiskApproved:
 
     def test_creation(self):
         """Test creating a RiskApproved."""
-        # Use a mock request object
-        request = MockOrderRequest()
+        request = make_open_request()
         approved = risk.RiskApproved(request)
 
-        assert approved.item == request
-        assert approved.into_item() == request
+        assert isinstance(approved, core.RiskApproved)
+        item = approved.item
+        assert repr(item) == repr(request)
+        assert repr(approved.into_item()) == repr(request)
+        assert type(approved).__module__ == "barter_python"
 
     def test_equality(self):
         """Test equality of RiskApproved."""
-        request1 = MockOrderRequest()
-        request2 = MockOrderRequest()
+        request1 = make_open_request()
+        request2 = make_open_request()
         approved1 = risk.RiskApproved(request1)
         approved2 = risk.RiskApproved(request2)
 
@@ -35,17 +38,20 @@ class TestRiskRefused:
 
     def test_creation(self):
         """Test creating a RiskRefused."""
-        request = MockOrderRequest()
+        request = make_cancel_request()
         refused = risk.RiskRefused.new(request, "Test reason")
 
-        assert refused.item == request
+        assert isinstance(refused, core.RiskRefused)
+        item = refused.item
+        assert repr(item) == repr(request)
         assert refused.reason == "Test reason"
-        assert refused.into_item() == request
+        assert repr(refused.into_item()) == repr(request)
+        assert type(refused).__module__ == "barter_python"
 
     def test_equality(self):
         """Test equality of RiskRefused."""
-        request1 = MockOrderRequest()
-        request2 = MockOrderRequest()
+        request1 = make_cancel_request()
+        request2 = make_cancel_request()
         refused1 = risk.RiskRefused.new(request1, "reason")
         refused2 = risk.RiskRefused.new(request2, "reason")
 
@@ -59,17 +65,24 @@ class TestDefaultRiskManager:
         """Test that DefaultRiskManager approves all orders."""
         manager = risk.DefaultRiskManager()
 
-        cancels = [MockOrderRequest()]
-        opens = [MockOrderRequest()]
+        cancels = [make_cancel_request()]
+        opens = [make_open_request()]
 
-        approved_cancels, approved_opens, refused_cancels, refused_opens = (
-            manager.check(None, cancels, opens)
+        approved_cancels, approved_opens, refused_cancels, refused_opens = manager.check(
+            None, cancels, opens
         )
 
-        assert len(list(approved_cancels)) == 1
-        assert len(list(approved_opens)) == 1
-        assert len(list(refused_cancels)) == 0
-        assert len(list(refused_opens)) == 0
+        approved_cancels = list(approved_cancels)
+        approved_opens = list(approved_opens)
+        refused_cancels = list(refused_cancels)
+        refused_opens = list(refused_opens)
+
+        assert len(approved_cancels) == 1
+        assert len(approved_opens) == 1
+        assert len(refused_cancels) == 0
+        assert len(refused_opens) == 0
+        assert isinstance(approved_cancels[0], core.RiskApproved)
+        assert isinstance(approved_opens[0], core.RiskApproved)
 
 
 class TestRiskUtilities:
@@ -141,15 +154,25 @@ class TestRiskUtilities:
         assert result == expected
 
 
-class MockOrderRequest:
-    """Mock order request for testing."""
+def make_order_key() -> bp.OrderKey:
+    """Helper to build a deterministic order key."""
 
-    def __init__(self):
-        self.key = "mock_key"
-        self.state = "mock_state"
+    exchange = 1
+    instrument = 99
+    strategy = bp.StrategyId.new("strategy-alpha")
+    cid = bp.ClientOrderId.new("cid-100")
+    return bp.OrderKey(exchange, instrument, strategy, cid)
 
-    def __eq__(self, other):
-        return isinstance(other, MockOrderRequest)
 
-    def __hash__(self):
-        return hash(("MockOrderRequest", self.key, self.state))
+def make_open_request() -> bp.OrderRequestOpen:
+    """Create a simple open request for testing."""
+
+    key = make_order_key()
+    return bp.OrderRequestOpen(key, "buy", 100.0, 1.5)
+
+
+def make_cancel_request() -> bp.OrderRequestCancel:
+    """Create a simple cancel request for testing."""
+
+    key = make_order_key()
+    return bp.OrderRequestCancel(key)
