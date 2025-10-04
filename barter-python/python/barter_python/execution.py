@@ -10,7 +10,9 @@ from typing import Generic, TypeVar, Union
 
 from .instrument import QuoteAsset, Side
 from .barter_python import (
+    AccountSnapshot as _AccountSnapshot,
     ClientOrderId as _ClientOrderId,
+    InstrumentAccountSnapshot as _InstrumentAccountSnapshot,
     OrderId as _OrderId,
     OrderKey as _OrderKey,
     StrategyId as _StrategyId,
@@ -20,6 +22,8 @@ ClientOrderId = _ClientOrderId
 OrderId = _OrderId
 StrategyId = _StrategyId
 OrderKey = _OrderKey
+InstrumentAccountSnapshot = _InstrumentAccountSnapshot
+AccountSnapshot = _AccountSnapshot
 
 AssetKey = TypeVar("AssetKey")
 InstrumentKey = TypeVar("InstrumentKey")
@@ -734,108 +738,6 @@ class AccountEventKind(Generic[ExchangeKey, AssetKey, InstrumentKey]):
 
     def __hash__(self) -> int:
         return hash((self._kind, self._data))
-
-
-@dataclass(frozen=True)
-class InstrumentAccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
-    """Account snapshot for a specific instrument."""
-
-    instrument: InstrumentKey
-    orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]]
-
-    @classmethod
-    def new(
-        cls,
-        instrument: InstrumentKey,
-        orders: list[OrderSnapshot[ExchangeKey, AssetKey, InstrumentKey]] | None = None,
-    ) -> InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
-        return cls(instrument, orders or [])
-
-    def __str__(self) -> str:
-        return f"InstrumentAccountSnapshot(instrument={self.instrument}, orders={len(self.orders)})"
-
-    def __repr__(self) -> str:
-        return f"InstrumentAccountSnapshot(instrument={self.instrument!r}, orders={self.orders!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, InstrumentAccountSnapshot):
-            return NotImplemented
-        return self.instrument == other.instrument and self.orders == other.orders
-
-    def __hash__(self) -> int:
-        return hash((self.instrument, tuple(self.orders)))
-
-
-@dataclass(frozen=True)
-class AccountSnapshot(Generic[ExchangeKey, AssetKey, InstrumentKey]):
-    """Full account snapshot."""
-
-    exchange: ExchangeKey
-    balances: list[AssetBalance[AssetKey]]
-    instruments: list[InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]]
-
-    @classmethod
-    def new(
-        cls,
-        exchange: ExchangeKey,
-        balances: list[AssetBalance[AssetKey]],
-        instruments: list[
-            InstrumentAccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]
-        ],
-    ) -> AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]:
-        return cls(exchange, balances, instruments)
-
-    def time_most_recent(self) -> datetime | None:
-        """Get the most recent timestamp from balances or orders."""
-        times: list[datetime] = []
-        for balance in self.balances:
-            times.append(balance.time_exchange)
-        for instrument in self.instruments:
-            for order in instrument.orders:
-                time_exchange = order.state.time_exchange()
-                if time_exchange is not None:
-                    times.append(time_exchange)
-        return max(times) if times else None
-
-    def assets(self):
-        """Iterate over unique assets."""
-        seen = set()
-        for balance in self.balances:
-            if balance.asset not in seen:
-                seen.add(balance.asset)
-                yield balance.asset
-
-    def instruments_iter(self):
-        """Iterate over unique instruments."""
-        seen = set()
-        for instrument in self.instruments:
-            if instrument.instrument not in seen:
-                seen.add(instrument.instrument)
-                yield instrument.instrument
-
-    def __str__(self) -> str:
-        return f"AccountSnapshot(exchange={self.exchange}, balances={len(self.balances)}, instruments={len(self.instruments)})"
-
-    def __repr__(self) -> str:
-        return (
-            f"AccountSnapshot("
-            f"exchange={self.exchange!r}, "
-            f"balances={self.balances!r}, "
-            f"instruments={self.instruments!r}"
-            f")"
-        )
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, AccountSnapshot):
-            return NotImplemented
-        return (
-            self.exchange == other.exchange
-            and self.balances == other.balances
-            and self.instruments == other.instruments
-        )
-
-    def __hash__(self) -> int:
-        return hash((self.exchange, tuple(self.balances), tuple(self.instruments)))
 
 
 # Type aliases for convenience

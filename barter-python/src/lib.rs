@@ -8,6 +8,7 @@
 
 //! Python bindings for the Barter trading engine.
 
+mod account;
 mod analytics;
 mod backtest;
 mod books;
@@ -23,6 +24,7 @@ mod risk;
 mod summary;
 mod system;
 
+use account::{PyAccountSnapshot, PyInstrumentAccountSnapshot};
 use analytics::{
     calculate_calmar_ratio, calculate_max_drawdown, calculate_mean_drawdown,
     calculate_profit_factor, calculate_rate_of_return, calculate_sharpe_ratio,
@@ -639,6 +641,19 @@ impl PyEngineEvent {
         })
     }
 
+    /// Construct an [`EngineEvent::Account`] carrying a full account snapshot update.
+    #[staticmethod]
+    pub fn account_snapshot(snapshot: &PyAccountSnapshot) -> Self {
+        let event = AccountEvent::new(
+            snapshot.inner.exchange,
+            AccountEventKind::Snapshot(snapshot.clone_inner()),
+        );
+
+        Self {
+            inner: EngineEvent::Account(AccountStreamEvent::Item(event)),
+        }
+    }
+
     /// Construct an [`EngineEvent::Account`] with a trade fill update.
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
@@ -806,6 +821,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;
     m.add_class::<PyOrderSnapshot>()?;
+    m.add_class::<PyInstrumentAccountSnapshot>()?;
+    m.add_class::<PyAccountSnapshot>()?;
     m.add_class::<PyInstrumentFilter>()?;
     m.add_class::<PyTradingSummary>()?;
     m.add_class::<PyInstrumentTearSheet>()?;

@@ -541,6 +541,71 @@ def test_account_order_cancelled_helper() -> None:
     )
 
 
+def test_account_snapshot_helper_round_trip() -> None:
+    balance_time = dt.datetime(2026, 1, 1, 12, tzinfo=dt.timezone.utc)
+    order_time = dt.datetime(2026, 1, 1, 12, 5, tzinfo=dt.timezone.utc)
+
+    key = bp.OrderKey(1, 2, "strategy-delta", "cid-9")
+    open_request = bp.OrderRequestOpen(
+        key,
+        "buy",
+        125.5,
+        0.4,
+        kind="limit",
+        time_in_force="good_until_cancelled",
+    )
+    order_snapshot = bp.OrderSnapshot.from_open_request(
+        open_request,
+        order_id="order-999",
+        time_exchange=order_time,
+        filled_quantity=0.1,
+    )
+
+    instrument_snapshot = bp.InstrumentAccountSnapshot(
+        instrument=2,
+        orders=[order_snapshot],
+    )
+
+    snapshot = bp.AccountSnapshot(
+        exchange=1,
+        balances=[(3, 200.0, 150.0, balance_time)],
+        instruments=[instrument_snapshot],
+    )
+
+    assert snapshot.exchange == 1
+    assert snapshot.time_most_recent() == order_time
+
+    event = bp.EngineEvent.account_snapshot(snapshot)
+
+    account_payload = event.to_dict()["Account"]["Item"]["kind"]["Snapshot"]
+    assert account_payload["exchange"] == 1
+    balance = account_payload["balances"][0]
+    assert balance["asset"] == 3
+    assert balance["balance"]["total"] == "200"
+    assert balance["balance"]["free"] == "150"
+    assert balance["time_exchange"] == balance_time.isoformat().replace("+00:00", "Z")
+
+    instrument = account_payload["instruments"][0]
+    assert instrument["instrument"] == 2
+    assert instrument["orders"]
+    assert instrument["orders"][0]["state"]["Active"]["Open"]["id"] == "order-999"
+
+    replayed = bp.EngineEvent.from_json(event.to_json())
+    assert not replayed.is_terminal()
+
+
+def test_account_snapshot_balance_validation() -> None:
+    invalid_time = dt.datetime(2026, 2, 1, tzinfo=dt.timezone.utc)
+    instrument_snapshot = bp.InstrumentAccountSnapshot(instrument=5, orders=[])
+
+    with pytest.raises(ValueError):
+        bp.AccountSnapshot(
+            exchange=2,
+            balances=[(7, 10.0, 15.0, invalid_time)],
+            instruments=[instrument_snapshot],
+        )
+
+
 def test_calculate_rate_of_return() -> None:
     metric = bp.calculate_rate_of_return(mean_return=0.01, interval="daily")
 

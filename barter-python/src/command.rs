@@ -325,6 +325,12 @@ impl PyOrderSnapshot {
     pub(crate) fn clone_inner(&self) -> OrderSnapshot<ExchangeIndex, AssetIndex, InstrumentIndex> {
         self.inner.clone()
     }
+
+    pub(crate) fn from_inner(
+        inner: OrderSnapshot<ExchangeIndex, AssetIndex, InstrumentIndex>,
+    ) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]
