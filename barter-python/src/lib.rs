@@ -35,7 +35,7 @@ use analytics::{
     welford_calculate_population_variance, welford_calculate_recurrence_relation_m,
     welford_calculate_sample_variance,
 };
-use backtest::PyMarketDataInMemory;
+use backtest::{PyBacktestArgsConstant, PyBacktestArgsDynamic, PyMarketDataInMemory};
 use books::{PyLevel, PyOrderBook, calculate_mid_price, calculate_volume_weighted_mid_price};
 
 use barter::engine::{command::Command, state::trading::TradingState};
@@ -963,6 +963,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDefaultRiskManager>()?;
     m.add_class::<PyMetric>()?;
     m.add_class::<PyTag>()?;
+    m.add_class::<PyBacktestArgsConstant>()?;
+    m.add_class::<PyBacktestArgsDynamic>()?;
     m.add_class::<PyMarketDataInMemory>()?;
     m.add_class::<PyField>()?;
     m.add_class::<PyValue>()?;

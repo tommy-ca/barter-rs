@@ -12,22 +12,17 @@
 4. Publish and verify via `uv` environment using example E2E flows.
 
 ## Current Focus (2025-10-05)
-- Bridge execution order enums into the Python API.
-  - [x] Capture binding requirements in `.agent/specs/python-order-enum-bindings.md`.
-  - [x] Expose PyO3 `OrderKind` and `TimeInForce` wrappers and re-export via `execution.py`.
-  - [x] Extend pytest and Rust coverage for the new wrappers (cargo test, uv run pytest on 2025-10-05).
-- Expand execution instrument mapping coverage to the Python API.
-  - [x] Capture binding requirements in `.agent/specs/python-execution-instrument-map.md`.
-  - [x] Expose `ExecutionInstrumentMap` wrappers & generator functions via PyO3.
-  - [x] Add pytest coverage validating lookup helpers and error handling.
-- [x] Replace pure Python instrument name wrappers with Rust-backed bindings and align pytest
-  coverage (`.agent/specs/python-instrument-name-bindings.md`).
-- Bridge mock execution client lifecycle into the Python API.
-  - [x] Capture requirements in `.agent/specs/python-mock-execution-client.md`.
-  - [x] Expose PyO3 bindings & Python wrapper for a `MockExecutionClient` harness.
-  - [x] Add TDD coverage (pytest + doctest) exercising snapshots and stream polling.
+- Prepare Milestone 2 for backtest execution pipeline bindings.
+  - [ ] Design async-to-sync wrapper for `backtest` and `run_backtests` using Tokio runtimes.
+  - [ ] Define strategy/risk plumbing for default implementations using new argument wrappers.
+  - [ ] Extend pytest coverage for single vs. multi-run flows once bindings exist.
 
 ## Completed (2025-10-05)
+- Bridge backtest argument wrappers into the Python API.
+  - [x] Update `.agent/specs/python-backtest-bindings.md` with milestone breakdown.
+  - [x] Add `PyBacktestArgsConstant` & `PyBacktestArgsDynamic` with validation and market data coercion.
+  - [x] Re-export wrappers via `python/backtest.py` and align pytest expectations (`TestBacktestArgs`).
+  - [x] Run `cargo test -p barter-python` and `uv run pytest tests_py/test_backtest.py` post-change.
 - Expose execution balance wrappers to the Python API.
   - [x] Align module exports with the Rust-backed `Balance` and `AssetBalance` bindings.
   - [x] Update pytest coverage asserting execution types are surfaced to Python callers.

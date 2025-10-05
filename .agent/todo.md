@@ -41,6 +41,8 @@
   - [x] Extend pytest coverage for sequence ergonomics.
  - [x] Bridge `OrderEvent` execution updates into Python bindings (spec:
   `.agent/specs/python-order-event-bindings.md`).
+- [ ] Implement Milestone 2 backtest execution helpers (`backtest` / `run_backtests`) using new
+      argument wrappers.
 
 ## Planned (2025-10-03)
 - [x] Update top-level README with Python quickstart guidance. (2025-10-04)

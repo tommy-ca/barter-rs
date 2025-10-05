@@ -4,7 +4,9 @@ import asyncio
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from barter_python import backtest
+import pytest
+
+from barter_python import SystemConfig, backtest
 from barter_python.data import DataKind, MarketEvent, PublicTrade
 from barter_python.instrument import (
     Asset,
@@ -138,41 +140,52 @@ class TestMultiBacktestSummary:
 class TestBacktestArgs:
     """Test backtest argument structures."""
 
-    def test_backtest_args_constant(self):
-        """Test BacktestArgsConstant creation."""
-        instruments = backtest.IndexedInstruments.new([])
-        executions = [backtest.ExecutionConfig.mock(backtest.MockExecutionConfig())]
-        market_data = backtest.MarketDataInMemory(
-            _time_first_event=datetime(2023, 1, 1), events=[]
+    def test_backtest_args_constant(self, example_paths):
+        """BacktestArgsConstant exposes configuration metadata."""
+        system_config = SystemConfig.from_json(str(example_paths["system_config"]))
+        market_data = backtest.MarketDataInMemory.from_json_file(
+            str(example_paths["market_data"])
         )
-        summary_interval = Annual365()
-        engine_state = backtest.EngineEngineState()
 
         args = backtest.BacktestArgsConstant(
-            instruments=instruments,
-            executions=executions,
+            system_config=system_config,
             market_data=market_data,
-            summary_interval=summary_interval,
-            engine_state=engine_state,
+            summary_interval="annual_365",
         )
 
-        assert args.instruments == instruments
-        assert len(args.executions) == 1
-        assert args.market_data == market_data
-        assert args.summary_interval == summary_interval
-        assert args.engine_state == engine_state
+        assert args.instrument_count == 3
+        assert args.execution_count == 1
+        assert args.summary_interval == "annual_365"
+        assert args.market_data is market_data
+
+    def test_backtest_args_constant_rejects_interval(self, example_paths):
+        """Invalid summary interval raises a ValueError."""
+        system_config = SystemConfig.from_json(str(example_paths["system_config"]))
+        market_data = backtest.MarketDataInMemory.from_json_file(
+            str(example_paths["market_data"])
+        )
+
+        with pytest.raises(ValueError):
+            backtest.BacktestArgsConstant(
+                system_config=system_config,
+                market_data=market_data,
+                summary_interval="fortnightly",
+            )
 
     def test_backtest_args_dynamic(self):
         """Test BacktestArgsDynamic creation."""
         args = backtest.BacktestArgsDynamic(
-            id="test",
+            id="baseline",
             risk_free_return=Decimal("0.02"),
-            strategy=None,  # Placeholder
-            risk=None,  # Placeholder
         )
 
-        assert args.id == "test"
+        assert args.id == "baseline"
         assert args.risk_free_return == Decimal("0.02")
+
+    def test_backtest_args_dynamic_requires_id(self):
+        """Empty identifiers are rejected."""
+        with pytest.raises(ValueError):
+            backtest.BacktestArgsDynamic(id="", risk_free_return=Decimal("0.01"))
 
 
 class TestIndexedInstruments:
@@ -301,7 +314,9 @@ class TestExecutionConfig:
         """Test creating mock execution config."""
         mock_config = backtest.MockExecutionConfig()
         config = backtest.ExecutionConfig.mock(mock_config)
-        assert config.mock_config == mock_config
+        assert config.kind == "mock"
+        assert config.mock_config.mocked_exchange == mock_config.mocked_exchange
+        assert config.mock_config.latency_ms == mock_config.latency_ms
 
 
 class TestBalance:

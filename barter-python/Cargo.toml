@@ -34,3 +34,4 @@ tracing-subscriber = { workspace = true }
 rust_decimal = { workspace = true }
 vecmap-rs = { workspace = true }
 fnv = { workspace = true }
+smol_str = { workspace = true }

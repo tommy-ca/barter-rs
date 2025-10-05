@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar
 
 from .barter_python import (
+    BacktestArgsConstant as _BacktestArgsConstant,
+    BacktestArgsDynamic as _BacktestArgsDynamic,
     ExecutionConfig as _ExecutionConfig,
     MarketDataInMemory as _RustMarketDataInMemory,
     MockExecutionConfig as _MockExecutionConfig,
@@ -48,6 +50,8 @@ from .statistic import (
 
 ExecutionConfig = _ExecutionConfig
 MockExecutionConfig = _MockExecutionConfig
+BacktestArgsConstant = _BacktestArgsConstant
+BacktestArgsDynamic = _BacktestArgsDynamic
 
 # Type variables for generic backtest interfaces
 MarketEventKind = TypeVar("MarketEventKind")
@@ -262,27 +266,6 @@ class MultiBacktestSummary(Generic[SummaryInterval]):
     ) -> MultiBacktestSummary[SummaryInterval]:
         """Create a new MultiBacktestSummary."""
         return cls(total_duration=duration, summaries=summaries)
-
-
-@dataclass(frozen=True)
-class BacktestArgsConstant(Generic[SummaryInterval]):
-    """Configuration for constants used across all backtests in a batch."""
-
-    instruments: IndexedInstruments  # TODO: Define this
-    executions: list[ExecutionConfig]  # TODO: Define this
-    market_data: BacktestMarketData
-    summary_interval: SummaryInterval
-    engine_state: EngineEngineState
-
-
-@dataclass(frozen=True)
-class BacktestArgsDynamic(Generic[Strategy, Risk]):
-    """Configuration for variables that can change between individual backtests."""
-
-    id: str
-    risk_free_return: Decimal
-    strategy: Strategy
-    risk: Risk
 
 
 async def run_backtests(

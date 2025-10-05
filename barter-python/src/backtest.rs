@@ -1,12 +1,23 @@
-use std::{fs::File, io::BufReader, sync::Arc};
+use std::{fs::File, io::BufReader, str::FromStr, sync::Arc};
 
-use crate::summary::decimal_to_py;
+use crate::{
+    common::{SummaryInterval, parse_initial_balances, parse_summary_interval},
+    config::PySystemConfig,
+    summary::decimal_to_py,
+};
 use barter::backtest::market_data::MarketDataInMemory;
+use barter::system::config::SystemConfig;
 use barter_data::{
     event::{DataKind, MarketEvent},
     streams::consumer::MarketStreamEvent,
 };
-use barter_instrument::{Side, exchange::ExchangeId, instrument::InstrumentIndex};
+use barter_execution::balance::Balance;
+use barter_instrument::{
+    Keyed, Side,
+    asset::{ExchangeAsset, name::AssetNameInternal},
+    exchange::ExchangeId,
+    instrument::InstrumentIndex,
+};
 use chrono::{DateTime, Utc};
 use pyo3::{
     Bound, PyObject, PyResult, Python,
@@ -15,6 +26,7 @@ use pyo3::{
     types::{PyAny, PyModule},
 };
 use rust_decimal::{Decimal, prelude::FromPrimitive};
+use smol_str::SmolStr;
 
 #[pyclass(module = "barter_python", name = "MarketDataInMemory", unsendable)]
 #[derive(Debug, Clone)]
@@ -168,6 +180,156 @@ impl PyMarketDataInMemory {
             ))
         })
     }
+}
+
+#[pyclass(module = "barter_python", name = "BacktestArgsConstant", unsendable)]
+pub struct PyBacktestArgsConstant {
+    system_config: SystemConfig,
+    _market_data: Py<PyMarketDataInMemory>,
+    market_data_py: PyObject,
+    summary_interval: SummaryInterval,
+    _initial_balances: Vec<Keyed<ExchangeAsset<AssetNameInternal>, Balance>>,
+}
+
+#[pymethods]
+impl PyBacktestArgsConstant {
+    #[new]
+    #[pyo3(signature = (system_config, market_data, summary_interval=None, initial_balances=None))]
+    pub fn __new__(
+        py: Python<'_>,
+        system_config: &PySystemConfig,
+        market_data: &Bound<'_, PyAny>,
+        summary_interval: Option<&str>,
+        initial_balances: Option<PyObject>,
+    ) -> PyResult<Self> {
+        let summary_interval = parse_summary_interval(summary_interval)?;
+        let initial_balances = parse_initial_balances(py, initial_balances)?;
+        let (market_data_py, market_data_inner) = coerce_market_data(py, market_data)?;
+
+        Ok(Self {
+            system_config: system_config.clone_inner(),
+            _market_data: market_data_inner,
+            market_data_py,
+            summary_interval,
+            _initial_balances: initial_balances,
+        })
+    }
+
+    #[getter]
+    pub fn instrument_count(&self) -> usize {
+        self.system_config.instruments.len()
+    }
+
+    #[getter]
+    pub fn execution_count(&self) -> usize {
+        self.system_config.executions.len()
+    }
+
+    #[getter]
+    pub fn summary_interval(&self) -> &'static str {
+        summary_interval_label(self.summary_interval)
+    }
+
+    #[getter]
+    pub fn market_data(&self, py: Python<'_>) -> PyObject {
+        self.market_data_py.clone_ref(py)
+    }
+}
+
+#[pyclass(module = "barter_python", name = "BacktestArgsDynamic", unsendable)]
+pub struct PyBacktestArgsDynamic {
+    id: SmolStr,
+    risk_free_return: Decimal,
+    strategy: Option<PyObject>,
+    risk: Option<PyObject>,
+}
+
+#[pymethods]
+impl PyBacktestArgsDynamic {
+    #[new]
+    #[pyo3(signature = (id, risk_free_return, strategy=None, risk=None))]
+    pub fn __new__(
+        py: Python<'_>,
+        id: &str,
+        risk_free_return: PyObject,
+        strategy: Option<PyObject>,
+        risk: Option<PyObject>,
+    ) -> PyResult<Self> {
+        let trimmed = id.trim();
+        if trimmed.is_empty() {
+            return Err(PyValueError::new_err("id must not be empty"));
+        }
+
+        let bound = risk_free_return.bind(py);
+        let risk_free = decimal_from_any(&bound, "risk_free_return")?;
+
+        Ok(Self {
+            id: SmolStr::new(trimmed),
+            risk_free_return: risk_free,
+            strategy,
+            risk,
+        })
+    }
+
+    #[getter]
+    pub fn id(&self) -> &str {
+        self.id.as_str()
+    }
+
+    #[getter]
+    pub fn risk_free_return(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.risk_free_return)
+    }
+
+    #[getter]
+    pub fn strategy(&self, py: Python<'_>) -> Option<PyObject> {
+        self.strategy.as_ref().map(|value| value.clone_ref(py))
+    }
+
+    #[getter]
+    pub fn risk(&self, py: Python<'_>) -> Option<PyObject> {
+        self.risk.as_ref().map(|value| value.clone_ref(py))
+    }
+}
+
+fn summary_interval_label(interval: SummaryInterval) -> &'static str {
+    match interval {
+        SummaryInterval::Daily => "daily",
+        SummaryInterval::Annual252 => "annual_252",
+        SummaryInterval::Annual365 => "annual_365",
+    }
+}
+
+fn decimal_from_any(value: &Bound<'_, PyAny>, label: &str) -> PyResult<Decimal> {
+    let stringy = value.str()?.extract::<String>()?;
+    let trimmed = stringy.trim();
+
+    Decimal::from_str(trimmed)
+        .map_err(|err| PyValueError::new_err(format!("{label} must be a valid decimal: {err}")))
+}
+
+fn coerce_market_data(
+    py: Python<'_>,
+    value: &Bound<'_, PyAny>,
+) -> PyResult<(PyObject, Py<PyMarketDataInMemory>)> {
+    if let Ok(inner) = value.extract::<Py<PyMarketDataInMemory>>() {
+        return Ok((value.to_object(py), inner));
+    }
+
+    if let Ok(attr) = value.getattr("_inner") {
+        if attr.is_none() {
+            return Err(PyValueError::new_err(
+                "market_data must be initialised with a Rust MarketDataInMemory backing",
+            ));
+        }
+
+        let inner = attr.extract::<Py<PyMarketDataInMemory>>()?;
+        return Ok((value.to_object(py), inner));
+    }
+
+    Err(PyValueError::new_err(
+        "market_data must be a barter_python.backtest.MarketDataInMemory instance",
+    ))
 }
 
 fn market_stream_event_to_py(
