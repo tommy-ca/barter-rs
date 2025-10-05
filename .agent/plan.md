@@ -18,6 +18,10 @@
   - [x] Add pytest coverage validating lookup helpers and error handling.
 - [x] Replace pure Python instrument name wrappers with Rust-backed bindings and align pytest
   coverage (`.agent/specs/python-instrument-name-bindings.md`).
+- Bridge mock execution client lifecycle into the Python API.
+  - [ ] Capture requirements in `.agent/specs/python-mock-execution-client.md`.
+  - [ ] Expose PyO3 bindings & Python wrapper for a `MockExecutionClient` harness.
+  - [ ] Add TDD coverage (pytest + doctest) exercising snapshots and stream polling.
 
 ## Completed (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.
