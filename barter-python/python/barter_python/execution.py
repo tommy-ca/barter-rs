@@ -10,6 +10,7 @@ from typing import Generic, TypeVar, Union
 
 from . import barter_python as _core
 from .instrument import QuoteAsset, Side
+from .trade_bindings import AssetFees, Trade, TradeId
 
 _AccountSnapshot = _core.AccountSnapshot
 _AssetBalance = _core.AssetBalance
@@ -210,130 +211,13 @@ InstrumentKey = TypeVar("InstrumentKey")
 ExchangeKey = TypeVar("ExchangeKey")
 
 
-@dataclass(frozen=True)
-class AssetFees(Generic[AssetKey]):
-    """Asset fees."""
-
-    asset: AssetKey
-    fees: Decimal
-
-    @classmethod
-    def quote_fees(cls, fees: Decimal):
-        return AssetFees(QuoteAsset(), fees)
-
-    def __str__(self) -> str:
-        return f"AssetFees(asset={self.asset}, fees={self.fees})"
-
-    def __repr__(self) -> str:
-        return f"AssetFees(asset={self.asset!r}, fees={self.fees!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, AssetFees):
-            return NotImplemented
-        return self.asset == other.asset and self.fees == other.fees
-
-    def __hash__(self) -> int:
-        return hash((self.asset, self.fees))
 
 
-@dataclass(frozen=True)
-class TradeId:
-    """Trade identifier."""
-
-    value: str
-
-    @classmethod
-    def new(cls, value: str) -> TradeId:
-        return cls(value)
-
-    def __str__(self) -> str:
-        return self.value
-
-    def __repr__(self) -> str:
-        return f"TradeId({self.value!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, TradeId):
-            return NotImplemented
-        return self.value == other.value
-
-    def __hash__(self) -> int:
-        return hash(self.value)
 
 
-@dataclass(frozen=True)
-class Trade(Generic[AssetKey, InstrumentKey]):
-    """Trade execution."""
 
-    id: TradeId
-    order_id: OrderId
-    instrument: InstrumentKey
-    strategy: StrategyId
-    time_exchange: datetime
-    side: Side
-    price: Decimal
-    quantity: Decimal
-    fees: AssetFees[AssetKey]
 
-    def value_quote(self) -> Decimal:
-        """Calculate quote value of the trade."""
-        return self.price * self.quantity
 
-    def __str__(self) -> str:
-        return (
-            f"Trade("
-            f"instrument={self.instrument}, "
-            f"side={self.side}, "
-            f"price={self.price}, "
-            f"quantity={self.quantity}, "
-            f"time={self.time_exchange}"
-            f")"
-        )
-
-    def __repr__(self) -> str:
-        return (
-            f"Trade("
-            f"id={self.id!r}, "
-            f"order_id={self.order_id!r}, "
-            f"instrument={self.instrument!r}, "
-            f"strategy={self.strategy!r}, "
-            f"time_exchange={self.time_exchange!r}, "
-            f"side={self.side!r}, "
-            f"price={self.price!r}, "
-            f"quantity={self.quantity!r}, "
-            f"fees={self.fees!r}"
-            f")"
-        )
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Trade):
-            return NotImplemented
-        return (
-            self.id == other.id
-            and self.order_id == other.order_id
-            and self.instrument == other.instrument
-            and self.strategy == other.strategy
-            and self.time_exchange == other.time_exchange
-            and self.side == other.side
-            and self.price == other.price
-            and self.quantity == other.quantity
-            and self.fees == other.fees
-        )
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.id,
-                self.order_id,
-                self.instrument,
-                self.strategy,
-                self.time_exchange,
-                self.side,
-                self.price,
-                self.quantity,
-                self.fees,
-            )
-        )
 
 
 # Order states

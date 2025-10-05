@@ -348,7 +348,7 @@ impl PyExecutionBalance {
 #[pyclass(module = "barter_python", name = "AssetBalance", eq, hash, frozen)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyExecutionAssetBalance {
-    inner: ExecutionAssetBalance<AssetIndex>,
+    pub(crate) inner: ExecutionAssetBalance<AssetIndex>,
 }
 
 impl PyExecutionAssetBalance {
@@ -1623,7 +1623,7 @@ impl PyAssetFees {
 #[pyclass(module = "barter_python", name = "Trade", unsendable, eq, hash, frozen)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyTrade {
-    inner: ExecutionTrade<QuoteAsset, InstrumentIndex>,
+    pub(crate) inner: ExecutionTrade<QuoteAsset, InstrumentIndex>,
 }
 
 #[pymethods]

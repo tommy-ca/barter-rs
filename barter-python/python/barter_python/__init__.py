@@ -46,6 +46,48 @@ __all__.append("MockExecutionClient")
 Balance = execution.Balance
 AssetBalance = execution.AssetBalance
 
+# Export execution classes
+OrderId = execution.OrderId
+StrategyId = execution.StrategyId
+ClientOrderId = execution.ClientOrderId
+OrderKey = execution.OrderKey
+OrderKind = execution.OrderKind
+TimeInForce = execution.TimeInForce
+TradeId = execution.TradeId
+Trade = execution.Trade
+AssetFees = execution.AssetFees
+Order = execution.Order
+InstrumentAccountSnapshot = execution.InstrumentAccountSnapshot
+AccountSnapshot = execution.AccountSnapshot
+OrderEvent = execution.OrderEvent
+
+# Export order state classes
+OpenInFlight = execution.OpenInFlight
+Open = execution.Open
+CancelInFlight = execution.CancelInFlight
+Cancelled = execution.Cancelled
+OrderError = execution.OrderError
+InactiveOrderState = execution.InactiveOrderState
+OrderState = execution.OrderState
+
+# Export request classes
+RequestOpen = execution.RequestOpen
+# OrderRequestOpen = execution.OrderRequestOpen  # Use PyO3 version
+# OrderRequestCancel = execution.OrderRequestCancel  # Use PyO3 version
+OrderResponseCancel = execution.OrderResponseCancel
+
+# Export event classes
+AccountEvent = execution.AccountEvent
+AccountEventKind = execution.AccountEventKind
+
+__all__.extend([
+    "OrderId", "StrategyId", "ClientOrderId", "OrderKey", "OrderKind", "TimeInForce",
+    "TradeId", "Trade", "AssetFees", "Order", "InstrumentAccountSnapshot", "AccountSnapshot", "OrderEvent",
+    "OpenInFlight", "Open", "CancelInFlight", "Cancelled", "OrderError", "InactiveOrderState", "OrderState",
+    "RequestOpen", "OrderResponseCancel",
+    "AccountEvent", "AccountEventKind"
+])
+
 ENGINE_FEED_MODE_STREAM = "stream"
 ENGINE_FEED_MODE_ITERATOR = "iterator"
 ENGINE_FEED_MODES = (ENGINE_FEED_MODE_STREAM, ENGINE_FEED_MODE_ITERATOR)

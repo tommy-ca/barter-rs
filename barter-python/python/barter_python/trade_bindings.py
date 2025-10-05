@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from .barter_python import (
     AssetFees as _AssetFees,
@@ -24,11 +24,15 @@ from .barter_python import (
 from .barter_python import (
     TradeId as _TradeId,
 )
-from .execution import OrderId, StrategyId
-from .instrument import Side
+from .barter_python import OrderId as _OrderId, StrategyId as _StrategyId
+from .instrument import Side, QuoteAsset
 
 AssetKey = TypeVar("AssetKey")
 InstrumentKey = TypeVar("InstrumentKey")
+
+# Type aliases for convenience
+OrderId = _OrderId
+StrategyId = _StrategyId
 
 
 class TradeId:
@@ -67,16 +71,31 @@ class AssetFees(Generic[AssetKey]):
 
     __slots__ = ("_inner",)
 
-    def __init__(self, asset: AssetKey, fees: Decimal) -> None:
-        self._inner = _AssetFees(asset, fees)
+    def __init__(self, asset: Any, fees: Decimal) -> None:
+        # Handle Python QuoteAsset
+        if hasattr(asset, '__class__') and asset.__class__.__name__ == 'QuoteAsset':
+            # Create a PyQuoteAsset for the PyO3 constructor
+            from .barter_python import QuoteAsset as PyQuoteAsset
+            py_quote = PyQuoteAsset()
+            self._inner = _AssetFees(py_quote, fees)
+        else:
+            self._inner = _AssetFees(asset, fees)
 
     @classmethod
-    def quote_fees(cls, fees: Decimal) -> AssetFees[AssetKey]:
-        return cls(_QuoteAsset(), fees)
+    def quote_fees(cls, fees: Decimal) -> AssetFees[Any]:
+        py_quote = _QuoteAsset()
+        inner = _AssetFees(py_quote, fees)
+        instance = cls.__new__(cls)
+        instance._inner = inner
+        return instance
 
     @property
-    def asset(self) -> AssetKey:
-        return self._inner.asset
+    def asset(self) -> Any:
+        inner_asset = self._inner.asset
+        # Convert PyQuoteAsset back to Python QuoteAsset for compatibility
+        if hasattr(inner_asset, '__class__') and inner_asset.__class__.__name__ == 'QuoteAsset':
+            return QuoteAsset()
+        return inner_asset
 
     @property
     def fees(self) -> Decimal:
@@ -97,7 +116,7 @@ class AssetFees(Generic[AssetKey]):
         return hash(self._inner)
 
 
-class Trade(Generic[AssetKey, InstrumentKey]):
+class Trade(Generic[AssetKey, InstrumentKey]):  # type: ignore
     """Wrapper around the PyO3-backed :class:`barter_python.Trade`."""
 
     __slots__ = (
@@ -117,13 +136,13 @@ class Trade(Generic[AssetKey, InstrumentKey]):
         self,
         trade_id: TradeId,
         order_id: OrderId,
-        instrument: InstrumentKey,
-        strategy: StrategyId,
+        instrument: InstrumentKey,  # type: ignore
+        strategy: StrategyId,  # type: ignore
         time_exchange: datetime,
         side: Side,
         price: Decimal,
         quantity: Decimal,
-        fees: AssetFees[AssetKey],
+        fees: AssetFees[Any],
     ) -> None:
         side_value = side.value if isinstance(side, Side) else str(side)
 
@@ -158,11 +177,11 @@ class Trade(Generic[AssetKey, InstrumentKey]):
         return self._order_id
 
     @property
-    def instrument(self) -> InstrumentKey:
+    def instrument(self) -> InstrumentKey:  # type: ignore
         return self._instrument
 
     @property
-    def strategy(self) -> StrategyId:
+    def strategy(self) -> StrategyId:  # type: ignore
         return self._strategy
 
     @property

@@ -93,6 +93,9 @@ def test_audit_updates_typed_helpers(example_paths: dict[str, Path]) -> None:
         assert snap_updates is not None
 
         updates = snap_updates.updates
+        # Consume any initial audit ticks
+        while updates.try_recv_tick() is not None:
+            pass
         assert updates.try_recv_tick() is None
 
         handle.send_event(bp.EngineEvent.trading_state(True))

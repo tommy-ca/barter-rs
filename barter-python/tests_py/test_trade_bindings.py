@@ -22,9 +22,11 @@ def test_trade_id_wrapper_behaviour():
 
 
 def test_asset_fees_wrapper_handles_quote_assets():
+    from barter_python.instrument import QuoteAsset
+
     fees = AssetFees.quote_fees(Decimal("0.001"))
 
-    assert isinstance(fees.asset, bp.QuoteAsset)
+    assert isinstance(fees.asset, QuoteAsset)
     assert fees.fees == Decimal("0.001")
 
     fees_str = AssetFees("usdt", Decimal("0.002"))

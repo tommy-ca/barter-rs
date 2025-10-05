@@ -417,15 +417,15 @@ class TestEngine:
         engine = Engine(initial_state, DefaultStrategy(), DefaultRiskManager())
 
         trade_event = Trade(
-            id=TradeId.new("trade-1"),
-            order_id=OrderId.new("order-1"),
-            instrument=1,  # type: ignore[arg-type]
-            strategy=StrategyId.new("strat-1"),
-            time_exchange=datetime(2024, 1, 1, 12, 10, tzinfo=timezone.utc),
-            side=Side.BUY,
-            price=Decimal("25000"),
-            quantity=Decimal("0.1"),
-            fees=AssetFees.quote_fees(Decimal("5")),
+            TradeId.new("trade-1"),
+            OrderId.new("order-1"),
+            1,  # type: ignore[arg-type]
+            StrategyId.new("strat-1"),
+            datetime(2024, 1, 1, 12, 10, tzinfo=timezone.utc),
+            Side.BUY,
+            Decimal("25000"),
+            Decimal("0.1"),
+            AssetFees.quote_fees(Decimal("5")),
         )
         account_event = AccountEvent.new(
             exchange=0,  # type: ignore[arg-type]

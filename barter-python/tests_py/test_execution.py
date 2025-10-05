@@ -7,31 +7,16 @@ import pytest
 
 import barter_python as bp
 import barter_python.execution as execution
-from barter_python import ExecutionConfig, MockExecutionConfig
+from barter_python import (
+    ExecutionConfig, MockExecutionConfig,
+    OrderKind, TimeInForce, ClientOrderId, OrderId, StrategyId, OrderKey,
+    Balance, AssetBalance, Trade, Order, InstrumentAccountSnapshot, AccountSnapshot, OrderEvent,
+    OpenInFlight, Open, CancelInFlight, Cancelled, OrderError, InactiveOrderState, OrderState,
+    RequestOpen, OrderRequestOpen, OrderRequestCancel, OrderResponseCancel,
+    AccountEvent, AccountEventKind
+)
 from barter_python.execution import (
-    AccountEvent,
-    AccountEventKind,
-    AccountSnapshot,
-    AssetBalance,
     AssetFees,
-    Balance,
-    CancelInFlight,
-    Cancelled,
-    ClientOrderId,
-    InactiveOrderState,
-    InstrumentAccountSnapshot,
-    Open,
-    OpenInFlight,
-    Order,
-    OrderError,
-    OrderId,
-    OrderKey,
-    OrderKind,
-    OrderResponseCancel,
-    OrderState,
-    StrategyId,
-    TimeInForce,
-    Trade,
     TradeId,
 )
 from barter_python.instrument import QuoteAsset, Side

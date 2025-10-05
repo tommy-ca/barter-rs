@@ -116,7 +116,7 @@ impl fmt::Debug for PySnapshot {
 
 #[pyclass(module = "barter_python", name = "SnapUpdates", unsendable)]
 pub struct PySnapUpdates {
-    inner: SnapUpdates<Snapshot<Py<PyAny>>, Py<PyAny>>,
+    pub(crate) inner: SnapUpdates<Snapshot<Py<PyAny>>, Py<PyAny>>,
 }
 
 impl PySnapUpdates {
