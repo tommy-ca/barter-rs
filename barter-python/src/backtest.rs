@@ -3,15 +3,31 @@ use std::{fs::File, io::BufReader, str::FromStr, sync::Arc};
 use crate::{
     common::{SummaryInterval, parse_initial_balances, parse_summary_interval},
     config::PySystemConfig,
-    summary::decimal_to_py,
+    summary::{
+        PyBacktestSummary, PyMultiBacktestSummary, backtest_summary_to_py, decimal_to_py,
+        multi_backtest_summary_to_py,
+    },
 };
-use barter::backtest::market_data::MarketDataInMemory;
+use barter::backtest::{
+    BacktestArgsConstant as BacktestArgsConstantRust,
+    BacktestArgsDynamic as BacktestArgsDynamicRust, backtest as backtest_async,
+    market_data::MarketDataInMemory, run_backtests as run_backtests_async,
+};
+use barter::engine::state::{
+    EngineState, builder::EngineStateBuilder, global::DefaultGlobalData,
+    instrument::data::DefaultInstrumentMarketData, trading::TradingState,
+};
+use barter::error::BarterError;
+use barter::risk::DefaultRiskManager;
+use barter::statistic::time::{Annual252, Annual365, Daily, TimeInterval};
+use barter::strategy::DefaultStrategy;
 use barter::system::config::SystemConfig;
 use barter_data::{
     event::{DataKind, MarketEvent},
     streams::consumer::MarketStreamEvent,
 };
 use barter_execution::balance::Balance;
+use barter_instrument::index::IndexedInstruments;
 use barter_instrument::{
     Keyed, Side,
     asset::{ExchangeAsset, name::AssetNameInternal},
@@ -20,13 +36,18 @@ use barter_instrument::{
 };
 use chrono::{DateTime, Utc};
 use pyo3::{
-    Bound, PyObject, PyResult, Python,
+    Bound, PyErr, PyObject, PyResult, Python,
     exceptions::PyValueError,
     prelude::*,
     types::{PyAny, PyModule},
 };
 use rust_decimal::{Decimal, prelude::FromPrimitive};
 use smol_str::SmolStr;
+use tokio::runtime::Builder as RuntimeBuilder;
+
+type EngineStateType = EngineState<DefaultGlobalData, DefaultInstrumentMarketData>;
+type StrategyType = DefaultStrategy<EngineStateType>;
+type RiskType = DefaultRiskManager<EngineStateType>;
 
 #[pyclass(module = "barter_python", name = "MarketDataInMemory", unsendable)]
 #[derive(Debug, Clone)]
@@ -191,6 +212,50 @@ pub struct PyBacktestArgsConstant {
     _initial_balances: Vec<Keyed<ExchangeAsset<AssetNameInternal>, Balance>>,
 }
 
+impl PyBacktestArgsConstant {
+    fn to_rust_args_constant<Interval>(
+        &self,
+    ) -> PyResult<BacktestArgsConstantRust<MarketDataInMemory<DataKind>, Interval, EngineStateType>>
+    where
+        Interval: TimeInterval + Default + Clone + Send + 'static,
+    {
+        let (market_data, time_first_event) = Python::with_gil(|py| {
+            let borrow = self._market_data.bind(py).borrow();
+            (borrow._inner.clone(), borrow.time_first_event)
+        });
+
+        let mut config = self.system_config.clone();
+
+        if !self._initial_balances.is_empty() {
+            for execution in &mut config.executions {
+                match execution {
+                    barter::system::config::ExecutionConfig::Mock(mock) => {
+                        mock.initial_state.balances.clear();
+                    }
+                }
+            }
+        }
+
+        let instruments = IndexedInstruments::new(config.instruments.clone());
+
+        let engine_state = EngineStateBuilder::new(&instruments, DefaultGlobalData, |_| {
+            DefaultInstrumentMarketData::default()
+        })
+        .trading_state(TradingState::Enabled)
+        .time_engine_start(time_first_event)
+        .balances(self._initial_balances.clone())
+        .build();
+
+        Ok(BacktestArgsConstantRust {
+            instruments,
+            executions: config.executions,
+            market_data,
+            summary_interval: Interval::default(),
+            engine_state,
+        })
+    }
+}
+
 #[pymethods]
 impl PyBacktestArgsConstant {
     #[new]
@@ -242,6 +307,29 @@ pub struct PyBacktestArgsDynamic {
     risk_free_return: Decimal,
     strategy: Option<PyObject>,
     risk: Option<PyObject>,
+}
+
+impl PyBacktestArgsDynamic {
+    fn to_rust_args_dynamic(&self) -> PyResult<BacktestArgsDynamicRust<StrategyType, RiskType>> {
+        if self.strategy.is_some() {
+            return Err(PyValueError::new_err(
+                "custom strategy bindings are not yet supported",
+            ));
+        }
+
+        if self.risk.is_some() {
+            return Err(PyValueError::new_err(
+                "custom risk manager bindings are not yet supported",
+            ));
+        }
+
+        Ok(BacktestArgsDynamicRust {
+            id: self.id.clone(),
+            risk_free_return: self.risk_free_return,
+            strategy: StrategyType::default(),
+            risk: RiskType::default(),
+        })
+    }
 }
 
 #[pymethods]
@@ -776,6 +864,102 @@ fn side_from_py(
             Err(PyValueError::new_err(
                 "expected barter_python.instrument.Side or string for side",
             ))
+        }
+    }
+}
+
+fn map_barter_error(err: BarterError) -> PyErr {
+    PyValueError::new_err(err.to_string())
+}
+
+fn build_runtime() -> PyResult<tokio::runtime::Runtime> {
+    RuntimeBuilder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| PyValueError::new_err(err.to_string()))
+}
+
+fn run_backtest_for_interval<Interval>(
+    py: Python<'_>,
+    args_constant: &PyBacktestArgsConstant,
+    args_dynamic: &PyBacktestArgsDynamic,
+) -> PyResult<Py<PyBacktestSummary>>
+where
+    Interval: TimeInterval + Default + Clone + Send + Sync + 'static,
+{
+    let rust_constant = Arc::new(args_constant.to_rust_args_constant::<Interval>()?);
+    let rust_dynamic = args_dynamic.to_rust_args_dynamic()?;
+    let runtime = build_runtime()?;
+
+    let result = py.allow_threads(|| {
+        runtime.block_on(backtest_async(Arc::clone(&rust_constant), rust_dynamic))
+    });
+
+    let summary = result.map_err(map_barter_error)?;
+    backtest_summary_to_py(py, summary)
+}
+
+fn run_backtests_for_interval<Interval>(
+    py: Python<'_>,
+    args_constant: &PyBacktestArgsConstant,
+    args_dynamics: &[Py<PyBacktestArgsDynamic>],
+) -> PyResult<Py<PyMultiBacktestSummary>>
+where
+    Interval: TimeInterval + Default + Clone + Send + Sync + 'static,
+{
+    let rust_constant = Arc::new(args_constant.to_rust_args_constant::<Interval>()?);
+    let mut dynamics = Vec::with_capacity(args_dynamics.len());
+    for dynamic in args_dynamics {
+        let borrowed = dynamic.bind(py).borrow();
+        dynamics.push(borrowed.to_rust_args_dynamic()?);
+    }
+
+    let runtime = build_runtime()?;
+
+    let result = py.allow_threads(|| {
+        runtime.block_on(run_backtests_async(Arc::clone(&rust_constant), dynamics))
+    });
+
+    let summary = result.map_err(map_barter_error)?;
+    multi_backtest_summary_to_py(py, summary)
+}
+
+#[pyfunction]
+#[pyo3(signature = (args_constant, args_dynamic))]
+pub fn backtest(
+    py: Python<'_>,
+    args_constant: &PyBacktestArgsConstant,
+    args_dynamic: &PyBacktestArgsDynamic,
+) -> PyResult<Py<PyBacktestSummary>> {
+    match args_constant.summary_interval {
+        SummaryInterval::Daily => {
+            run_backtest_for_interval::<Daily>(py, args_constant, args_dynamic)
+        }
+        SummaryInterval::Annual252 => {
+            run_backtest_for_interval::<Annual252>(py, args_constant, args_dynamic)
+        }
+        SummaryInterval::Annual365 => {
+            run_backtest_for_interval::<Annual365>(py, args_constant, args_dynamic)
+        }
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (args_constant, args_dynamics))]
+pub fn run_backtests(
+    py: Python<'_>,
+    args_constant: &PyBacktestArgsConstant,
+    args_dynamics: Vec<Py<PyBacktestArgsDynamic>>,
+) -> PyResult<Py<PyMultiBacktestSummary>> {
+    match args_constant.summary_interval {
+        SummaryInterval::Daily => {
+            run_backtests_for_interval::<Daily>(py, args_constant, &args_dynamics)
+        }
+        SummaryInterval::Annual252 => {
+            run_backtests_for_interval::<Annual252>(py, args_constant, &args_dynamics)
+        }
+        SummaryInterval::Annual365 => {
+            run_backtests_for_interval::<Annual365>(py, args_constant, &args_dynamics)
         }
     }
 }

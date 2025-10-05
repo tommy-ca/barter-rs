@@ -106,7 +106,7 @@ async def test_market_data_in_memory_from_json(example_paths: dict[str, Path]) -
 
 def test_indexed_instruments_basic():
     """Test basic IndexedInstruments functionality."""
-    from barter_python.backtest import IndexedInstruments
+    from barter_python.instrument import IndexedInstruments
 
     # Test empty
     indexed = IndexedInstruments.new([])
@@ -156,7 +156,7 @@ def test_indexed_instruments_basic():
 
 def test_execution_config_basic():
     """Test basic ExecutionConfig functionality."""
-    from barter_python.backtest import ExecutionConfig, MockExecutionConfig
+    from barter_python import ExecutionConfig, MockExecutionConfig
 
     mock_config = MockExecutionConfig()
     config = ExecutionConfig.mock(mock_config)

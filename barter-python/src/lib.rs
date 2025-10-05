@@ -982,6 +982,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
+    m.add_function(wrap_pyfunction!(backtest::backtest, m)?)?;
+    m.add_function(wrap_pyfunction!(backtest::run_backtests, m)?)?;
     m.add_function(wrap_pyfunction!(start_system, m)?)?;
     m.add_function(wrap_pyfunction!(init_dynamic_streams, m)?)?;
     #[cfg(feature = "python-tests")]

@@ -30,6 +30,26 @@ where
     PyTradingSummary::from_summary(py, summary)
 }
 
+pub fn backtest_summary_to_py<Interval>(
+    py: Python<'_>,
+    summary: BacktestSummary<Interval>,
+) -> PyResult<Py<PyBacktestSummary>>
+where
+    Interval: TimeInterval,
+{
+    PyBacktestSummary::from_backtest_summary(py, summary)
+}
+
+pub fn multi_backtest_summary_to_py<Interval>(
+    py: Python<'_>,
+    summary: MultiBacktestSummary<Interval>,
+) -> PyResult<Py<PyMultiBacktestSummary>>
+where
+    Interval: TimeInterval,
+{
+    PyMultiBacktestSummary::from_multi_backtest_summary(py, summary)
+}
+
 #[pyclass(module = "barter_python", name = "TradingSummary", unsendable)]
 pub struct PyTradingSummary {
     time_engine_start: DateTime<Utc>,

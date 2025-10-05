@@ -1,6 +1,6 @@
 # Python Backtest Bindings Specification
 
-**Last Updated:** 2025-10-05
+**Last Updated:** 2025-10-05 (Milestone 2 complete)
 
 ## Objective
 - Bridge the Rust `barter::backtest` module into the `barter-python` package via PyO3 bindings.
@@ -23,10 +23,10 @@
 - Add Rust unit coverage confirming argument wrappers serialize into the underlying `BacktestArgsConstant`/`BacktestArgsDynamic` structures with expected indices and validation errors.
 - Update the Python `backtest` module to surface the new wrappers for downstream consumers.
 
-### Milestone 2 — Execution Pipeline (TBD)
-- Wire the wrappers into synchronous helpers that execute `backtest`/`run_backtests` behind the scenes while releasing the GIL.
-- Extend pytest coverage to exercise single and multi-run flows using canned market data fixtures.
-- Document usage patterns in the README and integration guides.
+### Milestone 2 — Execution Pipeline (2025-10-05)
+- Wire the wrappers into synchronous helpers that execute `backtest`/`run_backtests` behind the scenes while releasing the GIL. ✅
+- Extend pytest coverage to exercise single and multi-run flows using canned market data fixtures. ✅
+- Document usage patterns in the README and integration guides. (Follow-up: refresh README examples to mention new helpers.)
 
 ## Out of Scope
 - Custom strategy or risk manager injection beyond the default engine implementations.

@@ -13,9 +13,9 @@
 
 ## Current Focus (2025-10-05)
 - Prepare Milestone 2 for backtest execution pipeline bindings.
-  - [ ] Design async-to-sync wrapper for `backtest` and `run_backtests` using Tokio runtimes.
-  - [ ] Define strategy/risk plumbing for default implementations using new argument wrappers.
-  - [ ] Extend pytest coverage for single vs. multi-run flows once bindings exist.
+  - [x] Design async-to-sync wrapper for `backtest` and `run_backtests` using Tokio runtimes.
+  - [x] Define strategy/risk plumbing for default implementations using new argument wrappers.
+  - [x] Extend pytest coverage for single vs. multi-run flows once bindings exist.
 
 ## Completed (2025-10-05)
 - Bridge backtest argument wrappers into the Python API.
