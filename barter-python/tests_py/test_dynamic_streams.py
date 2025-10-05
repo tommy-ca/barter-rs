@@ -5,7 +5,14 @@ import datetime as dt
 import pytest
 
 import barter_python as bp
-
+from barter_python.data import (
+    DataKind,
+    MarketEvent,
+    MarketStreamItem,
+    MarketStreamReconnecting,
+    PublicTrade,
+)
+from barter_python.instrument import Side
 
 UTC = dt.timezone.utc
 
@@ -54,10 +61,13 @@ def test_dynamic_trade_stream_yields_market_event():
     assert stream is not None
 
     event = stream.recv()
-    assert event is not None
-    assert event.exchange == "binance_spot"
-    assert event.instrument == 7
-    assert event.kind.kind == "trade"
+    assert isinstance(event, MarketStreamItem)
+    assert event.kind == "item"
+
+    market_event = event.event
+    assert market_event.exchange == "binance_spot"
+    assert market_event.instrument == 7
+    assert market_event.kind.kind == "trade"
 
     # Stream should now be exhausted
     assert stream.recv() is None
@@ -70,9 +80,9 @@ def test_dynamic_stream_handles_reconnect():
     assert stream is not None
 
     reconnect = stream.recv()
-    assert isinstance(reconnect, dict)
-    assert reconnect["kind"] == "reconnecting"
-    assert reconnect["exchange"] == "binance_spot"
+    assert isinstance(reconnect, MarketStreamReconnecting)
+    assert reconnect.kind == "reconnecting"
+    assert reconnect.exchange == "binance_spot"
 
 
 def test_dynamic_stream_propagates_errors():
@@ -84,3 +94,28 @@ def test_dynamic_stream_propagates_errors():
         stream.recv()
 
     assert "down" in str(exc.value)
+
+
+def test_market_stream_item_equality_and_repr():
+    trade = PublicTrade("t-1", 101.25, 0.5, Side.BUY)
+    kind = DataKind.trade(trade)
+    time_exchange = dt.datetime(2025, 10, 4, 12, 0, tzinfo=UTC)
+    event = MarketEvent(time_exchange, time_exchange, "binance_spot", 42, kind)
+
+    item_a = MarketStreamItem(event)
+    item_b = MarketStreamItem(event)
+
+    assert item_a == item_b
+    assert hash(item_a) == hash(item_b)
+    assert "MarketStreamItem" in repr(item_a)
+
+
+def test_market_stream_reconnecting_equality_and_repr():
+    reconnect_a = MarketStreamReconnecting("binance_spot")
+    reconnect_b = MarketStreamReconnecting("binance_spot")
+    reconnect_c = MarketStreamReconnecting("kraken")
+
+    assert reconnect_a == reconnect_b
+    assert hash(reconnect_a) == hash(reconnect_b)
+    assert reconnect_a != reconnect_c
+    assert "MarketStreamReconnecting" in repr(reconnect_a)

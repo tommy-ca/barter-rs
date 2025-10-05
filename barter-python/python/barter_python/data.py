@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar, Union
+from typing import Any, Generic, TypeVar, Union
 
 from .instrument import Side
 
@@ -564,3 +564,62 @@ def as_liquidation(
             event.kind.data,
         )
     return None
+
+
+class MarketStreamEvent:
+    """Base wrapper for dynamic market stream events."""
+
+    kind: str
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "kind":
+            return self.kind
+        raise KeyError(key)
+
+
+class MarketStreamItem(MarketStreamEvent):
+    """Container for `MarketEvent` payloads emitted by dynamic streams."""
+
+    def __init__(self, event: MarketEvent[Any, Any]) -> None:
+        self.kind = "item"
+        self.event = event
+
+    def __repr__(self) -> str:
+        return f"MarketStreamItem(event={self.event!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MarketStreamItem):
+            return NotImplemented
+        return self.event == other.event
+
+    def __hash__(self) -> int:
+        return hash((self.kind, self.event))
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "event":
+            return self.event
+        return super().__getitem__(key)
+
+
+class MarketStreamReconnecting(MarketStreamEvent):
+    """Notification that a stream is reconnecting for the given exchange."""
+
+    def __init__(self, exchange: str) -> None:
+        self.kind = "reconnecting"
+        self.exchange = exchange
+
+    def __repr__(self) -> str:
+        return f"MarketStreamReconnecting(exchange={self.exchange!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MarketStreamReconnecting):
+            return NotImplemented
+        return self.exchange == other.exchange
+
+    def __hash__(self) -> int:
+        return hash((self.kind, self.exchange))
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "exchange":
+            return self.exchange
+        return super().__getitem__(key)

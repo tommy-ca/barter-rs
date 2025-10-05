@@ -914,18 +914,22 @@ fn market_stream_result_to_py(
     py: Python<'_>,
     event: MarketStreamResult<InstrumentIndex, DataKind>,
 ) -> PyResult<PyObject> {
+    let data_module = PyModule::import_bound(py, "barter_python.data")?;
+
     match event {
         Event::Reconnecting(exchange) => {
-            let dict = PyDict::new_bound(py);
-            dict.set_item("kind", "reconnecting")?;
-            dict.set_item("exchange", exchange.as_str())?;
-            Ok(dict.into_py(py))
+            let reconnecting = data_module.getattr("MarketStreamReconnecting")?;
+            let constructed = reconnecting.call1((exchange.as_str(),))?;
+            Ok(constructed.into_py(py))
         }
         Event::Item(result) => match result {
             Ok(event) => {
-                let data_module = PyModule::import_bound(py, "barter_python.data")?;
                 let instrument_module = PyModule::import_bound(py, "barter_python.instrument")?;
-                market_event_to_py(py, &event, &data_module, &instrument_module)
+                let market_event =
+                    market_event_to_py(py, &event, &data_module, &instrument_module)?;
+                let item_class = data_module.getattr("MarketStreamItem")?;
+                let constructed = item_class.call1((market_event,))?;
+                Ok(constructed.into_py(py))
             }
             Err(error) => Err(PyValueError::new_err(error.to_string())),
         },
