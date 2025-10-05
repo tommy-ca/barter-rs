@@ -10,8 +10,8 @@
 - Implement `PyActionOutput` enum-like wrapper with variants for `CancelOrders`,
   `OpenOrders`, `ClosePositions`, and a fallback `Other` representation wrapping
   arbitrary JSON payloads.
-- Implement `PySendRequestsOutput` wrapper exposing `requested`, `fulfilled`,
-  and `errors` collections with sequence semantics (`len`, iteration, `repr`).
+- Implement `PySendRequestsOutput` wrapper exposing `sent` and `errors`
+  collections with sequence semantics (`len`, iteration, `repr`).
 - Update `PyAuditEvent` construction to emit the new wrappers inside
   `outputs` / `errors` collections.
 - Ensure close-position outputs expose `cancels` and `opens` as typed
