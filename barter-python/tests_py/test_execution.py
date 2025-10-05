@@ -1099,6 +1099,66 @@ class TestMockExecutionConfigBindings:
         assert system_config.executions() == []
 
 
+class TestMockExecutionClientBindings:
+    def _instrument_map(self):
+        definitions = [
+            {
+                "exchange": "mock",
+                "name_exchange": "BTCUSDT",
+                "underlying": {"base": "btc", "quote": "usdt"},
+                "quote": "underlying_quote",
+                "kind": "spot",
+            }
+        ]
+        return execution.ExecutionInstrumentMap.from_definitions(
+            bp.ExchangeId.MOCK,
+            definitions,
+        )
+
+    def _config(self):
+        timestamp = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        initial_state = {
+            "exchange": "mock",
+            "balances": [
+                {
+                    "asset": "USDT",
+                    "balance": {"total": "1000", "free": "1000"},
+                    "time_exchange": timestamp.isoformat().replace("+00:00", "Z"),
+                }
+            ],
+            "instruments": [],
+        }
+        return MockExecutionConfig(initial_state=initial_state)
+
+    def test_snapshot_balances_and_events(self):
+        config = self._config()
+        instrument_map = self._instrument_map()
+
+        with execution.MockExecutionClient(config, instrument_map) as client:
+            snapshot = client.account_snapshot()
+            assert snapshot["exchange"] == "mock"
+            assert snapshot["balances"][0]["asset"] == "USDT"
+
+            balances = client.fetch_balances()
+            assert isinstance(balances, list)
+
+            orders = client.fetch_open_orders()
+            assert isinstance(orders, list)
+
+            trades = client.fetch_trades(datetime(2024, 1, 1, tzinfo=timezone.utc))
+            assert isinstance(trades, list)
+
+            response = client.open_market_order("BTCUSDT", "buy", Decimal("0.1"))
+            assert response is not None
+
+            first_event = client.poll_event(timeout=0.2)
+            second_event = client.poll_event(timeout=0.2)
+
+            observed = first_event or second_event
+            assert observed is not None
+            assert observed["exchange"] == "mock"
+            assert "kind" in observed
+
 class TestExecutionInstrumentMap:
     def _definitions(self) -> list[dict[str, object]]:
         return [

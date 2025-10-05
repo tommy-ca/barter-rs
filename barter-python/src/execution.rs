@@ -2,18 +2,26 @@ use std::str::FromStr;
 
 use barter::system::config::InstrumentConfig;
 use barter_execution::{
+    UnindexedAccountEvent,
     balance::{AssetBalance as ExecutionAssetBalance, Balance as ExecutionBalance},
-    error::{ApiError, KeyError, OrderError},
+    client::{
+        ExecutionClient,
+        mock::{MockExecution, MockExecutionClientConfig},
+    },
+    error::{ApiError, KeyError, OrderError, UnindexedClientError},
+    exchange::mock::MockExchange,
     map::{ExecutionInstrumentMap, generate_execution_instrument_map},
     order::{
-        OrderEvent,
+        OrderEvent, OrderKey, OrderKind, TimeInForce,
         id::{ClientOrderId, OrderId, StrategyId},
+        request::{OrderRequestOpen, RequestOpen},
         state::{
             ActiveOrderState, CancelInFlight, Cancelled, InactiveOrderState, Open, OrderState,
         },
     },
     trade::{AssetFees as ExecutionAssetFees, Trade as ExecutionTrade, TradeId},
 };
+use barter_instrument::instrument::kind::InstrumentKind;
 use barter_instrument::{
     Side,
     asset::{AssetIndex, QuoteAsset, name::AssetNameExchange},
@@ -22,23 +30,30 @@ use barter_instrument::{
     instrument::{Instrument, InstrumentIndex, name::InstrumentNameExchange},
 };
 use chrono::{DateTime, Utc};
+use fnv::FnvHashMap;
+use futures::{StreamExt, stream::BoxStream};
 use pyo3::{
-    Bound, Py, PyAny, PyObject, PyResult, Python,
+    Bound, Py, PyAny, PyObject, PyRefMut, PyResult, Python,
     exceptions::PyValueError,
     prelude::*,
     types::{PyModule, PyType},
 };
 use rust_decimal::Decimal;
+use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
+use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinHandle;
+use tokio::time::{Duration, timeout};
 
 use crate::{
     command::{PyOrderKey, parse_side},
-    config::PySystemConfig,
+    config::{PyMockExecutionConfig, PySystemConfig},
     data::PyExchangeId,
     instrument::{PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyQuoteAsset, PySide},
     summary::decimal_to_py,
 };
 use serde::Serialize;
 use serde_json;
+use std::sync::{Arc, Mutex};
 
 fn ensure_non_empty(value: &str, label: &str) -> PyResult<()> {
     if value.trim().is_empty() {
@@ -113,6 +128,10 @@ fn key_error_to_py(error: KeyError) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
 
+fn unindexed_client_error_to_py(error: UnindexedClientError) -> PyErr {
+    PyValueError::new_err(error.to_string())
+}
+
 pub(crate) fn instrument_configs_from_py(
     py: Python<'_>,
     value: &Bound<'_, PyAny>,
@@ -128,6 +147,20 @@ pub(crate) fn instrument_configs_from_py(
     let serialized: String = dumps.call1((value,))?.extract()?;
     serde_json::from_str(&serialized).map_err(|err| PyValueError::new_err(err.to_string()))
 }
+
+fn asset_name_for_index(
+    assets: &[AssetNameExchange],
+    index: AssetIndex,
+) -> PyResult<AssetNameExchange> {
+    assets.get(index.index()).cloned().ok_or_else(|| {
+        PyValueError::new_err(format!(
+            "execution instrument map is missing asset index {}",
+            index.index()
+        ))
+    })
+}
+
+const MOCK_ACCOUNT_STREAM_CAPACITY: usize = 256;
 
 type DefaultOrderEvent =
     OrderEvent<OrderState<AssetIndex, InstrumentIndex>, ExchangeIndex, InstrumentIndex>;
@@ -1400,6 +1433,55 @@ impl PyExecutionInstrumentMap {
         names.dedup();
         names
     }
+
+    fn asset_lookup(&self) -> Vec<AssetNameExchange> {
+        self.inner
+            .assets
+            .iter()
+            .map(|asset| asset.asset.name_exchange.clone())
+            .collect()
+    }
+
+    fn asset_filters(&self) -> Vec<AssetNameExchange> {
+        self.inner.asset_names.keys().cloned().collect()
+    }
+
+    fn instrument_filters(&self) -> Vec<InstrumentNameExchange> {
+        self.inner.instrument_names.keys().cloned().collect()
+    }
+
+    fn mock_exchange_instruments(
+        &self,
+    ) -> PyResult<FnvHashMap<InstrumentNameExchange, Instrument<ExchangeId, AssetNameExchange>>>
+    {
+        let exchange_id = self.inner.exchange.value;
+        let asset_lookup = self.asset_lookup();
+
+        let mut instruments = FnvHashMap::default();
+        for instrument in &self.inner.instruments {
+            if instrument.exchange.value != exchange_id {
+                continue;
+            }
+
+            let mapped = instrument
+                .clone()
+                .map_exchange_key(instrument.exchange.value);
+            let converted = mapped
+                .map_asset_key_with_lookup(|asset| asset_name_for_index(&asset_lookup, *asset))
+                .map_err(|err| err)?;
+
+            if !matches!(converted.kind, InstrumentKind::Spot) {
+                return Err(PyValueError::new_err(format!(
+                    "MockExecutionClient only supports spot instruments; found {:?}",
+                    converted.kind
+                )));
+            }
+
+            instruments.insert(converted.name_exchange.clone(), converted);
+        }
+
+        Ok(instruments)
+    }
 }
 
 #[pymethods]
@@ -1489,5 +1571,356 @@ impl PyExecutionInstrumentMap {
             self.inner.assets.len(),
             self.inner.instruments.len()
         )
+    }
+}
+
+#[pyclass(module = "barter_python", name = "MockExecutionClient", unsendable)]
+pub struct PyMockExecutionClient {
+    runtime: Arc<Runtime>,
+    client: Mutex<Option<MockExecution<fn() -> DateTime<Utc>>>>,
+    exchange_handle: Mutex<Option<JoinHandle<()>>>,
+    account_stream: Mutex<Option<BoxStream<'static, UnindexedAccountEvent>>>,
+    asset_filters: Vec<AssetNameExchange>,
+    instrument_filters: Vec<InstrumentNameExchange>,
+    exchange_id: ExchangeId,
+}
+
+impl PyMockExecutionClient {
+    fn clone_client(&self) -> PyResult<MockExecution<fn() -> DateTime<Utc>>> {
+        self.client
+            .lock()
+            .map_err(|_| PyValueError::new_err("mock execution client handle poisoned"))?
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| PyValueError::new_err("mock execution client is closed"))
+    }
+
+    fn take_client(&self) -> PyResult<Option<MockExecution<fn() -> DateTime<Utc>>>> {
+        self.client
+            .lock()
+            .map_err(|_| PyValueError::new_err("mock execution client handle poisoned"))
+            .map(|mut guard| guard.take())
+    }
+
+    fn parse_asset_filters(&self, assets: Option<Vec<String>>) -> Vec<AssetNameExchange> {
+        assets
+            .map(|values| {
+                values
+                    .into_iter()
+                    .map(|name| AssetNameExchange::new(&name))
+                    .collect()
+            })
+            .unwrap_or_else(|| self.asset_filters.clone())
+    }
+
+    fn parse_instrument_filters(
+        &self,
+        instruments: Option<Vec<String>>,
+    ) -> Vec<InstrumentNameExchange> {
+        instruments
+            .map(|values| {
+                values
+                    .into_iter()
+                    .map(|name| InstrumentNameExchange::new(name))
+                    .collect()
+            })
+            .unwrap_or_else(|| self.instrument_filters.clone())
+    }
+}
+
+#[pymethods]
+impl PyMockExecutionClient {
+    #[new]
+    #[pyo3(signature = (config, instrument_map))]
+    pub fn __new__(
+        _py: Python<'_>,
+        config: &PyMockExecutionConfig,
+        instrument_map: &PyExecutionInstrumentMap,
+    ) -> PyResult<Self> {
+        let exchange_id = config.inner.mocked_exchange;
+        if instrument_map.inner.exchange.value != exchange_id {
+            return Err(PyValueError::new_err(format!(
+                "mock execution config exchange {} must match execution instrument map exchange {}",
+                exchange_id.as_str(),
+                instrument_map.inner.exchange.value.as_str()
+            )));
+        }
+
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+        let runtime = Arc::new(runtime);
+
+        let instruments = instrument_map.mock_exchange_instruments()?;
+        let asset_filters = instrument_map.asset_filters();
+        let instrument_filters = instrument_map.instrument_filters();
+
+        let (request_tx, request_rx) = mpsc::unbounded_channel();
+        let (event_tx, event_rx) = broadcast::channel(MOCK_ACCOUNT_STREAM_CAPACITY);
+
+        let exchange_task = MockExchange::new(
+            config.inner.clone(),
+            request_rx,
+            event_tx.clone(),
+            instruments,
+        );
+        let exchange_handle = runtime.spawn(exchange_task.run());
+
+        let client_config = MockExecutionClientConfig::new(
+            exchange_id,
+            Utc::now as fn() -> DateTime<Utc>,
+            request_tx,
+            event_rx,
+        );
+
+        let client = <MockExecution<_> as ExecutionClient>::new(client_config);
+
+        Ok(Self {
+            runtime,
+            client: Mutex::new(Some(client)),
+            exchange_handle: Mutex::new(Some(exchange_handle)),
+            account_stream: Mutex::new(None),
+            asset_filters,
+            instrument_filters,
+            exchange_id,
+        })
+    }
+
+    #[pyo3(signature = ())]
+    pub fn account_snapshot(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let client = self.clone_client()?;
+        let assets = self.asset_filters.clone();
+        let instruments = self.instrument_filters.clone();
+        let runtime = Arc::clone(&self.runtime);
+
+        let snapshot = py.allow_threads(move || {
+            runtime.block_on(client.account_snapshot(&assets, &instruments))
+        });
+        let snapshot = snapshot.map_err(unindexed_client_error_to_py)?;
+        serialize_to_py_dict(py, &snapshot)
+    }
+
+    #[pyo3(signature = (assets=None))]
+    pub fn fetch_balances(
+        &self,
+        py: Python<'_>,
+        assets: Option<Vec<String>>,
+    ) -> PyResult<PyObject> {
+        let client = self.clone_client()?;
+        let filters = self.parse_asset_filters(assets);
+        let runtime = Arc::clone(&self.runtime);
+
+        let balances = py.allow_threads(move || runtime.block_on(client.fetch_balances(&filters)));
+        let balances = balances.map_err(unindexed_client_error_to_py)?;
+        serialize_to_py_dict(py, &balances)
+    }
+
+    #[pyo3(signature = (instruments=None))]
+    pub fn fetch_open_orders(
+        &self,
+        py: Python<'_>,
+        instruments: Option<Vec<String>>,
+    ) -> PyResult<PyObject> {
+        let client = self.clone_client()?;
+        let filters = self.parse_instrument_filters(instruments);
+        let runtime = Arc::clone(&self.runtime);
+
+        let orders = py.allow_threads(move || runtime.block_on(client.fetch_open_orders(&filters)));
+        let orders = orders.map_err(unindexed_client_error_to_py)?;
+        serialize_to_py_dict(py, &orders)
+    }
+
+    #[pyo3(signature = (time_since))]
+    pub fn fetch_trades(&self, py: Python<'_>, time_since: DateTime<Utc>) -> PyResult<PyObject> {
+        let client = self.clone_client()?;
+        let runtime = Arc::clone(&self.runtime);
+
+        let trades = py.allow_threads(move || runtime.block_on(client.fetch_trades(time_since)));
+        let trades = trades.map_err(unindexed_client_error_to_py)?;
+        serialize_to_py_dict(py, &trades)
+    }
+
+    #[pyo3(signature = (instrument, side, quantity, price=None, strategy=None, client_order_id=None))]
+    pub fn open_market_order(
+        &self,
+        py: Python<'_>,
+        instrument: &str,
+        side: &Bound<'_, PyAny>,
+        quantity: &Bound<'_, PyAny>,
+        price: Option<&Bound<'_, PyAny>>,
+        strategy: Option<&Bound<'_, PyAny>>,
+        client_order_id: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Option<PyObject>> {
+        let trade_side = extract_side(side, "side")?;
+        let quantity_decimal = extract_decimal(quantity, "quantity")?;
+        if quantity_decimal <= Decimal::ZERO {
+            return Err(PyValueError::new_err(
+                "quantity must be a positive numeric value",
+            ));
+        }
+
+        let price_decimal = if let Some(value) = price {
+            extract_decimal(value, "price")?
+        } else {
+            Decimal::ZERO
+        };
+
+        if price_decimal < Decimal::ZERO {
+            return Err(PyValueError::new_err("price must be non-negative"));
+        }
+
+        let strategy_id = match strategy {
+            Some(value) => coerce_strategy_id(value)?,
+            None => StrategyId::unknown(),
+        };
+        let cid = coerce_client_order_id(client_order_id)?;
+
+        let client = self.clone_client()?;
+        let runtime = Arc::clone(&self.runtime);
+        let instrument_name = instrument.to_string();
+        let exchange_id = self.exchange_id;
+
+        let order = py.allow_threads(move || {
+            runtime.block_on(async move {
+                let instrument_exchange = InstrumentNameExchange::new(instrument_name);
+                let key = OrderKey {
+                    exchange: exchange_id,
+                    instrument: &instrument_exchange,
+                    strategy: strategy_id,
+                    cid,
+                };
+                let request = OrderRequestOpen::new(
+                    key,
+                    RequestOpen::new(
+                        trade_side,
+                        price_decimal,
+                        quantity_decimal,
+                        OrderKind::Market,
+                        TimeInForce::ImmediateOrCancel,
+                    ),
+                );
+                client.open_order(request).await
+            })
+        });
+
+        match order {
+            Some(order) => serialize_to_py_dict(py, &order).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    #[pyo3(signature = (timeout_secs=None))]
+    pub fn poll_event(
+        &self,
+        py: Python<'_>,
+        timeout_secs: Option<f64>,
+    ) -> PyResult<Option<PyObject>> {
+        let mut guard = self
+            .account_stream
+            .lock()
+            .map_err(|_| PyValueError::new_err("mock execution client stream lock poisoned"))?;
+
+        if guard.is_none() {
+            let client = self.clone_client()?;
+            let assets = self.asset_filters.clone();
+            let instruments = self.instrument_filters.clone();
+            let runtime = Arc::clone(&self.runtime);
+
+            let stream = py.allow_threads(move || {
+                runtime.block_on(client.account_stream(&assets, &instruments))
+            });
+            let stream = stream.map_err(unindexed_client_error_to_py)?;
+            *guard = Some(stream);
+        }
+
+        let stream = guard
+            .as_mut()
+            .ok_or_else(|| PyValueError::new_err("mock execution client is closed"))?;
+        let runtime = Arc::clone(&self.runtime);
+
+        if let Some(secs) = timeout_secs {
+            if !secs.is_finite() {
+                return Err(PyValueError::new_err("timeout must be finite"));
+            }
+            if secs < 0.0 {
+                return Err(PyValueError::new_err("timeout must be non-negative"));
+            }
+
+            let duration = Duration::from_secs_f64(secs);
+            let event = py.allow_threads(move || {
+                runtime.block_on(async { timeout(duration, stream.next()).await })
+            });
+
+            match event {
+                Ok(Some(event)) => serialize_to_py_dict(py, &event).map(Some),
+                Ok(None) => Ok(None),
+                Err(_) => Ok(None),
+            }
+        } else {
+            let event = py.allow_threads(move || runtime.block_on(stream.next()));
+            match event {
+                Some(event) => serialize_to_py_dict(py, &event).map(Some),
+                None => Ok(None),
+            }
+        }
+    }
+
+    pub fn close(&self, py: Python<'_>) -> PyResult<()> {
+        {
+            let mut guard = self
+                .account_stream
+                .lock()
+                .map_err(|_| PyValueError::new_err("mock execution client stream lock poisoned"))?;
+            *guard = None;
+        }
+
+        let _ = self.take_client()?;
+
+        if let Some(handle) = self
+            .exchange_handle
+            .lock()
+            .map_err(|_| PyValueError::new_err("mock execution client handle poisoned"))?
+            .take()
+        {
+            let runtime = Arc::clone(&self.runtime);
+            let join_result = py.allow_threads(move || runtime.block_on(async { handle.await }));
+            if let Err(err) = join_result {
+                if !err.is_cancelled() {
+                    return Err(PyValueError::new_err(err.to_string()));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn __enter__(slf: PyRefMut<'_, Self>) -> PyResult<PyRefMut<'_, Self>> {
+        Ok(slf)
+    }
+
+    #[pyo3(signature = (_exc_type=None, _exc_value=None, _traceback=None))]
+    pub fn __exit__(
+        &self,
+        py: Python<'_>,
+        _exc_type: Option<PyObject>,
+        _exc_value: Option<PyObject>,
+        _traceback: Option<PyObject>,
+    ) -> PyResult<bool> {
+        self.close(py)?;
+        Ok(false)
+    }
+}
+
+impl Drop for PyMockExecutionClient {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.client.lock() {
+            guard.take();
+        }
+        if let Ok(mut guard) = self.exchange_handle.lock() {
+            if let Some(handle) = guard.take() {
+                handle.abort();
+            }
+        }
     }
 }

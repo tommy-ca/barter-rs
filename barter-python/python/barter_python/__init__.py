@@ -40,6 +40,9 @@ __all__.extend(
 ExecutionInstrumentMap = execution.ExecutionInstrumentMap
 __all__.append("ExecutionInstrumentMap")
 
+MockExecutionClient = execution.MockExecutionClient
+__all__.append("MockExecutionClient")
+
 
 def __getattr__(name: str):
     return getattr(_core, name)

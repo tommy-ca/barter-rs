@@ -84,8 +84,8 @@ use data::{
 use execution::{
     PyActiveOrderState, PyAssetFees, PyCancelInFlightState, PyCancelledState, PyClientOrderId,
     PyExecutionAssetBalance, PyExecutionBalance, PyExecutionInstrumentMap, PyInactiveOrderState,
-    PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderState, PyStrategyId, PyTrade,
-    PyTradeId, asset_balance_new, balance_new,
+    PyMockExecutionClient, PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderState,
+    PyStrategyId, PyTrade, PyTradeId, asset_balance_new, balance_new,
 };
 use instrument::{
     PyAsset, PyAssetIndex, PyAssetNameExchange, PyAssetNameInternal, PyExchangeIndex,
@@ -911,6 +911,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutionBalance>()?;
     m.add_class::<PyExecutionAssetBalance>()?;
     m.add_class::<PyExecutionInstrumentMap>()?;
+    m.add_class::<PyMockExecutionClient>()?;
     m.add_class::<PyOrderKey>()?;
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;

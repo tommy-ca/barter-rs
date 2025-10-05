@@ -16,6 +16,7 @@ from .barter_python import (
     ClientOrderId as _ClientOrderId,
     InstrumentAccountSnapshot as _InstrumentAccountSnapshot,
     ExecutionInstrumentMap as _ExecutionInstrumentMap,
+    MockExecutionClient as _MockExecutionClient,
     OrderId as _OrderId,
     OrderKey as _OrderKey,
     OrderEvent as _OrderEvent,
@@ -183,6 +184,62 @@ class AssetBalance:
 
     def __hash__(self) -> int:
         return hash(self._inner)
+
+
+class MockExecutionClient:
+    """High-level helper around the Rust-backed mock execution client."""
+
+    __slots__ = ("_inner",)
+
+    def __init__(self, config, instrument_map):
+        if hasattr(instrument_map, "_inner"):
+            instrument_map_inner = instrument_map._inner
+        else:
+            instrument_map_inner = instrument_map
+        self._inner = _MockExecutionClient(config, instrument_map_inner)
+
+    def account_snapshot(self):
+        return self._inner.account_snapshot()
+
+    def fetch_balances(self, assets=None):
+        return self._inner.fetch_balances(assets=assets)
+
+    def fetch_open_orders(self, instruments=None):
+        return self._inner.fetch_open_orders(instruments=instruments)
+
+    def fetch_trades(self, time_since):
+        return self._inner.fetch_trades(time_since)
+
+    def open_market_order(
+        self,
+        instrument,
+        side,
+        quantity,
+        price=None,
+        strategy=None,
+        client_order_id=None,
+    ):
+        return self._inner.open_market_order(
+            instrument,
+            side,
+            quantity,
+            price=price,
+            strategy=strategy,
+            client_order_id=client_order_id,
+        )
+
+    def poll_event(self, timeout=None):
+        return self._inner.poll_event(timeout=timeout)
+
+    def close(self):
+        self._inner.close()
+
+    def __enter__(self):
+        self._inner.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return self._inner.__exit__(exc_type, exc_value, traceback)
 
 AssetKey = TypeVar("AssetKey")
 InstrumentKey = TypeVar("InstrumentKey")
