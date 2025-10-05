@@ -20,7 +20,6 @@ use barter_instrument::{
 };
 use pyo3::{Bound, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*, types::PyType};
 use rust_decimal::{Decimal, prelude::FromPrimitive};
-use serde_json;
 
 use crate::{
     config::PySystemConfig,

@@ -888,6 +888,7 @@ pub fn init_dynamic_streams(
         HashMap::new();
     let mut next_index = 0usize;
 
+    #[allow(clippy::type_complexity)]
     let converted: Vec<
         Vec<Subscription<ExchangeId, Keyed<InstrumentIndex, MarketDataInstrument>, SubKind>>,
     > = subscriptions
@@ -979,7 +980,7 @@ fn parse_side(value: &str) -> PyResult<Side> {
 
 #[cfg(feature = "python-tests")]
 fn parse_trade_event(
-    py: Python<'_>,
+    _py: Python<'_>,
     dict: &Bound<'_, PyDict>,
 ) -> PyResult<(ExchangeId, MarketStreamResult<InstrumentIndex, PublicTrade>)> {
     let exchange_str: String = dict

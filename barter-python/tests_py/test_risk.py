@@ -5,8 +5,8 @@ from decimal import Decimal
 import pytest
 
 import barter_python as bp
-from barter_python import risk
 import barter_python.barter_python as core
+from barter_python import risk
 
 
 class TestRiskApproved:

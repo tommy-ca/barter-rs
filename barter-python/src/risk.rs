@@ -88,6 +88,7 @@ impl PyRiskApproved {
         self.request.to_py(py)
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn into_item(&self, py: Python<'_>) -> PyResult<PyObject> {
         self.request.to_py(py)
     }
@@ -150,6 +151,7 @@ impl PyRiskRefused {
         &self.reason
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn into_item(&self, py: Python<'_>) -> PyResult<PyObject> {
         self.request.to_py(py)
     }
@@ -177,6 +179,7 @@ impl PyDefaultRiskManager {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     #[pyo3(signature = (state, cancels, opens))]
     pub fn check(
         &self,

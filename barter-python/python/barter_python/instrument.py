@@ -11,8 +11,14 @@ from typing import Generic, TypeVar, Union
 
 from .barter_python import (
     AssetNameExchange as _AssetNameExchange,
+)
+from .barter_python import (
     AssetNameInternal as _AssetNameInternal,
+)
+from .barter_python import (
     InstrumentNameExchange as _InstrumentNameExchange,
+)
+from .barter_python import (
     InstrumentNameInternal as _InstrumentNameInternal,
 )
 

@@ -7,6 +7,7 @@ import pytest
 
 import barter_python as bp
 import barter_python.execution as execution
+from barter_python import ExecutionConfig, MockExecutionConfig
 from barter_python.execution import (
     AccountEvent,
     AccountEventKind,
@@ -33,9 +34,7 @@ from barter_python.execution import (
     Trade,
     TradeId,
 )
-from barter_python import ExecutionConfig, MockExecutionConfig
 from barter_python.instrument import QuoteAsset, Side
-
 
 BINANCE_INDEX = 1
 KRAKEN_INDEX = 2

@@ -4,7 +4,6 @@ import datetime as dt
 
 import barter_python as bp
 
-
 UTC = dt.timezone.utc
 
 

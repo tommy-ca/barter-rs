@@ -1758,7 +1758,7 @@ mod tests {
         let py_err = crate::error::socket_error_to_py_err(error);
 
         Python::with_gil(|py| {
-            let instance = py_err.to_object(py).into_bound(py);
+            let instance = py_err.into_py(py).into_bound(py);
             let exc_type = py.get_type_bound::<PySocketErrorExc>();
             assert!(instance.is_instance(exc_type.as_any()).unwrap());
 

@@ -8,8 +8,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import Generic, TypeVar, Union
 
-from .instrument import QuoteAsset, Side
 from . import barter_python as _core
+from .instrument import QuoteAsset, Side
 
 _AccountSnapshot = _core.AccountSnapshot
 _AssetBalance = _core.AssetBalance

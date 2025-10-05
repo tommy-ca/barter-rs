@@ -6,6 +6,9 @@ from collections.abc import Iterable
 from decimal import Decimal
 from typing import Callable, Protocol, TypeVar
 
+from .barter_python import (
+    build_ioc_market_order_to_close_position as _build_ioc_market_order_to_close_position,
+)
 from .execution import (
     ClientOrderId,
     OrderKey,
@@ -17,9 +20,6 @@ from .execution import (
     TimeInForce,
 )
 from .instrument import Side
-from .barter_python import (
-    build_ioc_market_order_to_close_position as _build_ioc_market_order_to_close_position,
-)
 
 # Type aliases for common key types
 ExchangeIndex = int

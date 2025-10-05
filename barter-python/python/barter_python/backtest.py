@@ -5,18 +5,35 @@ from __future__ import annotations
 from collections.abc import AsyncIterable, Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from .barter_python import (
     BacktestArgsConstant as _BacktestArgsConstant,
+)
+from .barter_python import (
     BacktestArgsDynamic as _BacktestArgsDynamic,
+)
+from .barter_python import (
     BacktestSummary as _BacktestSummary,
+)
+from .barter_python import (
     ExecutionConfig as _ExecutionConfig,
+)
+from .barter_python import (
     IndexedInstruments as _IndexedInstruments,
+)
+from .barter_python import (
     MarketDataInMemory as _RustMarketDataInMemory,
-    MultiBacktestSummary as _MultiBacktestSummary,
+)
+from .barter_python import (
     MockExecutionConfig as _MockExecutionConfig,
+)
+from .barter_python import (
+    MultiBacktestSummary as _MultiBacktestSummary,
+)
+from .barter_python import (
     backtest as _backtest,
+)
+from .barter_python import (
     run_backtests as _run_backtests,
 )
 from .data import DataKind, MarketEvent
@@ -36,7 +53,7 @@ class MarketDataInMemory:
     def __init__(
         self,
         _time_first_event: datetime,
-        events: List[MarketEvent[int, DataKind]],
+        events: list[MarketEvent[int, DataKind]],
         *,
         _inner: _RustMarketDataInMemory | None = None,
     ) -> None:
@@ -45,7 +62,7 @@ class MarketDataInMemory:
         self._inner = _inner
 
     @classmethod
-    def from_json_file(cls, path: str | Path) -> "MarketDataInMemory":
+    def from_json_file(cls, path: str | Path) -> MarketDataInMemory:
         """Load market data from a JSON file into memory."""
         inner = _RustMarketDataInMemory.from_json_file(str(path))
         events = inner.events()
@@ -73,10 +90,7 @@ class MarketDataInMemory:
 
     def __repr__(self) -> str:  # pragma: no cover - debugging helper
         return (
-            "MarketDataInMemory(events={events}, time_first_event={time})".format(
-                events=len(self.events),
-                time=self._time_first_event.isoformat(),
-            )
+            f"MarketDataInMemory(events={len(self.events)}, time_first_event={self._time_first_event.isoformat()})"
         )
 
 

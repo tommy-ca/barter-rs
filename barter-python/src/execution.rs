@@ -21,13 +21,13 @@ use barter_execution::{
     },
     trade::{AssetFees as ExecutionAssetFees, Trade as ExecutionTrade, TradeId},
 };
-use barter_instrument::instrument::kind::InstrumentKind;
+
 use barter_instrument::{
     Side,
     asset::{AssetIndex, QuoteAsset, name::AssetNameExchange},
     exchange::{ExchangeId, ExchangeIndex},
     index::{IndexedInstruments, error::IndexError},
-    instrument::{Instrument, InstrumentIndex, name::InstrumentNameExchange},
+    instrument::{Instrument, InstrumentIndex, kind::InstrumentKind, name::InstrumentNameExchange},
 };
 use chrono::{DateTime, Utc};
 use fnv::FnvHashMap;
@@ -52,7 +52,6 @@ use crate::{
     summary::decimal_to_py,
 };
 use serde::Serialize;
-use serde_json;
 use std::sync::{Arc, Mutex};
 
 fn ensure_non_empty(value: &str, label: &str) -> PyResult<()> {
@@ -607,12 +606,11 @@ impl PyTimeInForce {
             Some(bound) => {
                 if let Ok(wrapper) = bound.extract::<Py<PyTimeInForce>>() {
                     let borrowed = wrapper.borrow(bound.py());
-                    if let Some(flag) = post_only {
-                        if flag != borrowed.is_post_only() {
-                            return Err(PyValueError::new_err(
-                                "post_only argument must match provided TimeInForce value",
-                            ));
-                        }
+                    if let Some(flag) = post_only
+                        && flag != borrowed.is_post_only() {
+                        return Err(PyValueError::new_err(
+                            "post_only argument must match provided TimeInForce value",
+                        ));
                     }
 
                     return Ok(borrowed.inner());
@@ -1819,8 +1817,8 @@ impl PyExecutionInstrumentMap {
                 .clone()
                 .map_exchange_key(instrument.exchange.value);
             let converted = mapped
-                .map_asset_key_with_lookup(|asset| asset_name_for_index(&asset_lookup, *asset))
-                .map_err(|err| err)?;
+                .map_asset_key_with_lookup(|asset| asset_name_for_index(&asset_lookup, *asset))?;
+
 
             if !matches!(converted.kind, InstrumentKind::Spot) {
                 return Err(PyValueError::new_err(format!(
@@ -1926,6 +1924,7 @@ impl PyExecutionInstrumentMap {
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[pyclass(module = "barter_python", name = "MockExecutionClient", unsendable)]
 pub struct PyMockExecutionClient {
     runtime: Arc<Runtime>,
@@ -1938,6 +1937,7 @@ pub struct PyMockExecutionClient {
 }
 
 impl PyMockExecutionClient {
+    #[allow(clippy::type_complexity)]
     fn clone_client(&self) -> PyResult<MockExecution<fn() -> DateTime<Utc>>> {
         self.client
             .lock()
@@ -1947,6 +1947,7 @@ impl PyMockExecutionClient {
             .ok_or_else(|| PyValueError::new_err("mock execution client is closed"))
     }
 
+    #[allow(clippy::type_complexity)]
     fn take_client(&self) -> PyResult<Option<MockExecution<fn() -> DateTime<Utc>>>> {
         self.client
             .lock()
@@ -1973,7 +1974,7 @@ impl PyMockExecutionClient {
             .map(|values| {
                 values
                     .into_iter()
-                    .map(|name| InstrumentNameExchange::new(name))
+                    .map(InstrumentNameExchange::new)
                     .collect()
             })
             .unwrap_or_else(|| self.instrument_filters.clone())
@@ -2094,6 +2095,7 @@ impl PyMockExecutionClient {
     }
 
     #[pyo3(signature = (instrument, side, quantity, price=None, strategy=None, client_order_id=None))]
+    #[allow(clippy::too_many_arguments)]
     pub fn open_market_order(
         &self,
         py: Python<'_>,
@@ -2172,6 +2174,7 @@ impl PyMockExecutionClient {
         strategy=None,
         client_order_id=None
     ))]
+    #[allow(clippy::too_many_arguments)]
     pub fn open_limit_order(
         &self,
         py: Python<'_>,
@@ -2315,11 +2318,10 @@ impl PyMockExecutionClient {
             .take()
         {
             let runtime = Arc::clone(&self.runtime);
-            let join_result = py.allow_threads(move || runtime.block_on(async { handle.await }));
-            if let Err(err) = join_result {
-                if !err.is_cancelled() {
-                    return Err(PyValueError::new_err(err.to_string()));
-                }
+            let join_result = py.allow_threads(move || runtime.block_on(handle));
+            if let Err(err) = join_result
+                && !err.is_cancelled() {
+                return Err(PyValueError::new_err(err.to_string()));
             }
         }
 
@@ -2348,10 +2350,9 @@ impl Drop for PyMockExecutionClient {
         if let Ok(mut guard) = self.client.lock() {
             guard.take();
         }
-        if let Ok(mut guard) = self.exchange_handle.lock() {
-            if let Some(handle) = guard.take() {
-                handle.abort();
-            }
+        if let Ok(mut guard) = self.exchange_handle.lock()
+            && let Some(handle) = guard.take() {
+            handle.abort();
         }
     }
 }

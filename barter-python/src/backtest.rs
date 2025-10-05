@@ -401,7 +401,7 @@ fn coerce_market_data(
     value: &Bound<'_, PyAny>,
 ) -> PyResult<(PyObject, Py<PyMarketDataInMemory>)> {
     if let Ok(inner) = value.extract::<Py<PyMarketDataInMemory>>() {
-        return Ok((value.to_object(py), inner));
+        return Ok((value.into_py(py), inner));
     }
 
     if let Ok(attr) = value.getattr("_inner") {
@@ -412,7 +412,7 @@ fn coerce_market_data(
         }
 
         let inner = attr.extract::<Py<PyMarketDataInMemory>>()?;
-        return Ok((value.to_object(py), inner));
+        return Ok((value.into_py(py), inner));
     }
 
     Err(PyValueError::new_err(

@@ -14,8 +14,14 @@ from typing import Generic, TypeVar
 
 from .barter_python import (
     AssetFees as _AssetFees,
+)
+from .barter_python import (
     QuoteAsset as _QuoteAsset,
+)
+from .barter_python import (
     Trade as _Trade,
+)
+from .barter_python import (
     TradeId as _TradeId,
 )
 from .execution import OrderId, StrategyId
@@ -34,7 +40,7 @@ class TradeId:
         self._inner = inner
 
     @classmethod
-    def new(cls, value: str) -> "TradeId":
+    def new(cls, value: str) -> TradeId:
         return cls(_TradeId.new(value))
 
     @property
@@ -65,7 +71,7 @@ class AssetFees(Generic[AssetKey]):
         self._inner = _AssetFees(asset, fees)
 
     @classmethod
-    def quote_fees(cls, fees: Decimal) -> "AssetFees[AssetKey]":
+    def quote_fees(cls, fees: Decimal) -> AssetFees[AssetKey]:
         return cls(_QuoteAsset(), fees)
 
     @property

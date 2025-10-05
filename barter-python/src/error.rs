@@ -237,6 +237,7 @@ impl PySocketErrorInfo {
     }
 }
 
+#[allow(dead_code)]
 fn build_socket_error(py: Python<'_>, error: IntegrationSocketError) -> PyResult<PyErr> {
     let info = PySocketErrorInfo::from_socket_error(error);
     let info_obj = Py::new(py, info)?;
@@ -261,6 +262,7 @@ fn build_socket_error(py: Python<'_>, error: IntegrationSocketError) -> PyResult
     Ok(err)
 }
 
+#[allow(dead_code)]
 pub fn socket_error_to_py_err(error: IntegrationSocketError) -> PyErr {
     Python::with_gil(|py| build_socket_error(py, error)).unwrap_or_else(|err| err)
 }

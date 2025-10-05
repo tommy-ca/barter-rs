@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from .barter_python import SnapUpdates as _SnapUpdates, Snapshot as _Snapshot
+from .barter_python import Snapshot as _Snapshot
+from .barter_python import SnapUpdates as _SnapUpdates
 
 
 class SubscriptionId:

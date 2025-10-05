@@ -1,14 +1,18 @@
 """Unit tests for Python integration data structures and bindings."""
 
-from barter_python import SnapUpdates, Snapshot
+from barter_python import Snapshot, SnapUpdates
 from barter_python.integration import (
     Field,
     Metric,
-    SnapUpdates as IntegrationSnapUpdates,
-    Snapshot as IntegrationSnapshot,
     SubscriptionId,
     Tag,
     Value,
+)
+from barter_python.integration import (
+    Snapshot as IntegrationSnapshot,
+)
+from barter_python.integration import (
+    SnapUpdates as IntegrationSnapUpdates,
 )
 
 

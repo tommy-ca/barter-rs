@@ -255,6 +255,7 @@ impl PyAuditContext {
         self.time
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         let context = EngineContext {
             sequence: self.sequence,
@@ -759,7 +760,7 @@ fn build_py_snapupdates(
 
     let py_updates = Py::new(py, PyAuditUpdates::new(runtime, updates))?;
     let snap_updates_value =
-        PySnapUpdates::__new__(py, py_snapshot.clone_ref(py), py_updates.to_object(py))?;
+        PySnapUpdates::__new__(py, py_snapshot.clone_ref(py), py_updates.into_py(py))?;
 
     Py::new(py, snap_updates_value)
 }

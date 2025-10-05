@@ -21,7 +21,6 @@ from barter_python.execution import (
     AssetFees,
     Cancelled,
     ClientOrderId,
-    InstrumentAccountSnapshot,
     OpenInFlight,
     Order,
     OrderId,

@@ -58,6 +58,7 @@ fn build_close_position_request(
 }
 
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (exchange, instrument, side, quantity, strategy_id, price, client_order_id=None))]
 pub fn build_ioc_market_order_to_close_position(
     py: Python<'_>,
