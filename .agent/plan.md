@@ -17,6 +17,10 @@
   - [x] Capture spec under `.agent/specs/python-engine-action-output-bindings.md`.
   - [x] Add TDD coverage (Rust + Python) for the new wrappers.
   - [x] Implement PyO3 bindings and expose modules to Python consumers.
+- Expose typed `EngineOutput` wrappers through audit summaries.
+  - [x] Capture spec under `.agent/specs/python-engine-output-bindings.md`.
+  - [ ] Implement Rust wrappers and re-export from the Python extension module.
+  - [ ] Extend Rust unit tests and Python integration tests for the new wrappers.
 
 ## Completed (2025-10-05)
 - Add integration coverage for backtest argument wrappers.
