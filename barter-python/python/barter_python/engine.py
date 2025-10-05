@@ -13,11 +13,15 @@ from .execution import (
     AccountEvent,
     AccountSnapshot,
     AssetBalance,
+    CancelInFlight,
+    Open,
+    OpenInFlight,
     Order,
     OrderKey,
     OrderRequestCancel,
     OrderRequestOpen,
     OrderResponseCancel,
+    OrderState,
     Trade,
 )
 from .instrument import ExchangeId, InstrumentIndex
@@ -212,8 +216,66 @@ class SendRequests:
     cancel_requests: list[OrderRequestCancel]
 
     def execute(self, engine_state: EngineState) -> None:
-        """Send the requests (placeholder for actual execution)."""
-        # TODO: Integrate with execution layer
+        """Apply open and cancel requests to the engine state."""
+        for cancel in self.cancel_requests:
+            self._apply_cancel(engine_state, cancel)
+
+        for open_request in self.open_requests:
+            self._apply_open(engine_state, open_request)
+
+    def _apply_open(
+        self,
+        engine_state: EngineState,
+        open_request: OrderRequestOpen,
+    ) -> None:
+        instrument_id = open_request.key.instrument
+        exchange_id = open_request.key.exchange
+
+        instrument_state = engine_state.get_instrument_state(instrument_id)
+        if instrument_state is None:
+            instrument_state = InstrumentState(
+                instrument=instrument_id,  # type: ignore[arg-type]
+                exchange=exchange_id,  # type: ignore[arg-type]
+            )
+            engine_state.update_instrument_state(instrument_id, instrument_state)
+
+        instrument_state.orders[open_request.key] = Order(
+            open_request.key,
+            open_request.state.side,
+            open_request.state.price,
+            open_request.state.quantity,
+            open_request.state.kind,
+            open_request.state.time_in_force,
+            OrderState.active(OpenInFlight()),
+        )
+
+    def _apply_cancel(
+        self,
+        engine_state: EngineState,
+        cancel_request: OrderRequestCancel,
+    ) -> None:
+        instrument_id = cancel_request.key.instrument
+        instrument_state = engine_state.get_instrument_state(instrument_id)
+        if instrument_state is None:
+            return
+
+        order = instrument_state.orders.get(cancel_request.key)
+        if order is None:
+            return
+
+        current_state = order.state.state
+        open_state = current_state if isinstance(current_state, Open) else None
+        next_state = OrderState.active(CancelInFlight.new(open_state))
+
+        instrument_state.orders[cancel_request.key] = Order(
+            order.key,
+            order.side,
+            order.price,
+            order.quantity,
+            order.kind,
+            order.time_in_force,
+            next_state,
+        )
 
 
 @dataclass

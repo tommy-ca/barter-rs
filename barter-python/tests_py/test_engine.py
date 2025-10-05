@@ -19,6 +19,7 @@ from barter_python.execution import (
     AccountEventKind,
     AccountSnapshot,
     AssetFees,
+    CancelInFlight,
     Cancelled,
     ClientOrderId,
     OpenInFlight,
@@ -26,8 +27,11 @@ from barter_python.execution import (
     OrderId,
     OrderKey,
     OrderKind,
+    OrderRequestCancel,
+    OrderRequestOpen,
     OrderResponseCancel,
     OrderState,
+    RequestOpen,
     StrategyId,
     TimeInForce,
     Trade,
@@ -440,3 +444,140 @@ class TestEngine:
         assert inst_state_after.position.side == "buy"
         assert inst_state_after.position.quantity_abs == Decimal("0.1")
         assert inst_state_after.position.entry_price == Decimal("25000")
+
+    def test_send_requests_records_open_orders(self):
+        """SendRequests should track approved opens as OpenInFlight orders."""
+
+        exchange_index = 0
+        instrument_index = 5
+        state = EngineState()
+        instrument_state = InstrumentState(
+            instrument=instrument_index,
+            exchange=exchange_index,
+        )
+        state.update_instrument_state(instrument_index, instrument_state)
+
+        class StubStrategy:
+            def generate_algo_orders(self, *_):
+                return [], []
+
+        class StubRiskManager:
+            class _Approved:
+                def __init__(self, item):
+                    self.item = item
+
+            def check(self, _state, cancel_requests, open_requests):
+                approved = self._Approved
+                return (
+                    [approved(item) for item in cancel_requests],
+                    [approved(item) for item in open_requests],
+                    [],
+                    [],
+                )
+
+        engine = Engine(state, StubStrategy(), StubRiskManager())
+
+        from dataclasses import dataclass
+
+        @dataclass(frozen=True)
+        class _Key:
+            exchange: int
+            instrument: int
+            strategy: str
+            cid: str
+
+        key = _Key(
+            exchange=exchange_index,
+            instrument=instrument_index,
+            strategy="send-requests",
+            cid="open-001",
+        )
+        request_state = RequestOpen(
+            side=Side.BUY,
+            price=Decimal("100.0"),
+            quantity=Decimal("2.0"),
+            kind=OrderKind.MARKET,
+            time_in_force=TimeInForce.IMMEDIATE_OR_CANCEL,
+        )
+        open_request = OrderRequestOpen(key, request_state)
+
+        engine.send_requests([open_request], [])
+
+        stored = engine.state.instruments[instrument_index].orders[key]
+        assert stored.side == Side.BUY
+        assert stored.quantity == Decimal("2.0")
+        assert stored.state.is_active()
+        assert isinstance(stored.state.state, OpenInFlight)
+
+    def test_send_requests_marks_cancel_in_flight(self):
+        """SendRequests should mark existing orders as CancelInFlight when cancelling."""
+
+        exchange_index = 1
+        instrument_index = 9
+        state = EngineState()
+        instrument_state = InstrumentState(
+            instrument=instrument_index,
+            exchange=exchange_index,
+        )
+        state.update_instrument_state(instrument_index, instrument_state)
+
+        class StubStrategy:
+            def generate_algo_orders(self, *_):
+                return [], []
+
+        class StubRiskManager:
+            class _Approved:
+                def __init__(self, item):
+                    self.item = item
+
+            def check(self, _state, cancel_requests, open_requests):
+                approved = self._Approved
+                return (
+                    [approved(item) for item in cancel_requests],
+                    [approved(item) for item in open_requests],
+                    [],
+                    [],
+                )
+
+        engine = Engine(state, StubStrategy(), StubRiskManager())
+
+        from dataclasses import dataclass
+
+        @dataclass(frozen=True)
+        class _Key:
+            exchange: int
+            instrument: int
+            strategy: str
+            cid: str
+
+        key = _Key(
+            exchange=exchange_index,
+            instrument=instrument_index,
+            strategy="send-requests",
+            cid="open-002",
+        )
+        request_state = RequestOpen(
+            side=Side.SELL,
+            price=Decimal("101.0"),
+            quantity=Decimal("1.5"),
+            kind=OrderKind.LIMIT,
+            time_in_force=TimeInForce.GOOD_UNTIL_CANCELLED,
+        )
+        order = Order(
+            key,
+            request_state.side,
+            request_state.price,
+            request_state.quantity,
+            request_state.kind,
+            request_state.time_in_force,
+            OrderState.active(OpenInFlight()),
+        )
+        engine.state.instruments[instrument_index].orders[key] = order
+
+        cancel_request = OrderRequestCancel(key, None)
+
+        engine.send_requests([], [cancel_request])
+
+        stored = engine.state.instruments[instrument_index].orders[key]
+        assert stored.state.is_active()
+        assert isinstance(stored.state.state, CancelInFlight)
