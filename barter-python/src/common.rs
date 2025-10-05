@@ -5,7 +5,11 @@ use barter_instrument::{
     asset::{ExchangeAsset, name::AssetNameInternal},
     exchange::ExchangeId,
 };
-use pyo3::{Bound, PyObject, PyResult, Python, exceptions::PyValueError, types::PyDict};
+use pyo3::{
+    Bound, PyObject, PyResult, Python,
+    exceptions::PyValueError,
+    types::{PyAnyMethods, PyDict, PyDictMethods},
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SummaryInterval {

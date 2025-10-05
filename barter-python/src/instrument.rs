@@ -1,6 +1,6 @@
 use barter_instrument::{
     Side,
-    asset::{Asset, AssetIndex},
+    asset::{Asset, AssetIndex, QuoteAsset},
     exchange::ExchangeIndex,
     instrument::InstrumentIndex,
 };
@@ -60,6 +60,32 @@ impl PyAsset {
             self.name_internal(),
             self.name_exchange()
         ))
+    }
+}
+
+/// Wrapper around [`QuoteAsset`] for Python exposure.
+#[pyclass(module = "barter_python", name = "QuoteAsset", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyQuoteAsset {
+    inner: QuoteAsset,
+}
+
+#[pymethods]
+impl PyQuoteAsset {
+    /// Create a new [`QuoteAsset`].
+    #[new]
+    fn new() -> Self {
+        Self { inner: QuoteAsset }
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> &'static str {
+        "QuoteAsset"
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> &'static str {
+        "QuoteAsset()"
     }
 }
 
@@ -139,6 +165,10 @@ impl PySide {
 impl PySide {
     pub(crate) fn inner(&self) -> Side {
         self.inner
+    }
+
+    pub(crate) fn from_side(side: Side) -> Self {
+        Self { inner: side }
     }
 }
 

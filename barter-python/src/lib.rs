@@ -77,8 +77,8 @@ use data::{
     PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId,
     init_dynamic_streams,
 };
-use execution::{PyClientOrderId, PyOrderId, PyStrategyId};
-use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PySide};
+use execution::{PyAssetFees, PyClientOrderId, PyOrderId, PyStrategyId, PyTrade, PyTradeId};
+use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyQuoteAsset, PySide};
 use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
 use metric::{PyField, PyMetric, PyTag, PyValue};
@@ -825,6 +825,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyClientOrderId>()?;
     m.add_class::<PyOrderId>()?;
     m.add_class::<PyStrategyId>()?;
+    m.add_class::<PyTradeId>()?;
+    m.add_class::<PyTrade>()?;
+    m.add_class::<PyAssetFees>()?;
     m.add_class::<PyOrderKey>()?;
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;
@@ -846,6 +849,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDynamicStreams>()?;
     m.add_class::<PyAsset>()?;
     m.add_class::<PyAssetIndex>()?;
+    m.add_class::<PyQuoteAsset>()?;
     m.add_class::<PyExchangeIndex>()?;
     m.add_class::<PyInstrumentIndex>()?;
     m.add_class::<PySide>()?;
