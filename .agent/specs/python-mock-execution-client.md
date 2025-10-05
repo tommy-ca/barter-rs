@@ -16,6 +16,8 @@ Last updated: 2025-10-05
 - Expose an incremental event poller that surfaces account stream updates as Python dictionaries.
 - Maintain ergonomic construction by reusing `MockExecutionConfig` and
   `ExecutionInstrumentMap` information already surfaced in the bindings.
+- Provide helpers for opening both market and limit orders, including
+  time-in-force and post-only coordination for limit orders.
 
 ## Non-Goals
 - Deliver a fully async Python surface (reuse the existing Tokio runtime approach instead).
@@ -40,6 +42,8 @@ Last updated: 2025-10-05
   - Creating a client from a minimal execution map and config.
   - Fetching an account snapshot and verifying expected balances/orders.
   - Polling at least one event from the mock stream after an order is opened.
+  - Opening market **and** limit orders, asserting returned payloads include
+    the requested price, quantity, and time-in-force semantics.
 - Add a Rust unit smoke test if practical (optional) asserting the helper conversion logic.
 - Verify the full suite: `cargo test -p barter-python` and `pytest -q tests_py`.
 

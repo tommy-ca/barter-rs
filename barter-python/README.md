@@ -94,6 +94,38 @@ config.add_execution(execution_config)
 print(execution_config.to_dict())
 PY
 
+# Open limit orders through the mock execution client
+python - <<'PY'
+from decimal import Decimal
+
+import barter_python as bp
+
+config = bp.MockExecutionConfig()
+instrument_map = bp.ExecutionInstrumentMap.from_definitions(
+    bp.ExchangeId.MOCK,
+    [
+        {
+            "exchange": "mock",
+            "name_exchange": "BTCUSDT",
+            "underlying": {"base": "btc", "quote": "usdt"},
+            "quote": "underlying_quote",
+            "kind": "spot",
+        }
+    ],
+)
+
+with bp.MockExecutionClient(config, instrument_map) as client:
+    order = client.open_limit_order(
+        "BTCUSDT",
+        "sell",
+        Decimal("45000"),
+        Decimal("0.05"),
+        time_in_force="good_until_cancelled",
+        post_only=True,
+    )
+    print(order["kind"], order["time_in_force"])
+PY
+
 # Calculate portfolio analytics directly from summary inputs
 python - <<'PY'
 import barter_python as bp
