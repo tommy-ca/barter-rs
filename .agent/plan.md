@@ -1,4 +1,4 @@
-# Plan (2025-10-04)
+# Plan (2025-10-05)
 
 ## Objectives
 - Ensure Python bindings exist for all barter-rs crates (engine, data, execution, instrument, integration, macro).
@@ -12,12 +12,10 @@
 4. Publish and verify via `uv` environment using example E2E flows.
 
 ## Current Focus (2025-10-05)
-- Bridge remaining core barter crates through Rust-first bindings.
-  - [x] Capture binding gaps for sequencing and audit metadata in `.agent/specs`.
-  - [x] Extend PyO3 surface with strongly typed wrappers for engine sequencing.
-  - [x] Update Python integration layers & tests to exercise new bindings end-to-end.
-  - [x] Bridge execution `OrderEvent` updates into Python bindings (spec:
-  `.agent/specs/python-order-event-bindings.md`).
+- Expand execution instrument mapping coverage to the Python API.
+  - [ ] Capture binding requirements in `.agent/specs/python-execution-instrument-map.md`.
+  - [ ] Expose `ExecutionInstrumentMap` wrappers & generator functions via PyO3.
+  - [ ] Add pytest coverage validating lookup helpers and error handling.
 
 ## Completed (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.

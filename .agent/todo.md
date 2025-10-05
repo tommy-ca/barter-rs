@@ -33,6 +33,8 @@
   - [x] Validate ergonomics & docs for strategy helpers post binding switch.
 
 ## Active (2025-10-05)
+- [ ] Bridge execution instrument map lookups into Python bindings (spec: `.agent/specs/python-execution-instrument-map.md`).
+- [ ] Add pytest coverage validating exchange/asset/instrument translations via bindings.
 - [x] Implement `PySequence` bindings for engine sequencing (spec: `.agent/specs/python-sequence-bindings.md`).
   - [x] Add Rust coverage for sequence wrapper semantics.
   - [x] Update Python audit context translation to emit typed sequences.
