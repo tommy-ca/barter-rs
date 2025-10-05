@@ -2,10 +2,13 @@ use std::str::FromStr;
 
 use barter_execution::{
     balance::{AssetBalance as ExecutionAssetBalance, Balance as ExecutionBalance},
+    error::{ApiError, OrderError},
     order::{
-        id::{ClientOrderId, OrderId, StrategyId},
-        state::OrderState,
         OrderEvent,
+        id::{ClientOrderId, OrderId, StrategyId},
+        state::{
+            ActiveOrderState, CancelInFlight, Cancelled, InactiveOrderState, Open, OrderState,
+        },
     },
     trade::{AssetFees as ExecutionAssetFees, Trade as ExecutionTrade, TradeId},
 };
@@ -17,16 +20,19 @@ use barter_instrument::{
 };
 use chrono::{DateTime, Utc};
 use pyo3::{
-    Bound, Py, PyAny, PyObject, PyResult, Python, exceptions::PyValueError, prelude::*,
+    Bound, Py, PyAny, PyObject, PyResult, Python,
+    exceptions::PyValueError,
+    prelude::*,
     types::{PyModule, PyType},
 };
 use rust_decimal::Decimal;
 
 use crate::{
-    command::{parse_side, PyOrderKey},
+    command::{PyOrderKey, parse_side},
     instrument::{PyAssetIndex, PyInstrumentIndex, PyQuoteAsset, PySide},
     summary::decimal_to_py,
 };
+use serde::Serialize;
 use serde_json;
 
 fn ensure_non_empty(value: &str, label: &str) -> PyResult<()> {
@@ -94,11 +100,17 @@ fn extract_asset_index(value: &Bound<'_, PyAny>, label: &str) -> PyResult<AssetI
     )))
 }
 
-type DefaultOrderEvent = OrderEvent<
-    OrderState<AssetIndex, InstrumentIndex>,
-    ExchangeIndex,
-    InstrumentIndex,
->;
+type DefaultOrderEvent =
+    OrderEvent<OrderState<AssetIndex, InstrumentIndex>, ExchangeIndex, InstrumentIndex>;
+
+type DefaultOrderState = OrderState<AssetIndex, InstrumentIndex>;
+type DefaultActiveOrderState = ActiveOrderState;
+type DefaultInactiveOrderState = InactiveOrderState<AssetIndex, InstrumentIndex>;
+type DefaultOpenState = Open;
+type DefaultCancelInFlight = CancelInFlight;
+type DefaultCancelledState = Cancelled;
+type DefaultOrderError = OrderError<AssetIndex, InstrumentIndex>;
+type DefaultApiError = ApiError<AssetIndex, InstrumentIndex>;
 
 /// Wrapper around [`ExecutionBalance`] for Python exposure.
 #[pyclass(module = "barter_python", name = "Balance", eq, hash, frozen)]
@@ -521,6 +533,24 @@ pub(crate) fn coerce_client_order_id(value: Option<&Bound<'_, PyAny>>) -> PyResu
     }
 }
 
+fn serialize_to_json<T>(value: &T) -> PyResult<String>
+where
+    T: Serialize,
+{
+    serde_json::to_string(value).map_err(|err| PyValueError::new_err(err.to_string()))
+}
+
+fn serialize_to_py_dict<T>(py: Python<'_>, value: &T) -> PyResult<PyObject>
+where
+    T: Serialize,
+{
+    let serialized = serialize_to_json(value)?;
+    let json_module = PyModule::import_bound(py, "json")?;
+    let loads = json_module.getattr("loads")?;
+    let loaded = loads.call1((serialized.into_py(py),))?;
+    Ok(loaded.into())
+}
+
 /// Wrapper around [`OrderEvent`] for Python exposure.
 #[pyclass(module = "barter_python", name = "OrderEvent", unsendable)]
 #[derive(Debug, Clone)]
@@ -529,6 +559,10 @@ pub struct PyOrderEvent {
 }
 
 impl PyOrderEvent {
+    fn state_inner(&self) -> DefaultOrderState {
+        self.inner.state.clone()
+    }
+
     fn state_kind_inner(&self) -> &'static str {
         match &self.inner.state {
             OrderState::Active(_) => "Active",
@@ -560,13 +594,25 @@ impl PyOrderEvent {
     }
 
     #[getter]
+    pub fn state(&self) -> PyOrderState {
+        PyOrderState::from_inner(self.state_inner())
+    }
+
+    pub fn is_active(&self) -> bool {
+        matches!(self.inner.state, OrderState::Active(_))
+    }
+
+    pub fn is_inactive(&self) -> bool {
+        matches!(self.inner.state, OrderState::Inactive(_))
+    }
+
+    #[getter]
     pub fn state_kind(&self) -> &'static str {
         self.state_kind_inner()
     }
 
     pub fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| PyValueError::new_err(err.to_string()))
+        serde_json::to_string(&self.inner).map_err(|err| PyValueError::new_err(err.to_string()))
     }
 
     pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
@@ -580,6 +626,404 @@ impl PyOrderEvent {
     fn __repr__(&self) -> PyResult<String> {
         let json = self.to_json()?;
         Ok(format!("OrderEvent({json})"))
+    }
+}
+
+/// Wrapper around [`OrderState`] for Python exposure.
+#[pyclass(module = "barter_python", name = "OrderState", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyOrderState {
+    inner: DefaultOrderState,
+}
+
+impl PyOrderState {
+    fn from_inner(inner: DefaultOrderState) -> Self {
+        Self { inner }
+    }
+
+    fn variant_inner(&self) -> &'static str {
+        match &self.inner {
+            OrderState::Active(_) => "Active",
+            OrderState::Inactive(_) => "Inactive",
+        }
+    }
+}
+
+#[pymethods]
+impl PyOrderState {
+    #[getter]
+    pub fn variant(&self) -> &'static str {
+        self.variant_inner()
+    }
+
+    pub fn is_active(&self) -> bool {
+        matches!(self.inner, OrderState::Active(_))
+    }
+
+    pub fn is_inactive(&self) -> bool {
+        matches!(self.inner, OrderState::Inactive(_))
+    }
+
+    pub fn active(&self) -> Option<PyActiveOrderState> {
+        match &self.inner {
+            OrderState::Active(state) => Some(PyActiveOrderState::from_inner(state.clone())),
+            _ => None,
+        }
+    }
+
+    pub fn inactive(&self) -> Option<PyInactiveOrderState> {
+        match &self.inner {
+            OrderState::Inactive(state) => Some(PyInactiveOrderState::from_inner(state.clone())),
+            _ => None,
+        }
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("OrderState({json})"))
+    }
+}
+
+/// Wrapper around [`ActiveOrderState`] for Python exposure.
+#[pyclass(module = "barter_python", name = "ActiveOrderState", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyActiveOrderState {
+    inner: DefaultActiveOrderState,
+}
+
+impl PyActiveOrderState {
+    fn from_inner(inner: DefaultActiveOrderState) -> Self {
+        Self { inner }
+    }
+
+    fn variant_inner(&self) -> &'static str {
+        match &self.inner {
+            ActiveOrderState::OpenInFlight(_) => "OpenInFlight",
+            ActiveOrderState::Open(_) => "Open",
+            ActiveOrderState::CancelInFlight(_) => "CancelInFlight",
+        }
+    }
+}
+
+#[pymethods]
+impl PyActiveOrderState {
+    #[getter]
+    pub fn variant(&self) -> &'static str {
+        self.variant_inner()
+    }
+
+    pub fn is_open_in_flight(&self) -> bool {
+        matches!(self.inner, ActiveOrderState::OpenInFlight(_))
+    }
+
+    pub fn is_open(&self) -> bool {
+        matches!(self.inner, ActiveOrderState::Open(_))
+    }
+
+    pub fn is_cancel_in_flight(&self) -> bool {
+        matches!(self.inner, ActiveOrderState::CancelInFlight(_))
+    }
+
+    pub fn open(&self) -> Option<PyOpenState> {
+        match &self.inner {
+            ActiveOrderState::Open(state) => Some(PyOpenState::from_inner(state.clone())),
+            ActiveOrderState::CancelInFlight(state) => {
+                state.order.clone().map(PyOpenState::from_inner)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn cancel_in_flight(&self) -> Option<PyCancelInFlightState> {
+        match &self.inner {
+            ActiveOrderState::CancelInFlight(state) => {
+                Some(PyCancelInFlightState::from_inner(state.clone()))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("ActiveOrderState({json})"))
+    }
+}
+
+/// Wrapper around [`InactiveOrderState`] for Python exposure.
+#[pyclass(module = "barter_python", name = "InactiveOrderState", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyInactiveOrderState {
+    inner: DefaultInactiveOrderState,
+}
+
+impl PyInactiveOrderState {
+    fn from_inner(inner: DefaultInactiveOrderState) -> Self {
+        Self { inner }
+    }
+
+    fn variant_inner(&self) -> &'static str {
+        match &self.inner {
+            InactiveOrderState::Cancelled(_) => "Cancelled",
+            InactiveOrderState::FullyFilled => "FullyFilled",
+            InactiveOrderState::OpenFailed(_) => "OpenFailed",
+            InactiveOrderState::Expired => "Expired",
+        }
+    }
+}
+
+#[pymethods]
+impl PyInactiveOrderState {
+    #[getter]
+    pub fn variant(&self) -> &'static str {
+        self.variant_inner()
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self.inner, InactiveOrderState::Cancelled(_))
+    }
+
+    pub fn is_fully_filled(&self) -> bool {
+        matches!(self.inner, InactiveOrderState::FullyFilled)
+    }
+
+    pub fn is_expired(&self) -> bool {
+        matches!(self.inner, InactiveOrderState::Expired)
+    }
+
+    pub fn is_open_failed(&self) -> bool {
+        matches!(self.inner, InactiveOrderState::OpenFailed(_))
+    }
+
+    pub fn cancelled(&self) -> Option<PyCancelledState> {
+        match &self.inner {
+            InactiveOrderState::Cancelled(state) => {
+                Some(PyCancelledState::from_inner(state.clone()))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn open_failed(&self) -> Option<PyOrderError> {
+        match &self.inner {
+            InactiveOrderState::OpenFailed(error) => Some(PyOrderError::from_inner(error.clone())),
+            _ => None,
+        }
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("InactiveOrderState({json})"))
+    }
+}
+
+/// Wrapper around [`Open`] order metadata for Python exposure.
+#[pyclass(module = "barter_python", name = "Open", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyOpenState {
+    inner: DefaultOpenState,
+}
+
+impl PyOpenState {
+    fn from_inner(inner: DefaultOpenState) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyOpenState {
+    #[getter]
+    pub fn order_id(&self) -> PyOrderId {
+        PyOrderId::from_inner(self.inner.id.clone())
+    }
+
+    #[getter]
+    pub fn time_exchange(&self) -> DateTime<Utc> {
+        self.inner.time_exchange
+    }
+
+    #[getter]
+    pub fn filled_quantity(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.inner.filled_quantity)
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("Open({json})"))
+    }
+}
+
+/// Wrapper around [`CancelInFlight`] for Python exposure.
+#[pyclass(module = "barter_python", name = "CancelInFlight", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyCancelInFlightState {
+    inner: DefaultCancelInFlight,
+}
+
+impl PyCancelInFlightState {
+    fn from_inner(inner: DefaultCancelInFlight) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyCancelInFlightState {
+    pub fn has_order(&self) -> bool {
+        self.inner.order.is_some()
+    }
+
+    pub fn order(&self) -> Option<PyOpenState> {
+        self.inner.order.clone().map(PyOpenState::from_inner)
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("CancelInFlight({json})"))
+    }
+}
+
+/// Wrapper around [`Cancelled`] order metadata for Python exposure.
+#[pyclass(module = "barter_python", name = "Cancelled", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyCancelledState {
+    inner: DefaultCancelledState,
+}
+
+impl PyCancelledState {
+    fn from_inner(inner: DefaultCancelledState) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyCancelledState {
+    #[getter]
+    pub fn order_id(&self) -> PyOrderId {
+        PyOrderId::from_inner(self.inner.id.clone())
+    }
+
+    #[getter]
+    pub fn time_exchange(&self) -> DateTime<Utc> {
+        self.inner.time_exchange
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("Cancelled({json})"))
+    }
+}
+
+/// Wrapper around [`OrderError`] for Python exposure.
+#[pyclass(module = "barter_python", name = "OrderError", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyOrderError {
+    inner: DefaultOrderError,
+}
+
+impl PyOrderError {
+    fn from_inner(inner: DefaultOrderError) -> Self {
+        Self { inner }
+    }
+
+    fn variant_inner(&self) -> &'static str {
+        match &self.inner {
+            OrderError::Connectivity(_) => "Connectivity",
+            OrderError::Rejected(_) => "Rejected",
+        }
+    }
+
+    fn api_error_inner(&self) -> Option<DefaultApiError> {
+        match &self.inner {
+            OrderError::Rejected(error) => Some(error.clone()),
+            _ => None,
+        }
+    }
+}
+
+#[pymethods]
+impl PyOrderError {
+    #[getter]
+    pub fn variant(&self) -> &'static str {
+        self.variant_inner()
+    }
+
+    pub fn is_connectivity(&self) -> bool {
+        matches!(self.inner, OrderError::Connectivity(_))
+    }
+
+    pub fn is_rejected(&self) -> bool {
+        matches!(self.inner, OrderError::Rejected(_))
+    }
+
+    pub fn message(&self) -> String {
+        self.inner.to_string()
+    }
+
+    pub fn api_error(&self, py: Python<'_>) -> PyResult<Option<PyObject>> {
+        match self.api_error_inner() {
+            Some(error) => serialize_to_py_dict(py, &error).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("OrderError({json})"))
     }
 }
 

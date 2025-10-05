@@ -82,8 +82,10 @@ use data::{
     init_dynamic_streams,
 };
 use execution::{
-    PyAssetFees, PyClientOrderId, PyExecutionAssetBalance, PyExecutionBalance, PyOrderEvent,
-    PyOrderId, PyStrategyId, PyTrade, PyTradeId, asset_balance_new, balance_new,
+    PyActiveOrderState, PyAssetFees, PyCancelInFlightState, PyCancelledState, PyClientOrderId,
+    PyExecutionAssetBalance, PyExecutionBalance, PyInactiveOrderState, PyOpenState, PyOrderError,
+    PyOrderEvent, PyOrderId, PyOrderState, PyStrategyId, PyTrade, PyTradeId, asset_balance_new,
+    balance_new,
 };
 use instrument::{
     PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyInstrumentSpec,
@@ -912,6 +914,13 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOrderRequestCancel>()?;
     m.add_class::<PyOrderSnapshot>()?;
     m.add_class::<PyOrderEvent>()?;
+    m.add_class::<PyOrderState>()?;
+    m.add_class::<PyActiveOrderState>()?;
+    m.add_class::<PyInactiveOrderState>()?;
+    m.add_class::<PyOpenState>()?;
+    m.add_class::<PyCancelInFlightState>()?;
+    m.add_class::<PyCancelledState>()?;
+    m.add_class::<PyOrderError>()?;
     m.add_class::<PyInstrumentAccountSnapshot>()?;
     m.add_class::<PyAccountSnapshot>()?;
     m.add_class::<PyInstrumentFilter>()?;
