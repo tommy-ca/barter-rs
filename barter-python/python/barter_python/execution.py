@@ -21,6 +21,7 @@ AssetFees = None
 ExecutionBalance = None
 ExecutionAssetBalance = None
 ExecutionInstrumentMap = None
+_ExecutionInstrumentMap = None
 MockExecutionClient = None
 OrderKey = None
 OrderKind = None
@@ -51,6 +52,30 @@ else:
         OrderKind = _execution_bindings.OrderKind
     if hasattr(_execution_bindings, "TimeInForce"):
         TimeInForce = _execution_bindings.TimeInForce
+    if hasattr(_execution_bindings, "ClientOrderId"):
+        ClientOrderId = _execution_bindings.ClientOrderId
+    if hasattr(_execution_bindings, "OrderId"):
+        OrderId = _execution_bindings.OrderId
+    if hasattr(_execution_bindings, "StrategyId"):
+        StrategyId = _execution_bindings.StrategyId
+    if hasattr(_execution_bindings, "TradeId"):
+        TradeId = _execution_bindings.TradeId
+    if hasattr(_execution_bindings, "Trade"):
+        Trade = _execution_bindings.Trade
+    if hasattr(_execution_bindings, "AssetFees"):
+        AssetFees = _execution_bindings.AssetFees
+    if hasattr(_execution_bindings, "ExecutionBalance"):
+        ExecutionBalance = _execution_bindings.ExecutionBalance
+    if hasattr(_execution_bindings, "ExecutionAssetBalance"):
+        ExecutionAssetBalance = _execution_bindings.ExecutionAssetBalance
+    if hasattr(_execution_bindings, "OrderKey"):
+        OrderKey = _execution_bindings.OrderKey
+    if hasattr(_execution_bindings, "InstrumentAccountSnapshot"):
+        InstrumentAccountSnapshot = _execution_bindings.InstrumentAccountSnapshot
+    if hasattr(_execution_bindings, "AccountSnapshot"):
+        AccountSnapshot = _execution_bindings.AccountSnapshot
+    if hasattr(_execution_bindings, "ExecutionInstrumentMap"):
+        _ExecutionInstrumentMap = _execution_bindings.ExecutionInstrumentMap
 
 try:
     _MockExecutionClient = _core.MockExecutionClient

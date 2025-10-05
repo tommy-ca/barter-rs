@@ -16,6 +16,17 @@ from barter_python.strategy import (
 )
 
 
+def test_strategy_module_exposes_binding_instrument_filter():
+    """Ensure the strategy module re-exports the Rust InstrumentFilter bindings."""
+    import barter_python as bp
+    from barter_python import strategy
+
+    assert strategy.InstrumentFilter is bp.InstrumentFilter
+    # Static constructors should be available via the alias.
+    filter_none = strategy.InstrumentFilter.none()
+    assert isinstance(filter_none, bp.InstrumentFilter)
+
+
 class TestClosePositionsStrategy:
     def test_build_ioc_market_order_to_close_long_position(self):
         """Test building IOC market order to close a long position."""

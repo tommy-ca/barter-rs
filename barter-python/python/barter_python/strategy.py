@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Iterable
 from decimal import Decimal
-from typing import Callable, Protocol, TypeVar
+from typing import TYPE_CHECKING, Callable, Protocol, TypeVar
 
-from .barter_python import (
-    build_ioc_market_order_to_close_position as _build_ioc_market_order_to_close_position,
-)
+_core = importlib.import_module("barter_python.barter_python")
+_build_ioc_market_order_to_close_position = _core.build_ioc_market_order_to_close_position
+_InstrumentFilterBinding = _core.InstrumentFilter
+_execution_bindings = _core.execution
 from .execution import (
-    ClientOrderId,
     OrderKey,
     OrderKind,
     OrderRequestCancel,
     OrderRequestOpen,
     RequestOpen,
-    StrategyId,
     TimeInForce,
 )
 from .instrument import Side
@@ -77,7 +77,7 @@ class ClosePositionsStrategy(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
     def close_positions_requests(
         self,
         state: State,
-        filter: InstrumentFilter[ExchangeKey, AssetKey, InstrumentKey] | None = None,
+        filter: "InstrumentFilter[ExchangeKey, AssetKey, InstrumentKey]" | None = None,
     ) -> tuple[
         Iterable[OrderRequestCancel[ExchangeKey, InstrumentKey]],
         Iterable[OrderRequestOpen[ExchangeKey, InstrumentKey]],
@@ -94,12 +94,26 @@ class ClosePositionsStrategy(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
         ...
 
 
-class InstrumentFilter(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
+class _InstrumentFilterProtocol(Protocol[ExchangeKey, AssetKey, InstrumentKey]):
     """Filter for instruments in the engine state."""
 
     def matches(self, exchange: ExchangeKey, instrument: InstrumentKey) -> bool:
         """Check if the instrument matches the filter."""
         ...
+
+
+_ClientOrderIdBinding = _execution_bindings.ClientOrderId
+_StrategyIdBinding = _execution_bindings.StrategyId
+
+
+if TYPE_CHECKING:
+    InstrumentFilter = _InstrumentFilterProtocol
+else:  # pragma: no cover - runtime binding alias
+    InstrumentFilter = _InstrumentFilterBinding
+
+
+ClientOrderId = _ClientOrderIdBinding
+StrategyId = _StrategyIdBinding
 
 
 class Position:

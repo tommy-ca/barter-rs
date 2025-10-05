@@ -282,7 +282,7 @@ class SendRequests:
 class CancelOrders:
     """Action to cancel orders."""
 
-    instrument_filter: InstrumentFilter | None = None  # TODO: Define proper filter
+    instrument_filter: InstrumentFilter | None = None
 
     def execute(self, engine_state: EngineState) -> list[OrderRequestCancel]:
         """Generate cancel requests for orders matching the filter."""
