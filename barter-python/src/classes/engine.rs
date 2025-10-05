@@ -1,13 +1,17 @@
 use chrono::{DateTime, Utc};
-use pyo3::{prelude::*, pyclass::CompareOp, types::PyModule, Bound, PyObject, exceptions::PyValueError};
+use pyo3::{prelude::*, types::PyModule, PyObject, exceptions::PyValueError};
 use rust_decimal::prelude::ToPrimitive;
 use serde_json::Value as JsonValue;
 
 use barter::{
-    engine::{command::Command, state::trading::TradingState},
+    EngineEvent,
+    engine::{
+        command::Command,
+        state::trading::TradingState,
+    },
     execution::AccountStreamEvent,
-    EngineEvent, Sequence, Timed,
 };
+
 use barter_data::{
     books::{Level, OrderBook},
     event::{DataKind, MarketEvent},
@@ -19,30 +23,18 @@ use barter_data::{
         trade::PublicTrade,
     },
 };
-use barter_execution::{
-    AccountEvent, AccountEventKind,
-    balance::{AssetBalance, Balance},
-    order::{
-        id::{OrderId, StrategyId},
-        request::OrderResponseCancel,
-        state::Cancelled,
-    },
-    trade::{AssetFees, Trade, TradeId},
-};
+
 use barter_instrument::{
-    asset::{AssetIndex, QuoteAsset},
-    exchange::{ExchangeId, ExchangeIndex},
+    exchange::ExchangeId,
     instrument::InstrumentIndex,
 };
 use barter_integration::Terminal;
 
 use crate::{
     command::{
-        collect_cancel_requests, collect_open_requests, clone_filter, parse_decimal, parse_side, PyInstrumentFilter,
-        PyOrderRequestCancel, PyOrderRequestOpen, PyOrderSnapshot,
+        collect_cancel_requests, collect_open_requests, PyInstrumentFilter,
+        PyOrderRequestCancel, PyOrderRequestOpen,
     },
-    execution::PyExecutionAssetBalance,
-    execution::PyTrade,
 };
 
 /// Wrapper around [`EngineEvent`] value for Python.
@@ -135,6 +127,7 @@ impl PyEngineEvent {
     }
 
     /// Construct an [`EngineEvent::Command`] to cancel all orders.
+    #[pyo3(signature = (filter=None))]
     #[staticmethod]
     pub fn cancel_all_orders(filter: Option<PyInstrumentFilter>) -> PyResult<Self> {
         let command = Command::CancelOrders(crate::command::clone_filter(filter.as_ref()));
@@ -487,7 +480,23 @@ impl PyEngineEvent {
         })
     }
 
+    /// Construct an [`EngineEvent::Market`] wrapping a reconnecting event.
+    #[staticmethod]
+    pub fn market_reconnecting(exchange: &str) -> PyResult<Self> {
+        let exchange_id = parse_exchange_id(exchange)?;
+        Ok(Self {
+            inner: EngineEvent::Market(MarketStreamEvent::Reconnecting(exchange_id)),
+        })
+    }
 
+    /// Construct an [`EngineEvent::Account`] wrapping a reconnecting event.
+    #[staticmethod]
+    pub fn account_reconnecting(exchange: &str) -> PyResult<Self> {
+        let exchange_id = parse_exchange_id(exchange)?;
+        Ok(Self {
+            inner: EngineEvent::Account(AccountStreamEvent::Reconnecting(exchange_id)),
+        })
+    }
 
     /// Check if the underlying event is terminal.
     pub fn is_terminal(&self) -> bool {

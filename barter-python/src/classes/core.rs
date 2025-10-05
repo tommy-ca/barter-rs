@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 use pyo3::{prelude::*, pyclass::CompareOp};
-use serde_json::Value as JsonValue;
 
-use barter::{EngineEvent, Sequence, Timed};
+use barter::{Sequence, Timed};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]

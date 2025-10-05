@@ -1455,7 +1455,7 @@ impl PyAssetFeesInner {
 }
 
 /// Wrapper around [`TradeId`] for Python exposure.
-#[pyclass(module = "barter_python", name = "TradeId", eq, hash, frozen)]
+#[pyclass(module = "barter_python.execution", name = "TradeId", eq, hash, frozen)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyTradeId {
     inner: TradeId,
@@ -1515,7 +1515,7 @@ impl PyTradeId {
 }
 
 /// Wrapper around [`AssetFees`] for Python exposure.
-#[pyclass(module = "barter_python", name = "AssetFees", eq, hash, frozen)]
+#[pyclass(module = "barter_python.execution", name = "AssetFees", eq, hash, frozen)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyAssetFees {
     inner: PyAssetFeesInner,
@@ -1620,7 +1620,7 @@ impl PyAssetFees {
 }
 
 /// Wrapper around [`Trade`] for Python exposure.
-#[pyclass(module = "barter_python", name = "Trade", unsendable, eq, hash, frozen)]
+#[pyclass(module = "barter_python.execution", name = "Trade", unsendable, eq, hash, frozen)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyTrade {
     pub(crate) inner: ExecutionTrade<QuoteAsset, InstrumentIndex>,

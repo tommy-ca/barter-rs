@@ -10,21 +10,37 @@ from typing import Generic, TypeVar, Union
 
 from . import barter_python as _core
 from .instrument import Side
-from .trade_bindings import Trade
 
-_AccountSnapshot = _core.AccountSnapshot
-_AssetBalance = _core.AssetBalance
-_ClientOrderId = _core.ClientOrderId
-_ExecutionInstrumentMap = _core.ExecutionInstrumentMap
-_InstrumentAccountSnapshot = _core.InstrumentAccountSnapshot
-_OrderEvent = _core.OrderEvent
-_OrderId = _core.OrderId
-_OrderKey = _core.OrderKey
-_OrderKind = _core.OrderKind
-_StrategyId = _core.StrategyId
+# Placeholders for classes added by Rust extension
+ClientOrderId = None
+OrderId = None
+StrategyId = None
+TradeId = None
+Trade = None
+AssetFees = None
+ExecutionBalance = None
+ExecutionAssetBalance = None
+ExecutionInstrumentMap = None
+MockExecutionClient = None
+OrderKey = None
+OrderKind = None
+OrderRequestOpen = None
+OrderRequestCancel = None
+OrderSnapshot = None
+OrderEvent = None
+OrderState = None
+ActiveOrderState = None
+InactiveOrderState = None
+OpenState = None
+CancelInFlightState = None
+CancelledState = None
+OrderError = None
+InstrumentAccountSnapshot = None
+AccountSnapshot = None
+TimeInForce = None
+
 _asset_balance_new = _core.asset_balance_new
 _balance_new = _core.balance_new
-_TimeInForce = _core.TimeInForce
 
 try:
     _MockExecutionClient = _core.MockExecutionClient
@@ -34,15 +50,6 @@ except AttributeError as _mock_import_error:  # pragma: no cover - extension mis
 else:
     _MOCK_EXECUTION_IMPORT_ERROR = None
 
-ClientOrderId = _ClientOrderId
-OrderId = _OrderId
-StrategyId = _StrategyId
-OrderKey = _OrderKey
-InstrumentAccountSnapshot = _InstrumentAccountSnapshot
-AccountSnapshot = _AccountSnapshot
-OrderEvent = _OrderEvent
-OrderKind = _OrderKind
-TimeInForce = _TimeInForce
 balance_new = _balance_new
 asset_balance_new = _asset_balance_new
 

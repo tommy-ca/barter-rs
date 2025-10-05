@@ -12,7 +12,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Generic, TypeVar
 
-from .barter_python import (
+from . import (
     AssetFees as _AssetFees,
 )
 from .barter_python import OrderId as _OrderId
