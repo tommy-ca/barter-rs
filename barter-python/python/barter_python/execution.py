@@ -172,6 +172,29 @@ class MockExecutionClient:
     def poll_event(self, timeout=None):
         return self._inner.poll_event(timeout_secs=timeout)
 
+    def open_limit_order(
+        self,
+        instrument,
+        side,
+        price,
+        quantity,
+        *,
+        time_in_force=None,
+        post_only=None,
+        strategy=None,
+        client_order_id=None,
+    ):
+        return self._inner.open_limit_order(
+            instrument,
+            side,
+            price,
+            quantity,
+            time_in_force=time_in_force,
+            post_only=post_only,
+            strategy=strategy,
+            client_order_id=client_order_id,
+        )
+
     def close(self):
         self._inner.close()
 

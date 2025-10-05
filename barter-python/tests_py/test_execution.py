@@ -1210,6 +1210,47 @@ class TestMockExecutionClientBindings:
                 assert observed["exchange"] == "mock"
                 assert "kind" in observed
 
+    def test_open_limit_order_with_post_only(self):
+        config = self._config()
+        instrument_map = self._instrument_map()
+
+        with execution.MockExecutionClient(config, instrument_map) as client:
+            order = client.open_limit_order(
+                "BTCUSDT",
+                "sell",
+                Decimal("45000"),
+                Decimal("0.05"),
+                time_in_force="good_until_cancelled",
+                post_only=True,
+                strategy="limit-tester",
+                client_order_id="limit-001",
+            )
+
+            assert order is not None
+            assert order["kind"] == "Limit"
+            assert Decimal(order["price"]) == Decimal("45000")
+            assert Decimal(order["quantity"]) == Decimal("0.05")
+
+            tif = order["time_in_force"]
+            assert tif["GoodUntilCancelled"]["post_only"] is True
+
+            observed = client.poll_event(timeout=0.5)
+            if observed is not None:
+                assert observed["exchange"] == "mock"
+
+    def test_open_limit_order_rejects_invalid_price(self):
+        config = self._config()
+        instrument_map = self._instrument_map()
+
+        with execution.MockExecutionClient(config, instrument_map) as client:
+            with pytest.raises(ValueError):
+                client.open_limit_order(
+                    "BTCUSDT",
+                    "buy",
+                    Decimal("0"),
+                    Decimal("0.1"),
+                )
+
 class TestExecutionInstrumentMap:
     def _definitions(self) -> list[dict[str, object]]:
         return [

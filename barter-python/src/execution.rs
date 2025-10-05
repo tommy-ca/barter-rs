@@ -45,7 +45,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{Duration, timeout};
 
 use crate::{
-    command::{PyOrderKey, parse_side},
+    command::{PyOrderKey, parse_side, parse_time_in_force},
     config::{PyMockExecutionConfig, PySystemConfig},
     data::PyExchangeId,
     instrument::{PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyQuoteAsset, PySide},
@@ -2150,6 +2150,85 @@ impl PyMockExecutionClient {
                         quantity_decimal,
                         OrderKind::Market,
                         TimeInForce::ImmediateOrCancel,
+                    ),
+                );
+                client.open_order(request).await
+            })
+        });
+
+        match order {
+            Some(order) => serialize_to_py_dict(py, &order).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    #[pyo3(signature = (
+        instrument,
+        side,
+        price,
+        quantity,
+        time_in_force=None,
+        post_only=None,
+        strategy=None,
+        client_order_id=None
+    ))]
+    pub fn open_limit_order(
+        &self,
+        py: Python<'_>,
+        instrument: &str,
+        side: &Bound<'_, PyAny>,
+        price: &Bound<'_, PyAny>,
+        quantity: &Bound<'_, PyAny>,
+        time_in_force: Option<&Bound<'_, PyAny>>,
+        post_only: Option<bool>,
+        strategy: Option<&Bound<'_, PyAny>>,
+        client_order_id: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Option<PyObject>> {
+        let trade_side = extract_side(side, "side")?;
+        let price_decimal = extract_decimal(price, "price")?;
+        if price_decimal <= Decimal::ZERO {
+            return Err(PyValueError::new_err(
+                "price must be a positive numeric value",
+            ));
+        }
+
+        let quantity_decimal = extract_decimal(quantity, "quantity")?;
+        if quantity_decimal <= Decimal::ZERO {
+            return Err(PyValueError::new_err(
+                "quantity must be a positive numeric value",
+            ));
+        }
+
+        let tif = parse_time_in_force(time_in_force, post_only)?;
+
+        let strategy_id = match strategy {
+            Some(value) => coerce_strategy_id(value)?,
+            None => StrategyId::unknown(),
+        };
+        let cid = coerce_client_order_id(client_order_id)?;
+
+        let client = self.clone_client()?;
+        let runtime = Arc::clone(&self.runtime);
+        let instrument_name = instrument.to_string();
+        let exchange_id = self.exchange_id;
+
+        let order = py.allow_threads(move || {
+            runtime.block_on(async move {
+                let instrument_exchange = InstrumentNameExchange::new(instrument_name);
+                let key = OrderKey {
+                    exchange: exchange_id,
+                    instrument: &instrument_exchange,
+                    strategy: strategy_id,
+                    cid,
+                };
+                let request = OrderRequestOpen::new(
+                    key,
+                    RequestOpen::new(
+                        trade_side,
+                        price_decimal,
+                        quantity_decimal,
+                        OrderKind::Limit,
+                        tif,
                     ),
                 );
                 client.open_order(request).await

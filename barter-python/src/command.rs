@@ -581,7 +581,7 @@ pub(crate) fn parse_decimal(value: f64, field: &str) -> PyResult<Decimal> {
         .ok_or_else(|| PyValueError::new_err(format!("{field} must be a finite numeric value")))
 }
 
-fn parse_time_in_force(
+pub(crate) fn parse_time_in_force(
     value: Option<&Bound<'_, PyAny>>,
     post_only: Option<bool>,
 ) -> PyResult<TimeInForce> {
