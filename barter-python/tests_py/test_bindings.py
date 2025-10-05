@@ -782,15 +782,32 @@ def test_subscription_creation() -> None:
     assert "option_call_european_2025-07-01-UTC" in sub_option.instrument
 
 
-def test_dynamic_streams_placeholder() -> None:
+def test_dynamic_streams_defaults() -> None:
     streams = bp.DynamicStreams()
 
-    # Test that methods exist (even if they return None for now)
-    result = streams.select_trades(bp.ExchangeId.BINANCE_SPOT)
-    assert result is None
+    # Per-exchange selectors should return None when no streams are registered.
+    assert streams.select_trades(bp.ExchangeId.BINANCE_SPOT) is None
+    assert streams.select_l1s(bp.ExchangeId.BINANCE_SPOT) is None
+    assert streams.select_l2s(bp.ExchangeId.BINANCE_SPOT) is None
+    assert streams.select_liquidations(bp.ExchangeId.BINANCE_SPOT) is None
 
-    result = streams.select_all_trades()
-    assert result is None
+    # Aggregate selectors now yield `MarketStream` handles even when empty.
+    all_trades = streams.select_all_trades()
+    assert isinstance(all_trades, bp.MarketStream)
+    assert all_trades.recv() is None
+    assert all_trades.is_closed() is True
+
+    all_l1s = streams.select_all_l1s()
+    assert isinstance(all_l1s, bp.MarketStream)
+    assert all_l1s.recv() is None
+
+    all_l2s = streams.select_all_l2s()
+    assert isinstance(all_l2s, bp.MarketStream)
+    assert all_l2s.recv() is None
+
+    all_liquidations = streams.select_all_liquidations()
+    assert isinstance(all_liquidations, bp.MarketStream)
+    assert all_liquidations.recv() is None
 
 
 class TestWelfordOnlineAlgorithms:
