@@ -46,3 +46,6 @@
   and Python without porting the full engine logic.
 - Follow TDD by introducing failing Python coverage before implementing the
   binding.
+- 2025-10-05: Engine audit command outputs now surface cancel / open request
+  results as typed `OrderRequestCancel` / `OrderRequestOpen` wrappers with
+  structured error entries for Python consumption.

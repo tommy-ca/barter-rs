@@ -1,11 +1,19 @@
 use crate::{
     PyEngineEvent, PySequence,
     collection::{PyNoneOneOrMany, wrap_none_one_or_many},
-    command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen},
+    command::{
+        DefaultOrderRequestCancel, DefaultOrderRequestOpen, PyInstrumentFilter,
+        PyOrderRequestCancel, PyOrderRequestOpen,
+    },
     common::{SummaryInterval, parse_initial_balances, parse_summary_interval},
     config::PySystemConfig,
     integration::{PySnapUpdates, PySnapshot},
     summary::{PyTradingSummary, summary_to_py},
+};
+use barter::engine::{
+    EngineOutput,
+    action::{ActionOutput, send_requests::SendRequestsOutput},
+    error::EngineError,
 };
 use barter::{
     EngineEvent,
@@ -35,15 +43,18 @@ use barter_data::{
         reconnect::{Event, stream::ReconnectingStream},
     },
 };
+use barter_execution::order::OrderEvent;
 use barter_instrument::{index::IndexedInstruments, instrument::InstrumentIndex};
 use barter_integration::{
     channel::{Tx, UnboundedRx},
+    collection::none_one_or_many::NoneOneOrMany,
     snapshot::{SnapUpdates, Snapshot},
 };
 use futures::{Stream, StreamExt, stream};
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use serde::Serialize;
 use std::{
     fs::File,
     io::Read,
@@ -519,7 +530,7 @@ fn audit_tick_summary_to_py(py: Python<'_>, tick: &TradingAuditTick) -> PyResult
             event_dict.set_item("output_count", process.outputs.len())?;
             event_dict.set_item("error_count", process.errors.len())?;
 
-            let outputs = wrap_none_one_or_many(py, process.outputs.clone())?;
+            let outputs = engine_outputs_to_py(py, &process.outputs)?;
             let errors = wrap_none_one_or_many(py, process.errors.clone())?;
             event_dict.set_item("outputs", outputs)?;
             event_dict.set_item("errors", errors)?;
@@ -550,6 +561,231 @@ fn engine_event_kind(event: &EngineEvent<DataKind>) -> &'static str {
         EngineEvent::Account(_) => "Account",
         EngineEvent::Market(_) => "Market",
     }
+}
+
+fn serialize_to_py_object<T>(py: Python<'_>, value: &T) -> PyResult<PyObject>
+where
+    T: Serialize,
+{
+    let serialized =
+        serde_json::to_string(value).map_err(|err| PyValueError::new_err(err.to_string()))?;
+    let json_module = PyModule::import_bound(py, "json")?;
+    let loads = json_module.getattr("loads")?;
+    let loaded = loads.call1((serialized.into_py(py),))?;
+    Ok(loaded.into_py(py))
+}
+
+fn engine_outputs_to_py<OnTradingDisabled, OnDisconnect>(
+    py: Python<'_>,
+    outputs: &NoneOneOrMany<EngineOutput<OnTradingDisabled, OnDisconnect>>,
+) -> PyResult<Py<PyNoneOneOrMany>>
+where
+    EngineOutput<OnTradingDisabled, OnDisconnect>: Serialize,
+    OnTradingDisabled: Serialize,
+    OnDisconnect: Serialize,
+{
+    let wrapper = match outputs {
+        NoneOneOrMany::None => PyNoneOneOrMany::empty(),
+        NoneOneOrMany::One(output) => {
+            let converted = engine_output_to_py(py, output)?;
+            PyNoneOneOrMany {
+                inner: NoneOneOrMany::One(converted.into_py(py)),
+            }
+        }
+        NoneOneOrMany::Many(values) => {
+            let mut converted = Vec::with_capacity(values.len());
+            for output in values {
+                converted.push(engine_output_to_py(py, output)?.into_py(py));
+            }
+            PyNoneOneOrMany {
+                inner: NoneOneOrMany::Many(converted),
+            }
+        }
+    };
+
+    Py::new(py, wrapper)
+}
+
+fn engine_output_to_py<OnTradingDisabled, OnDisconnect>(
+    py: Python<'_>,
+    output: &EngineOutput<OnTradingDisabled, OnDisconnect>,
+) -> PyResult<PyObject>
+where
+    EngineOutput<OnTradingDisabled, OnDisconnect>: Serialize,
+    OnTradingDisabled: Serialize,
+    OnDisconnect: Serialize,
+{
+    match output {
+        EngineOutput::Commanded(action) => action_output_to_py(py, action),
+        _ => serialize_to_py_object(py, output),
+    }
+}
+
+fn action_output_to_py(py: Python<'_>, output: &ActionOutput) -> PyResult<PyObject> {
+    match output {
+        ActionOutput::CancelOrders(result) => {
+            send_requests_output_to_py(py, "CancelOrders", result, order_request_cancel_to_py)
+        }
+        ActionOutput::OpenOrders(result) => {
+            send_requests_output_to_py(py, "OpenOrders", result, order_request_open_to_py)
+        }
+        ActionOutput::ClosePositions(result) => {
+            let dict = PyDict::new_bound(py);
+            dict.set_item("variant", "ClosePositions")?;
+            let cancels = send_requests_output_to_py(
+                py,
+                "CancelOrders",
+                &result.cancels,
+                order_request_cancel_to_py,
+            )?;
+            let opens = send_requests_output_to_py(
+                py,
+                "OpenOrders",
+                &result.opens,
+                order_request_open_to_py,
+            )?;
+            dict.set_item("cancels", cancels)?;
+            dict.set_item("opens", opens)?;
+            Ok(dict.into_py(py))
+        }
+        _ => serialize_to_py_object(py, output),
+    }
+}
+
+fn send_requests_output_to_py<State, F>(
+    py: Python<'_>,
+    variant: &str,
+    output: &SendRequestsOutput<State>,
+    converter: F,
+) -> PyResult<PyObject>
+where
+    State: Clone,
+    F: Fn(Python<'_>, &OrderEvent<State>) -> PyResult<PyObject>,
+{
+    let dict = PyDict::new_bound(py);
+    dict.set_item("variant", variant)?;
+
+    let sent = order_requests_to_py(py, &output.sent, &converter)?;
+    dict.set_item("sent", sent)?;
+    dict.set_item("sent_count", output.sent.len())?;
+
+    let errors = order_request_errors_to_py(py, &output.errors, &converter)?;
+    dict.set_item("errors", errors)?;
+    dict.set_item("error_count", output.errors.len())?;
+    dict.set_item("has_errors", !output.errors.is_none())?;
+
+    Ok(dict.into_py(py))
+}
+
+fn order_requests_to_py<State, F>(
+    py: Python<'_>,
+    value: &NoneOneOrMany<OrderEvent<State>>,
+    converter: &F,
+) -> PyResult<Py<PyNoneOneOrMany>>
+where
+    State: Clone,
+    F: Fn(Python<'_>, &OrderEvent<State>) -> PyResult<PyObject>,
+{
+    let wrapper = match value {
+        NoneOneOrMany::None => PyNoneOneOrMany::empty(),
+        NoneOneOrMany::One(event) => {
+            let converted = converter(py, event)?;
+            PyNoneOneOrMany {
+                inner: NoneOneOrMany::One(converted.into_py(py)),
+            }
+        }
+        NoneOneOrMany::Many(events) => {
+            let mut converted = Vec::with_capacity(events.len());
+            for event in events {
+                converted.push(converter(py, event)?.into_py(py));
+            }
+            PyNoneOneOrMany {
+                inner: NoneOneOrMany::Many(converted),
+            }
+        }
+    };
+
+    Py::new(py, wrapper)
+}
+
+fn order_request_errors_to_py<State, F>(
+    py: Python<'_>,
+    value: &NoneOneOrMany<(OrderEvent<State>, EngineError)>,
+    converter: &F,
+) -> PyResult<Py<PyNoneOneOrMany>>
+where
+    State: Clone,
+    F: Fn(Python<'_>, &OrderEvent<State>) -> PyResult<PyObject>,
+{
+    let wrapper = match value {
+        NoneOneOrMany::None => PyNoneOneOrMany::empty(),
+        NoneOneOrMany::One((order, error)) => {
+            let entry = order_request_error_entry_to_py(py, order, error, converter)?;
+            PyNoneOneOrMany {
+                inner: NoneOneOrMany::One(entry.into_py(py)),
+            }
+        }
+        NoneOneOrMany::Many(entries) => {
+            let mut converted = Vec::with_capacity(entries.len());
+            for (order, error) in entries {
+                converted.push(
+                    order_request_error_entry_to_py(py, order, error, converter)?.into_py(py),
+                );
+            }
+            PyNoneOneOrMany {
+                inner: NoneOneOrMany::Many(converted),
+            }
+        }
+    };
+
+    Py::new(py, wrapper)
+}
+
+fn order_request_error_entry_to_py<State, F>(
+    py: Python<'_>,
+    order: &OrderEvent<State>,
+    error: &EngineError,
+    converter: &F,
+) -> PyResult<Py<PyAny>>
+where
+    State: Clone,
+    F: Fn(Python<'_>, &OrderEvent<State>) -> PyResult<PyObject>,
+{
+    let dict = PyDict::new_bound(py);
+    dict.set_item("order", converter(py, order)?)?;
+    dict.set_item("error", engine_error_to_py(py, error)?)?;
+    Ok(dict.into_py(py))
+}
+
+fn engine_error_to_py(py: Python<'_>, error: &EngineError) -> PyResult<PyObject> {
+    let dict = PyDict::new_bound(py);
+    match error {
+        EngineError::Recoverable(inner) => {
+            dict.set_item("variant", "Recoverable")?;
+            dict.set_item("message", inner.to_string())?;
+        }
+        EngineError::Unrecoverable(inner) => {
+            dict.set_item("variant", "Unrecoverable")?;
+            dict.set_item("message", inner.to_string())?;
+        }
+    }
+    Ok(dict.into_py(py))
+}
+
+fn order_request_open_to_py(
+    py: Python<'_>,
+    request: &DefaultOrderRequestOpen,
+) -> PyResult<PyObject> {
+    let wrapper = PyOrderRequestOpen::from_inner(request.clone());
+    Py::new(py, wrapper).map(|value| value.into_py(py))
+}
+
+fn order_request_cancel_to_py(
+    py: Python<'_>,
+    request: &DefaultOrderRequestCancel,
+) -> PyResult<PyObject> {
+    let wrapper = PyOrderRequestCancel::from_inner(request.clone());
+    Py::new(py, wrapper).map(|value| value.into_py(py))
 }
 
 fn parse_risk_free_return(value: f64) -> PyResult<Decimal> {
@@ -598,4 +834,70 @@ fn load_historic_clock_and_market_stream(
         });
 
     Ok((clock, stream))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use barter_execution::order::{
+        OrderKey, OrderKind, TimeInForce,
+        id::{ClientOrderId, StrategyId},
+        request::{OrderRequestOpen, RequestOpen},
+    };
+    use barter_instrument::{Side, exchange::ExchangeIndex, instrument::InstrumentIndex};
+    use pyo3::types::{PyDict, PyList};
+    use rust_decimal::Decimal;
+    use rust_decimal::prelude::FromPrimitive;
+
+    #[test]
+    fn action_output_open_orders_converts_requests_to_wrappers() {
+        Python::with_gil(|py| {
+            let key = OrderKey {
+                exchange: ExchangeIndex(1),
+                instrument: InstrumentIndex(2),
+                strategy: StrategyId::new("strategy-alpha"),
+                cid: ClientOrderId::new("cid-1"),
+            };
+
+            let state = RequestOpen::new(
+                Side::Buy,
+                Decimal::from_f64(101.5).unwrap(),
+                Decimal::from_f64(0.75).unwrap(),
+                OrderKind::Limit,
+                TimeInForce::GoodUntilCancelled { post_only: false },
+            );
+
+            let request = OrderRequestOpen {
+                key: key.clone(),
+                state,
+            };
+
+            let output =
+                SendRequestsOutput::new(NoneOneOrMany::One(request.clone()), NoneOneOrMany::None);
+
+            let py_object = action_output_to_py(py, &ActionOutput::OpenOrders(output))
+                .expect("convert action output");
+            let dict = py_object
+                .downcast_bound::<PyDict>(py)
+                .expect("action output to dict");
+
+            let variant_obj = dict
+                .get_item("variant")
+                .expect("variant lookup failed")
+                .expect("variant present");
+            let variant: String = variant_obj.extract().expect("variant string");
+            assert_eq!(variant, "OpenOrders");
+
+            let sent_obj = dict
+                .get_item("sent")
+                .expect("sent lookup failed")
+                .expect("sent present");
+            let sent_list_obj = sent_obj.call_method0("to_list").expect("to_list succeeds");
+            let sent_list = sent_list_obj.downcast::<PyList>().expect("list conversion");
+
+            assert_eq!(sent_list.len(), 1);
+            let first = sent_list.get_item(0).expect("first item");
+            assert!(first.is_instance_of::<PyOrderRequestOpen>());
+        });
+    }
 }

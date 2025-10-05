@@ -37,7 +37,7 @@
   - [x] Add Rust coverage for sequence wrapper semantics.
   - [x] Update Python audit context translation to emit typed sequences.
   - [x] Extend pytest coverage for sequence ergonomics.
-- [ ] Bridge `OrderEvent` execution updates into Python bindings (spec:
+ - [x] Bridge `OrderEvent` execution updates into Python bindings (spec:
   `.agent/specs/python-order-event-bindings.md`).
 
 ## Planned (2025-10-03)
