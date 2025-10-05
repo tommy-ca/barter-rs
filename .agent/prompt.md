@@ -20,6 +20,8 @@ Make a commit and push your changes after every atomic change.
 
 ## Stack
 * modern python stack, uv, ruff
+* https://github.com/Fission-AI/OpenSpec
+ * npx @fission-ai/openspec@latest --help with to manage specs
 
 ## Memory system
 * Use the .agent directory as a scratchpad for your work.
