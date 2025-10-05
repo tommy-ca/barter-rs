@@ -341,13 +341,23 @@ impl PySystemHandle {
 
 /// Start a live or paper trading system using the provided configuration.
 #[pyfunction]
-#[pyo3(signature = (config, *, trading_enabled = true, initial_balances = None, audit = false))]
+#[pyo3(
+    signature = (
+        config,
+        *,
+        trading_enabled = true,
+        initial_balances = None,
+        audit = false,
+        engine_feed_mode = None
+    )
+)]
 pub fn start_system(
     py: Python<'_>,
     config: &PySystemConfig,
     trading_enabled: bool,
     initial_balances: Option<PyObject>,
     audit: bool,
+    engine_feed_mode: Option<&str>,
 ) -> PyResult<PySystemHandle> {
     let runtime = Arc::new(
         RuntimeBuilder::new_multi_thread()
@@ -357,6 +367,7 @@ pub fn start_system(
     );
 
     let seeded_balances = parse_initial_balances(py, initial_balances)?;
+    let feed_mode = parse_engine_feed_mode(engine_feed_mode)?;
 
     let audit_mode = if audit {
         AuditMode::Enabled
@@ -395,7 +406,7 @@ pub fn start_system(
     };
 
     let system_build = SystemBuilder::new(args)
-        .engine_feed_mode(EngineFeedMode::Stream)
+        .engine_feed_mode(feed_mode)
         .audit_mode(audit_mode)
         .trading_state(trading_state)
         .balances(seeded_balances)
@@ -411,7 +422,16 @@ pub fn start_system(
 
 /// Run a historic backtest using a [`SystemConfig`] and market data events encoded as JSON.
 #[pyfunction]
-#[pyo3(signature = (config, market_data_path, risk_free_return = 0.05, interval = None, initial_balances = None))]
+#[pyo3(
+    signature = (
+        config,
+        market_data_path,
+        risk_free_return = 0.05,
+        interval = None,
+        initial_balances = None,
+        engine_feed_mode = None
+    )
+)]
 pub fn run_historic_backtest(
     py: Python<'_>,
     config: &PySystemConfig,
@@ -419,11 +439,13 @@ pub fn run_historic_backtest(
     risk_free_return: f64,
     interval: Option<&str>,
     initial_balances: Option<PyObject>,
+    engine_feed_mode: Option<&str>,
 ) -> PyResult<Py<PyTradingSummary>> {
     let (clock, market_stream) =
         load_historic_clock_and_market_stream(Path::new(market_data_path))?;
 
     let seeded_balances = parse_initial_balances(py, initial_balances)?;
+    let feed_mode = parse_engine_feed_mode(engine_feed_mode)?;
 
     let mut config_inner = config.clone_inner();
 
@@ -453,7 +475,7 @@ pub fn run_historic_backtest(
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
     let system_build = SystemBuilder::new(args)
-        .engine_feed_mode(EngineFeedMode::Stream)
+        .engine_feed_mode(feed_mode)
         .audit_mode(AuditMode::Disabled)
         .trading_state(TradingState::Enabled)
         .balances(seeded_balances)
@@ -792,6 +814,22 @@ fn parse_risk_free_return(value: f64) -> PyResult<Decimal> {
     Decimal::from_f64(value).ok_or_else(|| PyValueError::new_err("risk_free_return must be finite"))
 }
 
+fn parse_engine_feed_mode(value: Option<&str>) -> PyResult<EngineFeedMode> {
+    match value {
+        None => Ok(EngineFeedMode::Stream),
+        Some(raw) => {
+            let normalized = raw.trim().to_ascii_lowercase();
+            match normalized.as_str() {
+                "stream" => Ok(EngineFeedMode::Stream),
+                "iterator" => Ok(EngineFeedMode::Iterator),
+                _ => Err(PyValueError::new_err(format!(
+                    "engine_feed_mode must be 'stream' or 'iterator', got {raw}",
+                ))),
+            }
+        }
+    }
+}
+
 fn load_historic_clock_and_market_stream(
     path: &Path,
 ) -> PyResult<(
@@ -899,5 +937,34 @@ mod tests {
             let first = sent_list.get_item(0).expect("first item");
             assert!(first.is_instance_of::<PyOrderRequestOpen>());
         });
+    }
+
+    #[test]
+    fn parse_engine_feed_mode_defaults_to_stream() {
+        assert_eq!(parse_engine_feed_mode(None).unwrap(), EngineFeedMode::Stream);
+    }
+
+    #[test]
+    fn parse_engine_feed_mode_accepts_known_values() {
+        assert_eq!(
+            parse_engine_feed_mode(Some("iterator")).unwrap(),
+            EngineFeedMode::Iterator
+        );
+        assert_eq!(
+            parse_engine_feed_mode(Some(" STREAM ")).unwrap(),
+            EngineFeedMode::Stream
+        );
+        assert_eq!(
+            parse_engine_feed_mode(Some("ItErAtOr")).unwrap(),
+            EngineFeedMode::Iterator
+        );
+    }
+
+    #[test]
+    fn parse_engine_feed_mode_rejects_unknown_value() {
+        let error = parse_engine_feed_mode(Some("warp")).unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("engine_feed_mode"));
+        assert!(message.contains("warp"));
     }
 }

@@ -16,10 +16,10 @@
   - [x] Design async-to-sync wrapper for `backtest` and `run_backtests` using Tokio runtimes.
   - [x] Define strategy/risk plumbing for default implementations using new argument wrappers.
   - [x] Extend pytest coverage for single vs. multi-run flows once bindings exist.
-- Expose engine feed mode selection to Python consumers.
+- [x] Expose engine feed mode selection to Python consumers.
   - [x] Capture feed mode specification under `.agent/specs/python-system-feed-mode.md`.
-  - [ ] Wire bindings for configuring `EngineFeedMode` from Python entry points.
-  - [ ] Cover new argument via integration tests for live and backtest flows.
+  - [x] Wire bindings for configuring `EngineFeedMode` from Python entry points.
+  - [x] Cover new argument via integration tests for live and backtest flows.
 
 ## Completed (2025-10-05)
 - Bridge backtest argument wrappers into the Python API.

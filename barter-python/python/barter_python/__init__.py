@@ -46,6 +46,18 @@ __all__.append("MockExecutionClient")
 Balance = execution.Balance
 AssetBalance = execution.AssetBalance
 
+ENGINE_FEED_MODE_STREAM = "stream"
+ENGINE_FEED_MODE_ITERATOR = "iterator"
+ENGINE_FEED_MODES = (ENGINE_FEED_MODE_STREAM, ENGINE_FEED_MODE_ITERATOR)
+
+__all__.extend(
+    [
+        "ENGINE_FEED_MODE_STREAM",
+        "ENGINE_FEED_MODE_ITERATOR",
+        "ENGINE_FEED_MODES",
+    ]
+)
+
 
 
 def __getattr__(name: str):

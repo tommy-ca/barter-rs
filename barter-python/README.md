@@ -269,6 +269,10 @@ iterable of mapping objects with `exchange`, `asset`, `total`, and optional `fre
 snake_case `ExchangeId` names such as `binance_spot`) to seed the engine's account balances before
 execution. When omitted, balances default to the data loaded from the system configuration.
 
+Both entry points expose an `engine_feed_mode` keyword to control whether the engine processes
+events using the asynchronous stream runner (`"stream"`, default) or the synchronous iterator
+runner (`"iterator"`). The value is case-insensitive and validated before initialising the system.
+
 Validation rules:
 - `exchange` must map to a known `ExchangeId`; unknown identifiers raise `ValueError`.
 - `free` defaults to the provided `total` when omitted and must never exceed `total`.
