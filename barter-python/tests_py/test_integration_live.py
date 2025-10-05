@@ -84,6 +84,56 @@ def test_take_audit_disabled_returns_none(example_paths: dict[str, Path]) -> Non
 
 
 @pytest.mark.integration
+def test_audit_updates_typed_helpers(example_paths: dict[str, Path]) -> None:
+    config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    handle = bp.start_system(config, trading_enabled=False, audit=True)
+
+    try:
+        snap_updates = handle.take_audit()
+        assert snap_updates is not None
+
+        updates = snap_updates.updates
+        assert updates.try_recv_tick() is None
+
+        handle.send_event(bp.EngineEvent.trading_state(True))
+        typed_tick = updates.recv_tick(timeout=1.0)
+
+        assert typed_tick is not None
+        assert isinstance(typed_tick, bp.AuditTick)
+
+        context = typed_tick.context
+        assert isinstance(context, bp.AuditContext)
+        assert isinstance(context.sequence, bp.Sequence)
+        assert isinstance(int(context.sequence), int)
+
+        event = typed_tick.event
+        assert isinstance(event, bp.AuditEvent)
+        assert event.kind in {"Process", "FeedEnded"}
+
+        if event.kind == "Process":
+            assert event.event_type in {
+                "Shutdown",
+                "Command",
+                "TradingStateUpdate",
+                "Account",
+                "Market",
+            }
+            assert event.output_count >= 0
+            assert event.error_count >= 0
+            assert isinstance(event.outputs, bp.NoneOneOrMany)
+            assert isinstance(event.errors, bp.NoneOneOrMany)
+
+        summary = typed_tick.to_dict()
+        assert summary["event"]["kind"] == event.kind
+
+        maybe_next = updates.try_recv_tick()
+        if maybe_next is not None:
+            assert isinstance(maybe_next, bp.AuditTick)
+    finally:
+        handle.shutdown()
+
+
+@pytest.mark.integration
 def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
     config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
     handle = bp.start_system(config, trading_enabled=False, audit=True)

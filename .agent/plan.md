@@ -22,6 +22,11 @@
   - [x] Cover new argument via integration tests for live and backtest flows.
 
 ## Completed (2025-10-05)
+- Expose typed audit tick bindings to Python consumers.
+  - [x] Document requirements under `.agent/specs/python-audit-tick-bindings.md`.
+  - [x] Add `PyAuditContext`, `PyAuditEvent`, and `PyAuditTick` with `recv_tick` helpers on `AuditUpdates`.
+  - [x] Extend integration coverage exercising typed audit flows alongside dict summaries.
+  - [x] Update README audit example to demonstrate the typed helpers.
 - Bridge backtest argument wrappers into the Python API.
   - [x] Update `.agent/specs/python-backtest-bindings.md` with milestone breakdown.
   - [x] Add `PyBacktestArgsConstant` & `PyBacktestArgsDynamic` with validation and market data coercion.

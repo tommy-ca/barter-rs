@@ -239,6 +239,10 @@ handle.send_event(bp.EngineEvent.trading_state(True))
 update = audit.updates.recv(timeout=1.0)
 print("First audit update:", update)
 
+typed_update = audit.updates.recv_tick(timeout=1.0)
+print("Typed audit kind:", typed_update.event.kind)
+print("Outputs count:", typed_update.event.output_count)
+
 handle.shutdown()
 PY
 

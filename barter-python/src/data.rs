@@ -2,8 +2,8 @@
 
 use crate::{backtest::market_event_to_py, command::parse_decimal};
 use barter_data::{
-    instrument::InstrumentData,
     event::{DataKind, MarketEvent},
+    instrument::InstrumentData,
     streams::{builder::dynamic::DynamicStreams, consumer::MarketStreamResult, reconnect::Event},
     subscription::{
         SubKind, Subscription,

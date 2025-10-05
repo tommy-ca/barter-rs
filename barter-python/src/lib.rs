@@ -107,7 +107,10 @@ use summary::{
     PyAssetTearSheet, PyBacktestSummary, PyBalance, PyDrawdown, PyInstrumentTearSheet,
     PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
-use system::{PyAuditUpdates, PySystemHandle, run_historic_backtest, start_system};
+use system::{
+    PyAuditContext, PyAuditEvent, PyAuditTick, PyAuditUpdates, PySystemHandle,
+    run_historic_backtest, start_system,
+};
 
 /// Wrapper around [`Timed`] with a floating point value for Python exposure.
 #[pyclass(module = "barter_python", name = "TimedF64", unsendable)]
@@ -974,6 +977,9 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOrderBook>()?;
     m.add_class::<PySnapshot>()?;
     m.add_class::<PySnapUpdates>()?;
+    m.add_class::<PyAuditContext>()?;
+    m.add_class::<PyAuditEvent>()?;
+    m.add_class::<PyAuditTick>()?;
     m.add_class::<PyNoneOneOrMany>()?;
     m.add_class::<PyOneOrMany>()?;
     m.add_class::<PyAuditUpdates>()?;

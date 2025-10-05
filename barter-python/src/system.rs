@@ -16,7 +16,7 @@ use barter::engine::{
     error::EngineError,
 };
 use barter::{
-    EngineEvent,
+    EngineEvent, Sequence,
     engine::{
         Engine, Processor,
         audit::{AuditTick, EngineAudit, context::EngineContext},
@@ -50,6 +50,7 @@ use barter_integration::{
     collection::none_one_or_many::NoneOneOrMany,
     snapshot::{SnapUpdates, Snapshot},
 };
+use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, stream};
 use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 use rust_decimal::Decimal;
@@ -109,42 +110,286 @@ impl PyAuditUpdates {
 
         func(receiver)
     }
+
+    fn recv_tick_inner(&self, timeout: Option<f64>) -> PyResult<Option<TradingAuditTick>> {
+        let runtime = Arc::clone(&self.runtime);
+        self.with_receiver(|receiver| Self::blocking_recv(runtime, receiver, timeout))
+    }
+
+    fn try_recv_tick_inner(&self) -> PyResult<Option<TradingAuditTick>> {
+        self.with_receiver(|receiver| match receiver.rx.try_recv() {
+            Ok(tick) => Ok(Some(tick)),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => Ok(None),
+        })
+    }
+
+    fn blocking_recv(
+        runtime: Arc<Runtime>,
+        receiver: &mut UnboundedRx<TradingAuditTick>,
+        timeout: Option<f64>,
+    ) -> PyResult<Option<TradingAuditTick>> {
+        if let Some(secs) = timeout {
+            if secs.is_sign_negative() {
+                return Err(PyValueError::new_err("timeout must be non-negative"));
+            }
+
+            if !secs.is_finite() {
+                return Err(PyValueError::new_err("timeout must be finite"));
+            }
+
+            let duration = Duration::from_secs_f64(secs);
+            runtime
+                .block_on(async { tokio::time::timeout(duration, receiver.rx.recv()).await })
+                .map_err(|_| PyValueError::new_err("timeout elapsed awaiting audit update"))
+        } else {
+            Ok(runtime.block_on(receiver.rx.recv()))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum AuditEventKind {
+    FeedEnded,
+    Process,
+}
+
+impl AuditEventKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::FeedEnded => "FeedEnded",
+            Self::Process => "Process",
+        }
+    }
+}
+
+#[pyclass(module = "barter_python", name = "AuditContext", unsendable)]
+#[derive(Debug, Copy, Clone)]
+pub struct PyAuditContext {
+    sequence: Sequence,
+    time: DateTime<Utc>,
+}
+
+impl PyAuditContext {
+    fn new(sequence: Sequence, time: DateTime<Utc>) -> Self {
+        Self { sequence, time }
+    }
+}
+
+#[pyclass(module = "barter_python", name = "AuditEvent", unsendable)]
+pub struct PyAuditEvent {
+    kind: AuditEventKind,
+    event_type: Option<&'static str>,
+    output_count: usize,
+    error_count: usize,
+    outputs: PyObject,
+    errors: PyObject,
+}
+
+impl PyAuditEvent {
+    fn new_feed_ended(py: Python<'_>) -> PyResult<Self> {
+        let outputs = Py::new(py, PyNoneOneOrMany::empty())?.into_py(py);
+        let errors = Py::new(py, PyNoneOneOrMany::empty())?.into_py(py);
+        Ok(Self {
+            kind: AuditEventKind::FeedEnded,
+            event_type: None,
+            output_count: 0,
+            error_count: 0,
+            outputs,
+            errors,
+        })
+    }
+
+    fn new_process(
+        event_type: &'static str,
+        output_count: usize,
+        error_count: usize,
+        outputs: PyObject,
+        errors: PyObject,
+    ) -> Self {
+        Self {
+            kind: AuditEventKind::Process,
+            event_type: Some(event_type),
+            output_count,
+            error_count,
+            outputs,
+            errors,
+        }
+    }
+
+    fn to_py(&self, py: Python<'_>) -> PyResult<Py<PyAuditEvent>> {
+        Py::new(
+            py,
+            Self {
+                kind: self.kind,
+                event_type: self.event_type,
+                output_count: self.output_count,
+                error_count: self.error_count,
+                outputs: self.outputs.clone_ref(py),
+                errors: self.errors.clone_ref(py),
+            },
+        )
+    }
+}
+
+#[pyclass(module = "barter_python", name = "AuditTick", unsendable)]
+pub struct PyAuditTick {
+    context: PyAuditContext,
+    event: PyAuditEvent,
+}
+
+impl PyAuditTick {
+    fn new(context: PyAuditContext, event: PyAuditEvent) -> Self {
+        Self { context, event }
+    }
+}
+
+#[pymethods]
+impl PyAuditContext {
+    #[getter]
+    pub fn sequence(&self) -> PySequence {
+        PySequence::from_inner(self.sequence)
+    }
+
+    #[getter]
+    pub fn time(&self) -> DateTime<Utc> {
+        self.time
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let context = EngineContext {
+            sequence: self.sequence,
+            time: self.time,
+        };
+        Ok(context_to_py(py, &context)?.into_py(py))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "AuditContext(sequence={}, time={})",
+            self.sequence.value(),
+            self.time.to_rfc3339()
+        ))
+    }
+}
+
+#[pymethods]
+impl PyAuditEvent {
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        self.kind.as_str()
+    }
+
+    #[getter]
+    pub fn event_type(&self) -> Option<&'static str> {
+        self.event_type
+    }
+
+    #[getter]
+    pub fn output_count(&self) -> usize {
+        self.output_count
+    }
+
+    #[getter]
+    pub fn error_count(&self) -> usize {
+        self.error_count
+    }
+
+    #[getter]
+    pub fn outputs(&self, py: Python<'_>) -> PyObject {
+        self.outputs.clone_ref(py)
+    }
+
+    #[getter]
+    pub fn errors(&self, py: Python<'_>) -> PyObject {
+        self.errors.clone_ref(py)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let event = PyDict::new_bound(py);
+        event.set_item("kind", self.kind.as_str())?;
+        if let Some(event_type) = self.event_type {
+            event.set_item("event_type", event_type)?;
+        }
+        if matches!(self.kind, AuditEventKind::Process) {
+            event.set_item("output_count", self.output_count)?;
+            event.set_item("error_count", self.error_count)?;
+        }
+        event.set_item("outputs", self.outputs.clone_ref(py))?;
+        event.set_item("errors", self.errors.clone_ref(py))?;
+        Ok(event.into_py(py))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let event_type = self
+            .event_type
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "None".to_string());
+        Ok(format!(
+            "AuditEvent(kind={}, event_type={}, outputs={}, errors={})",
+            self.kind.as_str(),
+            event_type,
+            self.output_count,
+            self.error_count,
+        ))
+    }
+}
+
+#[pymethods]
+impl PyAuditTick {
+    #[getter]
+    pub fn context(&self) -> PyAuditContext {
+        self.context
+    }
+
+    #[getter]
+    pub fn event(&self, py: Python<'_>) -> PyResult<Py<PyAuditEvent>> {
+        self.event.to_py(py)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let root = PyDict::new_bound(py);
+        root.set_item("context", self.context.to_dict(py)?)?;
+        root.set_item("event", self.event.to_dict(py)?)?;
+        Ok(root.into_py(py))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("AuditTick(kind={})", self.event.kind.as_str()))
+    }
 }
 
 #[pymethods]
 impl PyAuditUpdates {
     #[pyo3(signature = (timeout=None))]
     pub fn recv(&self, py: Python<'_>, timeout: Option<f64>) -> PyResult<Option<PyObject>> {
-        self.with_receiver(|receiver| {
-            let runtime = Arc::clone(&self.runtime);
-
-            let result = if let Some(secs) = timeout {
-                if secs.is_sign_negative() {
-                    return Err(PyValueError::new_err("timeout must be non-negative"));
-                }
-
-                let timeout_duration = Duration::from_secs_f64(secs);
-                let rx = &mut receiver.rx;
-                runtime
-                    .block_on(async { tokio::time::timeout(timeout_duration, rx.recv()).await })
-                    .map_err(|_| PyValueError::new_err("timeout elapsed awaiting audit update"))?
-            } else {
-                runtime.block_on(receiver.rx.recv())
-            };
-
-            match result {
-                Some(tick) => audit_tick_summary_to_py(py, &tick).map(Some),
-                None => Ok(None),
-            }
-        })
+        match self.recv_tick_inner(timeout)? {
+            Some(tick) => audit_tick_summary_to_py(py, &tick).map(Some),
+            None => Ok(None),
+        }
     }
 
     pub fn try_recv(&self, py: Python<'_>) -> PyResult<Option<PyObject>> {
-        self.with_receiver(|receiver| match receiver.rx.try_recv() {
-            Ok(tick) => audit_tick_summary_to_py(py, &tick).map(Some),
-            Err(TryRecvError::Empty) => Ok(None),
-            Err(TryRecvError::Disconnected) => Ok(None),
-        })
+        match self.try_recv_tick_inner()? {
+            Some(tick) => audit_tick_summary_to_py(py, &tick).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    #[pyo3(signature = (timeout=None))]
+    pub fn recv_tick(
+        &self,
+        py: Python<'_>,
+        timeout: Option<f64>,
+    ) -> PyResult<Option<Py<PyAuditTick>>> {
+        self.recv_tick_inner(timeout)?
+            .map(|tick| audit_tick_to_py(py, &tick))
+            .transpose()
+    }
+
+    pub fn try_recv_tick(&self, py: Python<'_>) -> PyResult<Option<Py<PyAuditTick>>> {
+        self.try_recv_tick_inner()?
+            .map(|tick| audit_tick_to_py(py, &tick))
+            .transpose()
     }
 
     pub fn is_closed(&self) -> PyResult<bool> {
@@ -536,34 +781,28 @@ fn snapshot_summary_to_py(py: Python<'_>, snapshot: &TradingSnapshotTick) -> PyR
 }
 
 fn audit_tick_summary_to_py(py: Python<'_>, tick: &TradingAuditTick) -> PyResult<PyObject> {
-    let event_dict = PyDict::new_bound(py);
+    let py_tick = audit_tick_to_py(py, tick)?;
+    py_tick.bind(py).borrow().to_dict(py)
+}
 
-    match &tick.event {
-        EngineAudit::FeedEnded => {
-            event_dict.set_item("kind", "FeedEnded")?;
-            let outputs = Py::new(py, PyNoneOneOrMany::empty())?;
-            let errors = Py::new(py, PyNoneOneOrMany::empty())?;
-            event_dict.set_item("outputs", outputs)?;
-            event_dict.set_item("errors", errors)?;
-        }
+fn audit_tick_to_py(py: Python<'_>, tick: &TradingAuditTick) -> PyResult<Py<PyAuditTick>> {
+    let context = PyAuditContext::new(tick.context.sequence, tick.context.time);
+    let event = match &tick.event {
+        EngineAudit::FeedEnded => PyAuditEvent::new_feed_ended(py)?,
         EngineAudit::Process(process) => {
-            event_dict.set_item("kind", "Process")?;
-            event_dict.set_item("event_type", engine_event_kind(&process.event))?;
-            event_dict.set_item("output_count", process.outputs.len())?;
-            event_dict.set_item("error_count", process.errors.len())?;
-
-            let outputs = engine_outputs_to_py(py, &process.outputs)?;
-            let errors = wrap_none_one_or_many(py, process.errors.clone())?;
-            event_dict.set_item("outputs", outputs)?;
-            event_dict.set_item("errors", errors)?;
+            let outputs = engine_outputs_to_py(py, &process.outputs)?.into_py(py);
+            let errors = wrap_none_one_or_many(py, process.errors.clone())?.into_py(py);
+            PyAuditEvent::new_process(
+                engine_event_kind(&process.event),
+                process.outputs.len(),
+                process.errors.len(),
+                outputs,
+                errors,
+            )
         }
-    }
+    };
 
-    let root = PyDict::new_bound(py);
-    root.set_item("context", context_to_py(py, &tick.context)?)?;
-    root.set_item("event", event_dict)?;
-
-    Ok(root.into_py(py))
+    Py::new(py, PyAuditTick::new(context, event))
 }
 
 fn context_to_py(py: Python<'_>, context: &EngineContext) -> PyResult<Py<PyDict>> {
