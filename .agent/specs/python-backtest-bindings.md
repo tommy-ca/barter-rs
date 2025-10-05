@@ -1,6 +1,6 @@
 # Python Backtest Bindings Specification
 
-**Last Updated:** 2025-10-04
+**Last Updated:** 2025-10-05
 
 ## Objective
 - Bridge the Rust `barter::backtest` module into the `barter-python` package via PyO3 bindings.
@@ -14,6 +14,20 @@
 - Return rich Python trading summaries with decimal fidelity and dictionary conversion helpers.
 - Validate inputs (risk-free return, summary interval strings, requested backtest ids) before calling Rust functions.
 
+## Milestones
+
+### Milestone 1 — Argument Wrappers (2025-10-05)
+- Introduce `PyBacktestArgsConstant` and `PyBacktestArgsDynamic` wrappers that expose strongly typed accessors for instruments, executions, market data, and risk-free rate inputs.
+- Allow constructing constant arguments from `PySystemConfig`, `PyMarketDataInMemory`, and a provided summary interval type without invoking the engine yet.
+- Ensure dynamic arguments accept minimal metadata (id, risk-free return) while deferring strategy and risk manager configuration for later milestones.
+- Add Rust unit coverage confirming argument wrappers serialize into the underlying `BacktestArgsConstant`/`BacktestArgsDynamic` structures with expected indices and validation errors.
+- Update the Python `backtest` module to surface the new wrappers for downstream consumers.
+
+### Milestone 2 — Execution Pipeline (TBD)
+- Wire the wrappers into synchronous helpers that execute `backtest`/`run_backtests` behind the scenes while releasing the GIL.
+- Extend pytest coverage to exercise single and multi-run flows using canned market data fixtures.
+- Document usage patterns in the README and integration guides.
+
 ## Out of Scope
 - Custom strategy or risk manager injection beyond the default engine implementations.
 - Alternate market data sources beyond the existing in-memory helper.
@@ -26,7 +40,7 @@
    - Executing `backtest` and `run_backtests` (multi run) and surfacing results as `PyBacktestSummary` / `PyMultiBacktestSummary`.
 2. Ensure bindings spin up Tokio runtimes and block on the async Rust functions while releasing the GIL.
 3. Update the Python `backtest` module to delegate to the new bindings while preserving a friendly API surface.
-4. Cover new behaviour with Rust smoke tests (where feasible) and Python integration tests exercising single and multi backtests.
+4. Cover new behaviour with Rust smoke tests (where feasible) and Python integration tests exercising single and multi backtests as each milestone lands.
 5. Document usage in `barter-python/README.md` and update `.agent/todo.md` if follow-ups emerge.
 
 ## Testing Strategy
