@@ -3,6 +3,8 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import pytest
+
 import barter_python as bp
 import barter_python.execution as execution
 from barter_python.execution import (
@@ -1081,3 +1083,65 @@ class TestMockExecutionConfigBindings:
 
         system_config.clear_executions()
         assert system_config.executions() == []
+
+
+class TestExecutionInstrumentMap:
+    def _definitions(self) -> list[dict[str, object]]:
+        return [
+            {
+                "exchange": "binance_spot",
+                "name_exchange": "BTCUSDT",
+                "underlying": {"base": "btc", "quote": "usdt"},
+                "quote": "underlying_quote",
+                "kind": "spot",
+            },
+            {
+                "exchange": "binance_spot",
+                "name_exchange": "ETHUSDT",
+                "underlying": {"base": "eth", "quote": "usdt"},
+                "quote": "underlying_quote",
+                "kind": "spot",
+            },
+        ]
+
+    def test_round_trip_lookup_from_definitions(self):
+        instrument_map = bp.ExecutionInstrumentMap.from_definitions(
+            bp.ExchangeId.BINANCE_SPOT,
+            self._definitions(),
+        )
+
+        assert instrument_map.exchange_id == bp.ExchangeId.BINANCE_SPOT
+        assert instrument_map.exchange_index.index == 0
+
+        asset_names = instrument_map.asset_names()
+        assert set(asset_names) == {"btc", "eth", "usdt"}
+
+        instrument_names = instrument_map.instrument_names()
+        assert set(instrument_names) == {"BTCUSDT", "ETHUSDT"}
+
+        btc_index = instrument_map.asset_index("btc")
+        assert instrument_map.asset_name(btc_index) == "btc"
+
+        ethusdt_index = instrument_map.instrument_index("ETHUSDT")
+        assert instrument_map.instrument_name(ethusdt_index) == "ETHUSDT"
+
+        with pytest.raises(ValueError):
+            instrument_map.asset_index("doge")
+
+        with pytest.raises(ValueError):
+            instrument_map.instrument_index("DOGEUSDT")
+
+    def test_from_system_config(self, example_paths):
+        config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+
+        instrument_map = bp.ExecutionInstrumentMap.from_system_config(
+            bp.ExchangeId.BINANCE_SPOT,
+            config,
+        )
+
+        names = instrument_map.instrument_names()
+        assert "BTCUSDT" in names
+        assert "ETHUSDT" in names
+
+        index = instrument_map.instrument_index("BTCUSDT")
+        assert instrument_map.instrument_name(index) == "BTCUSDT"

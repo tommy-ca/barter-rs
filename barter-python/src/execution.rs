@@ -1,8 +1,10 @@
 use std::str::FromStr;
 
+use barter::system::config::InstrumentConfig;
 use barter_execution::{
     balance::{AssetBalance as ExecutionAssetBalance, Balance as ExecutionBalance},
-    error::{ApiError, OrderError},
+    error::{ApiError, KeyError, OrderError},
+    map::{ExecutionInstrumentMap, generate_execution_instrument_map},
     order::{
         OrderEvent,
         id::{ClientOrderId, OrderId, StrategyId},
@@ -14,9 +16,10 @@ use barter_execution::{
 };
 use barter_instrument::{
     Side,
-    asset::{AssetIndex, QuoteAsset},
-    exchange::ExchangeIndex,
-    instrument::InstrumentIndex,
+    asset::{AssetIndex, QuoteAsset, name::AssetNameExchange},
+    exchange::{ExchangeId, ExchangeIndex},
+    index::{IndexedInstruments, error::IndexError},
+    instrument::{Instrument, InstrumentIndex, name::InstrumentNameExchange},
 };
 use chrono::{DateTime, Utc};
 use pyo3::{
@@ -29,7 +32,9 @@ use rust_decimal::Decimal;
 
 use crate::{
     command::{PyOrderKey, parse_side},
-    instrument::{PyAssetIndex, PyInstrumentIndex, PyQuoteAsset, PySide},
+    config::PySystemConfig,
+    data::PyExchangeId,
+    instrument::{PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyQuoteAsset, PySide},
     summary::decimal_to_py,
 };
 use serde::Serialize;
@@ -98,6 +103,30 @@ fn extract_asset_index(value: &Bound<'_, PyAny>, label: &str) -> PyResult<AssetI
     Err(PyValueError::new_err(format!(
         "{label} must be an integer or AssetIndex",
     )))
+}
+
+fn index_error_to_py(error: IndexError) -> PyErr {
+    PyValueError::new_err(error.to_string())
+}
+
+fn key_error_to_py(error: KeyError) -> PyErr {
+    PyValueError::new_err(error.to_string())
+}
+
+fn instrument_configs_from_py(
+    py: Python<'_>,
+    value: &Bound<'_, PyAny>,
+) -> PyResult<Vec<InstrumentConfig>> {
+    if let Ok(config) = value.extract::<Py<PySystemConfig>>() {
+        let borrowed = config.borrow(py);
+        let mut system = borrowed.clone_inner();
+        return Ok(system.instruments.drain(..).collect());
+    }
+
+    let json_module = PyModule::import_bound(py, "json")?;
+    let dumps = json_module.getattr("dumps")?;
+    let serialized: String = dumps.call1((value,))?.extract()?;
+    serde_json::from_str(&serialized).map_err(|err| PyValueError::new_err(err.to_string()))
 }
 
 type DefaultOrderEvent =
@@ -1328,6 +1357,137 @@ impl PyTrade {
             self.inner.price,
             self.inner.quantity,
             self.inner.fees.fees,
+        )
+    }
+}
+
+#[pyclass(module = "barter_python", name = "ExecutionInstrumentMap", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyExecutionInstrumentMap {
+    inner: ExecutionInstrumentMap,
+}
+
+impl PyExecutionInstrumentMap {
+    fn from_configs(exchange: ExchangeId, configs: Vec<InstrumentConfig>) -> PyResult<Self> {
+        let instruments = configs
+            .into_iter()
+            .map(Instrument::from)
+            .collect::<Vec<_>>();
+        let indexed = IndexedInstruments::new(instruments);
+        let inner =
+            generate_execution_instrument_map(&indexed, exchange).map_err(index_error_to_py)?;
+        Ok(Self { inner })
+    }
+
+    fn collect_asset_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .inner
+            .exchange_assets()
+            .map(|name| name.name().as_str().to_string())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    fn collect_instrument_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .inner
+            .exchange_instruments()
+            .map(|name| name.name().as_str().to_string())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+}
+
+#[pymethods]
+impl PyExecutionInstrumentMap {
+    #[classmethod]
+    #[pyo3(signature = (exchange, config))]
+    pub fn from_system_config(
+        _cls: &Bound<'_, PyType>,
+        exchange: &PyExchangeId,
+        config: &PySystemConfig,
+    ) -> PyResult<Self> {
+        let mut system = config.clone_inner();
+        Self::from_configs(exchange.as_inner(), system.instruments.drain(..).collect())
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (exchange, definitions))]
+    pub fn from_definitions(
+        _cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        exchange: &PyExchangeId,
+        definitions: PyObject,
+    ) -> PyResult<Self> {
+        let value = definitions.bind(py);
+        let configs = instrument_configs_from_py(py, &value)?;
+        Self::from_configs(exchange.as_inner(), configs)
+    }
+
+    #[getter]
+    pub fn exchange_id(&self) -> PyExchangeId {
+        PyExchangeId::from_inner(self.inner.exchange.value)
+    }
+
+    #[getter]
+    pub fn exchange_index(&self) -> PyExchangeIndex {
+        PyExchangeIndex::from_inner(self.inner.exchange.key)
+    }
+
+    pub fn asset_names(&self) -> Vec<String> {
+        self.collect_asset_names()
+    }
+
+    pub fn instrument_names(&self) -> Vec<String> {
+        self.collect_instrument_names()
+    }
+
+    #[pyo3(signature = (name))]
+    pub fn asset_index(&self, name: &str) -> PyResult<PyAssetIndex> {
+        let name_exchange = AssetNameExchange::new(name);
+        let index = self
+            .inner
+            .find_asset_index(&name_exchange)
+            .map_err(index_error_to_py)?;
+        Ok(PyAssetIndex::from_inner(index))
+    }
+
+    #[pyo3(signature = (index))]
+    pub fn asset_name(&self, index: &PyAssetIndex) -> PyResult<String> {
+        self.inner
+            .find_asset_name_exchange(index.inner())
+            .map(|name| name.name().as_str().to_string())
+            .map_err(key_error_to_py)
+    }
+
+    #[pyo3(signature = (name))]
+    pub fn instrument_index(&self, name: &str) -> PyResult<PyInstrumentIndex> {
+        let name_exchange = InstrumentNameExchange::new(name.to_string());
+        let index = self
+            .inner
+            .find_instrument_index(&name_exchange)
+            .map_err(index_error_to_py)?;
+        Ok(PyInstrumentIndex::from_inner(index))
+    }
+
+    #[pyo3(signature = (index))]
+    pub fn instrument_name(&self, index: &PyInstrumentIndex) -> PyResult<String> {
+        self.inner
+            .find_instrument_name_exchange(index.inner())
+            .map(|name| name.name().as_str().to_string())
+            .map_err(key_error_to_py)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "ExecutionInstrumentMap(exchange={}, assets={}, instruments={})",
+            self.inner.exchange.value.as_str(),
+            self.inner.assets.len(),
+            self.inner.instruments.len()
         )
     }
 }

@@ -13,9 +13,9 @@
 
 ## Current Focus (2025-10-05)
 - Expand execution instrument mapping coverage to the Python API.
-  - [ ] Capture binding requirements in `.agent/specs/python-execution-instrument-map.md`.
-  - [ ] Expose `ExecutionInstrumentMap` wrappers & generator functions via PyO3.
-  - [ ] Add pytest coverage validating lookup helpers and error handling.
+  - [x] Capture binding requirements in `.agent/specs/python-execution-instrument-map.md`.
+  - [x] Expose `ExecutionInstrumentMap` wrappers & generator functions via PyO3.
+  - [x] Add pytest coverage validating lookup helpers and error handling.
 
 ## Completed (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.

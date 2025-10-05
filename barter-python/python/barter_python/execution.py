@@ -15,6 +15,7 @@ from .barter_python import (
     asset_balance_new as _asset_balance_new,
     ClientOrderId as _ClientOrderId,
     InstrumentAccountSnapshot as _InstrumentAccountSnapshot,
+    ExecutionInstrumentMap as _ExecutionInstrumentMap,
     OrderId as _OrderId,
     OrderKey as _OrderKey,
     OrderEvent as _OrderEvent,
@@ -30,6 +31,54 @@ OrderKey = _OrderKey
 InstrumentAccountSnapshot = _InstrumentAccountSnapshot
 AccountSnapshot = _AccountSnapshot
 OrderEvent = _OrderEvent
+
+
+class ExecutionInstrumentMap:
+    """High-level wrapper around the Rust execution instrument map."""
+
+    __slots__ = ("_inner",)
+
+    def __init__(self, inner: _ExecutionInstrumentMap):
+        self._inner = inner
+
+    @classmethod
+    def from_definitions(cls, exchange, definitions):
+        inner = _ExecutionInstrumentMap.from_definitions(exchange, definitions)
+        return cls(inner)
+
+    @classmethod
+    def from_system_config(cls, exchange, config):
+        inner = _ExecutionInstrumentMap.from_system_config(exchange, config)
+        return cls(inner)
+
+    @property
+    def exchange_id(self):
+        return self._inner.exchange_id
+
+    @property
+    def exchange_index(self):
+        return self._inner.exchange_index
+
+    def asset_names(self) -> list[str]:
+        return list(self._inner.asset_names())
+
+    def instrument_names(self) -> list[str]:
+        return list(self._inner.instrument_names())
+
+    def asset_index(self, name: str):
+        return self._inner.asset_index(name)
+
+    def asset_name(self, index):
+        return self._inner.asset_name(index)
+
+    def instrument_index(self, name: str):
+        return self._inner.instrument_index(name)
+
+    def instrument_name(self, index):
+        return self._inner.instrument_name(index)
+
+    def __repr__(self) -> str:
+        return repr(self._inner)
 
 
 class Balance:

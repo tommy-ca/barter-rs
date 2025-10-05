@@ -133,6 +133,10 @@ impl PyExchangeIndex {
     pub(crate) fn inner(&self) -> ExchangeIndex {
         self.inner
     }
+
+    pub(crate) fn from_inner(inner: ExchangeIndex) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]
@@ -216,6 +220,10 @@ impl PyInstrumentIndex {
     pub(crate) fn inner(&self) -> InstrumentIndex {
         self.inner
     }
+
+    pub(crate) fn from_inner(inner: InstrumentIndex) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]
@@ -287,6 +295,10 @@ impl PyAssetIndex {
 impl PyAssetIndex {
     pub(crate) fn inner(&self) -> AssetIndex {
         self.inner
+    }
+
+    pub(crate) fn from_inner(inner: AssetIndex) -> Self {
+        Self { inner }
     }
 }
 
