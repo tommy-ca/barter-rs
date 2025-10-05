@@ -17,6 +17,7 @@ from .barter_python import (
     InstrumentAccountSnapshot as _InstrumentAccountSnapshot,
     OrderId as _OrderId,
     OrderKey as _OrderKey,
+    OrderEvent as _OrderEvent,
     balance_new as _balance_new,
     Balance as _Balance,
     StrategyId as _StrategyId,
@@ -28,6 +29,7 @@ StrategyId = _StrategyId
 OrderKey = _OrderKey
 InstrumentAccountSnapshot = _InstrumentAccountSnapshot
 AccountSnapshot = _AccountSnapshot
+OrderEvent = _OrderEvent
 
 
 class Balance:

@@ -43,6 +43,10 @@ impl PyOrderKey {
         self.inner.clone()
     }
 
+    pub(crate) fn from_inner(inner: DefaultOrderKey) -> Self {
+        Self { inner }
+    }
+
     pub(crate) fn from_parts(
         exchange: ExchangeIndex,
         instrument: InstrumentIndex,

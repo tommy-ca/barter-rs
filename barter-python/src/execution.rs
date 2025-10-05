@@ -2,26 +2,32 @@ use std::str::FromStr;
 
 use barter_execution::{
     balance::{AssetBalance as ExecutionAssetBalance, Balance as ExecutionBalance},
-    order::id::{ClientOrderId, OrderId, StrategyId},
+    order::{
+        id::{ClientOrderId, OrderId, StrategyId},
+        state::OrderState,
+        OrderEvent,
+    },
     trade::{AssetFees as ExecutionAssetFees, Trade as ExecutionTrade, TradeId},
 };
 use barter_instrument::{
     Side,
     asset::{AssetIndex, QuoteAsset},
+    exchange::ExchangeIndex,
     instrument::InstrumentIndex,
 };
 use chrono::{DateTime, Utc};
 use pyo3::{
     Bound, Py, PyAny, PyObject, PyResult, Python, exceptions::PyValueError, prelude::*,
-    types::PyType,
+    types::{PyModule, PyType},
 };
 use rust_decimal::Decimal;
 
 use crate::{
-    command::parse_side,
+    command::{parse_side, PyOrderKey},
     instrument::{PyAssetIndex, PyInstrumentIndex, PyQuoteAsset, PySide},
     summary::decimal_to_py,
 };
+use serde_json;
 
 fn ensure_non_empty(value: &str, label: &str) -> PyResult<()> {
     if value.trim().is_empty() {
@@ -87,6 +93,12 @@ fn extract_asset_index(value: &Bound<'_, PyAny>, label: &str) -> PyResult<AssetI
         "{label} must be an integer or AssetIndex",
     )))
 }
+
+type DefaultOrderEvent = OrderEvent<
+    OrderState<AssetIndex, InstrumentIndex>,
+    ExchangeIndex,
+    InstrumentIndex,
+>;
 
 /// Wrapper around [`ExecutionBalance`] for Python exposure.
 #[pyclass(module = "barter_python", name = "Balance", eq, hash, frozen)]
@@ -506,6 +518,68 @@ pub(crate) fn coerce_client_order_id(value: Option<&Bound<'_, PyAny>>) -> PyResu
             let text = extract_string(bound, "client order id")?;
             Ok(ClientOrderId::new(text))
         }
+    }
+}
+
+/// Wrapper around [`OrderEvent`] for Python exposure.
+#[pyclass(module = "barter_python", name = "OrderEvent", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyOrderEvent {
+    inner: DefaultOrderEvent,
+}
+
+impl PyOrderEvent {
+    fn state_kind_inner(&self) -> &'static str {
+        match &self.inner.state {
+            OrderState::Active(_) => "Active",
+            OrderState::Inactive(_) => "Inactive",
+        }
+    }
+}
+
+#[pymethods]
+impl PyOrderEvent {
+    #[staticmethod]
+    pub fn from_json(data: &str) -> PyResult<Self> {
+        let inner = serde_json::from_str::<DefaultOrderEvent>(data)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+        Ok(Self { inner })
+    }
+
+    #[staticmethod]
+    pub fn from_dict(py: Python<'_>, value: PyObject) -> PyResult<Self> {
+        let json_module = PyModule::import_bound(py, "json")?;
+        let dumps = json_module.getattr("dumps")?;
+        let serialized: String = dumps.call1((&value,))?.extract()?;
+        Self::from_json(&serialized)
+    }
+
+    #[getter]
+    pub fn key(&self) -> PyOrderKey {
+        PyOrderKey::from_inner(self.inner.key.clone())
+    }
+
+    #[getter]
+    pub fn state_kind(&self) -> &'static str {
+        self.state_kind_inner()
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner)
+            .map_err(|err| PyValueError::new_err(err.to_string()))
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let serialized = self.to_json()?;
+        let json_module = PyModule::import_bound(py, "json")?;
+        let loads = json_module.getattr("loads")?;
+        let loaded = loads.call1((serialized.into_py(py),))?;
+        Ok(loaded.into())
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("OrderEvent({json})"))
     }
 }
 
