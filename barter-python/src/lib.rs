@@ -17,6 +17,7 @@ mod command;
 mod common;
 mod config;
 mod data;
+mod error;
 mod execution;
 mod instrument;
 mod integration;
@@ -81,6 +82,7 @@ use data::{
     PyDynamicStreams, PyExchangeId, PyMarketStream, PySubKind, PySubscription, PySubscriptionId,
     exchange_supports_instrument_kind, init_dynamic_streams,
 };
+use error::{PySocketErrorInfo, SocketError as PySocketErrorExc};
 use execution::{
     PyActiveOrderState, PyAssetFees, PyCancelInFlightState, PyCancelledState, PyClientOrderId,
     PyExecutionAssetBalance, PyExecutionBalance, PyExecutionInstrumentMap, PyInactiveOrderState,
@@ -903,6 +905,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutionConfig>()?;
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
+    m.add_class::<PySocketErrorInfo>()?;
     m.add_class::<PySequence>()?;
     m.add_class::<PySystemHandle>()?;
     m.add_class::<PyClientOrderId>()?;
@@ -995,6 +998,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(exchange_supports_instrument_kind, m)?)?;
     #[cfg(feature = "python-tests")]
     m.add_function(wrap_pyfunction!(_testing_dynamic_trades, m)?)?;
+    #[cfg(feature = "python-tests")]
+    m.add_function(wrap_pyfunction!(error::_testing_raise_socket_error, m)?)?;
     m.add_function(wrap_pyfunction!(balance_new, m)?)?;
     m.add_function(wrap_pyfunction!(asset_balance_new, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_sharpe_ratio, m)?)?;
@@ -1027,6 +1032,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     let shutdown = PyEngineEvent::shutdown();
     m.add("SHUTDOWN_EVENT", shutdown.into_py(py))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    let socket_error_type = py.get_type_bound::<PySocketErrorExc>();
+    m.add("SocketError", socket_error_type)?;
 
     Ok(())
 }
@@ -1046,6 +1053,7 @@ mod tests {
         exchange::{ExchangeId, ExchangeIndex},
         instrument::InstrumentIndex,
     };
+    use barter_integration::error::SocketError as IntegrationSocketError;
     use chrono::{TimeDelta, TimeZone};
     use pyo3::{
         Python,
@@ -1702,5 +1710,72 @@ mod tests {
         let string_val = PyValue::string("hello".to_string());
         assert!(string_val.is_string());
         assert_eq!(string_val.as_string().unwrap(), "hello");
+    }
+
+    #[test]
+    fn socket_error_info_exposes_variant_details() {
+        let error = IntegrationSocketError::Deserialise {
+            error: serde_json::from_str::<serde_json::Value>("not-json").unwrap_err(),
+            payload: "not-json".to_string(),
+        };
+
+        let info = PySocketErrorInfo::from_socket_error(error);
+
+        Python::with_gil(|py| {
+            assert_eq!(info.kind(), "Deserialise");
+            assert!(info.message().contains("Deserialising JSON error"));
+
+            let details = info.details(py).expect("details to resolve");
+            let details = details.expect("details dictionary");
+            let details = details.bind(py);
+
+            let payload_obj = details
+                .get_item("payload")
+                .unwrap()
+                .expect("payload entry");
+            let payload: String = payload_obj.extract().expect("payload string");
+            assert_eq!(payload, "not-json");
+
+            let error_obj = details
+                .get_item("error")
+                .unwrap()
+                .expect("error entry");
+            let error_message: String = error_obj.extract().expect("error string");
+            let expected_error = serde_json::from_str::<serde_json::Value>("not-json")
+                .unwrap_err()
+                .to_string();
+            assert_eq!(error_message, expected_error);
+        });
+    }
+
+    #[test]
+    fn socket_error_to_py_err_sets_exception_attributes() {
+        let error = IntegrationSocketError::DeserialiseBinary {
+            error: serde_json::from_slice::<serde_json::Value>(b"not-json").unwrap_err(),
+            payload: vec![1_u8, 2, 3],
+        };
+
+        let py_err = crate::error::socket_error_to_py_err(error);
+
+        Python::with_gil(|py| {
+            let instance = py_err.to_object(py).into_bound(py);
+            let exc_type = py.get_type_bound::<PySocketErrorExc>();
+            assert!(instance.is_instance(exc_type.as_any()).unwrap());
+
+            let kind: String = instance.getattr("kind").unwrap().extract().unwrap();
+            assert_eq!(kind, "DeserialiseBinary");
+
+            let details_any = instance.getattr("details").unwrap();
+            let details = details_any.downcast::<PyDict>().unwrap();
+            let payload_obj = details
+                .get_item("payload")
+                .unwrap()
+                .expect("payload entry");
+            let payload: Vec<u8> = payload_obj.extract().unwrap();
+            assert_eq!(payload, vec![1, 2, 3]);
+
+            let message: String = instance.getattr("message").unwrap().extract().unwrap();
+            assert!(message.contains("binary payload"));
+        });
     }
 }
