@@ -31,6 +31,8 @@ OrderKey = _OrderKey
 InstrumentAccountSnapshot = _InstrumentAccountSnapshot
 AccountSnapshot = _AccountSnapshot
 OrderEvent = _OrderEvent
+balance_new = _balance_new
+asset_balance_new = _asset_balance_new
 
 
 class ExecutionInstrumentMap:

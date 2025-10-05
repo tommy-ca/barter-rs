@@ -228,6 +228,12 @@ class TestBalance:
         balance = Balance(Decimal("5"), Decimal("3"))
         assert hash(balance) == hash(Balance(Decimal("5"), Decimal("3")))
 
+    def test_balance_new_binding(self):
+        balance = bp.balance_new(Decimal("100.5"), Decimal("95.2"))
+        assert balance.total == Decimal("100.5")
+        assert balance.free == Decimal("95.2")
+        assert balance.__class__.__module__ == "barter_python"
+
 
 class TestAssetBalance:
     def test_creation(self):
@@ -270,6 +276,14 @@ class TestAssetBalance:
 
         asset_balance = AssetBalance(asset_index, balance, time)
         assert asset_balance.asset == 7
+
+    def test_asset_balance_new_binding(self):
+        balance = bp.balance_new(Decimal("3.0"), Decimal("1.5"))
+        time_exchange = datetime(2024, 2, 1, tzinfo=timezone.utc)
+        asset_balance = bp.asset_balance_new(BTC_ASSET_INDEX, balance, time_exchange)
+        assert asset_balance.asset == BTC_ASSET_INDEX
+        assert asset_balance.balance.total == Decimal("3.0")
+        assert asset_balance.__class__.__module__ == "barter_python"
 
 
 class TestAssetFees:
