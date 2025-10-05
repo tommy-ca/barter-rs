@@ -941,7 +941,10 @@ mod tests {
 
     #[test]
     fn parse_engine_feed_mode_defaults_to_stream() {
-        assert_eq!(parse_engine_feed_mode(None).unwrap(), EngineFeedMode::Stream);
+        assert_eq!(
+            parse_engine_feed_mode(None).unwrap(),
+            EngineFeedMode::Stream
+        );
     }
 
     #[test]

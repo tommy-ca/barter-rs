@@ -5,6 +5,8 @@
 - Expanded to expose the full `ExchangeId` enumeration in the Rust bindings (2025-10-04).
 - Python `SubKind` now includes `PUBLIC_TRADES`, `ORDER_BOOKS_L1`, `ORDER_BOOKS_L2`, `ORDER_BOOKS_L3`, `LIQUIDATIONS`, and `CANDLES`.
 - `PySubscription` supports spot, perpetual, future, and option market data instruments.
+- Added `exchange_supports_instrument_kind` helper and `PySubscription.is_supported()` to mirror
+  Rust validation utilities (2025-10-05).
 - Instrument kind mapping parses expiry, strike, option kind, and exercise fields.
 
 ## Remaining Gaps / Follow-ups

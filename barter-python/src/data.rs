@@ -2,9 +2,14 @@
 
 use crate::{backtest::market_event_to_py, command::parse_decimal};
 use barter_data::{
+    instrument::InstrumentData,
     event::{DataKind, MarketEvent},
     streams::{builder::dynamic::DynamicStreams, consumer::MarketStreamResult, reconnect::Event},
-    subscription::{SubKind, Subscription, trade::PublicTrade},
+    subscription::{
+        SubKind, Subscription,
+        exchange_supports_instrument_kind as rust_exchange_supports_instrument_kind,
+        trade::PublicTrade,
+    },
 };
 use barter_instrument::{
     Keyed, Side,
@@ -441,6 +446,11 @@ impl PySubscription {
     /// Return the debug representation.
     fn __repr__(&self) -> String {
         format!("{:?}", self.inner)
+    }
+
+    /// Determine whether the exchange supports this instrument kind.
+    pub fn is_supported(&self) -> bool {
+        rust_exchange_supports_instrument_kind(self.inner.exchange, self.inner.instrument.kind())
     }
 }
 
@@ -934,6 +944,19 @@ fn market_stream_result_to_py(
             Err(error) => Err(PyValueError::new_err(error.to_string())),
         },
     }
+}
+
+#[pyfunction]
+#[pyo3(signature = (exchange, instrument_kind))]
+pub fn exchange_supports_instrument_kind(
+    exchange: &PyExchangeId,
+    instrument_kind: Bound<'_, PyAny>,
+) -> PyResult<bool> {
+    let kind = parse_market_data_instrument_kind(Some(instrument_kind))?;
+    Ok(rust_exchange_supports_instrument_kind(
+        exchange.inner,
+        &kind,
+    ))
 }
 
 #[cfg(feature = "python-tests")]

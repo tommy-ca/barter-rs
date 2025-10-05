@@ -79,7 +79,7 @@ use config::{PyExecutionConfig, PyMockExecutionConfig, PySystemConfig};
 use data::_testing_dynamic_trades;
 use data::{
     PyDynamicStreams, PyExchangeId, PyMarketStream, PySubKind, PySubscription, PySubscriptionId,
-    init_dynamic_streams,
+    exchange_supports_instrument_kind, init_dynamic_streams,
 };
 use execution::{
     PyActiveOrderState, PyAssetFees, PyCancelInFlightState, PyCancelledState, PyClientOrderId,
@@ -986,6 +986,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(backtest::run_backtests, m)?)?;
     m.add_function(wrap_pyfunction!(start_system, m)?)?;
     m.add_function(wrap_pyfunction!(init_dynamic_streams, m)?)?;
+    m.add_function(wrap_pyfunction!(exchange_supports_instrument_kind, m)?)?;
     #[cfg(feature = "python-tests")]
     m.add_function(wrap_pyfunction!(_testing_dynamic_trades, m)?)?;
     m.add_function(wrap_pyfunction!(balance_new, m)?)?;
