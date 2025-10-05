@@ -1,2 +1,10 @@
-edition = "2024"
-imports_granularity = "crate"
+edition = "2021"
+hard_tabs = false
+max_width = 100
+tab_spaces = 4
+newline_style = "Auto"
+use_small_heuristics = "Default"
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+use_field_init_shorthand = true

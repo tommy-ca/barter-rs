@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from decimal import Decimal
 from time import sleep
-from datetime import datetime, timezone
-import json
 
 import barter_python as bp
 

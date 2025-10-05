@@ -66,7 +66,6 @@ test = [
 dev = [
     "ruff>=0.6.0",
     "mypy>=1.8",
-    "black>=24.0",
     "pre-commit>=3.6",
 ]
 docs = [
@@ -119,9 +118,12 @@ select = [
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
     "UP", # pyupgrade
+    "N",  # pep8-naming
+    "PIE", # flake8-pie
+    "SIM", # flake8-simplify
 ]
 ignore = [
-    "E501", # line too long, handled by black
+    "E501", # line too long, handled by ruff format
     "B008", # do not perform function calls in argument defaults
     "C901", # too complex
 ]
@@ -134,7 +136,18 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["barter_python"]
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
 [dependency-groups]
 dev = [
-    "ruff>=0.13.3",
+    "ruff>=0.6.0",
+    "mypy>=1.8",
+    "pre-commit>=3.6",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
 ]

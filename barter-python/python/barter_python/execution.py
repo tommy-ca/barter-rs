@@ -9,8 +9,8 @@ from enum import Enum
 from typing import Generic, TypeVar, Union
 
 from . import barter_python as _core
-from .instrument import QuoteAsset, Side
-from .trade_bindings import AssetFees, Trade, TradeId
+from .instrument import Side
+from .trade_bindings import Trade
 
 _AccountSnapshot = _core.AccountSnapshot
 _AssetBalance = _core.AssetBalance

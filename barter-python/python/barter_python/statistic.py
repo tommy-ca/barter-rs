@@ -452,9 +452,7 @@ class MaxDrawdownGenerator:
 
     def update(self, drawdown: Drawdown) -> None:
         """Update with a new drawdown, keeping the maximum."""
-        if self.max_drawdown is None:
-            self.max_drawdown = MaxDrawdown(drawdown)
-        elif abs(drawdown.value) > abs(self.max_drawdown.drawdown.value):
+        if self.max_drawdown is None or abs(drawdown.value) > abs(self.max_drawdown.drawdown.value):
             self.max_drawdown = MaxDrawdown(drawdown)
 
     def generate(self) -> MaxDrawdown | None:

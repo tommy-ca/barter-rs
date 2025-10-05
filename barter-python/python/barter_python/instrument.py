@@ -395,11 +395,7 @@ class InstrumentKind(Generic[AssetKey]):
         """Returns the contract size."""
         if self._kind == "spot":
             return Decimal("1")
-        elif self._kind == "perpetual":
-            return self._data.contract_size  # type: ignore
-        elif self._kind == "future":
-            return self._data.contract_size  # type: ignore
-        elif self._kind == "option":
+        elif self._kind == "perpetual" or self._kind == "future" or self._kind == "option":
             return self._data.contract_size  # type: ignore
         else:
             raise ValueError(f"Unknown instrument kind: {self._kind}")

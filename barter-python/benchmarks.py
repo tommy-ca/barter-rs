@@ -6,11 +6,9 @@ This script measures the performance of key operations in the Python bindings
 to identify bottlenecks and track improvements.
 """
 
-import time
 import datetime as dt
 import statistics
-from decimal import Decimal
-from typing import List, Tuple
+import time
 
 import barter_python as bp
 
@@ -50,7 +48,7 @@ def benchmark_event_creation(n: int = 10000) -> float:
                         bp.OrderKey(i % 10, i % 5, f"strategy-{i % 3}", f"cid-{i}"),
                         "buy",
                         float(50000 + i),
-                        float(0.1),
+                        0.1,
                         kind="limit",
                         time_in_force="good_until_cancelled",
                         post_only=False,

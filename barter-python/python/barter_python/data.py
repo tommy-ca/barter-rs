@@ -230,13 +230,11 @@ class Liquidation:
 class Bids:
     """Unit type to tag an OrderBookSide as the bid side (buyers) of an OrderBook."""
 
-    pass
 
 
 class Asks:
     """Unit type to tag an OrderBookSide as the ask side (sellers) of an OrderBook."""
 
-    pass
 
 
 class OrderBookSide:

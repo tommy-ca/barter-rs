@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import barter_python as bp
 

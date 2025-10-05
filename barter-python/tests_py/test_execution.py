@@ -8,12 +8,30 @@ import pytest
 import barter_python as bp
 import barter_python.execution as execution
 from barter_python import (
-    ExecutionConfig, MockExecutionConfig,
-    OrderKind, TimeInForce, ClientOrderId, OrderId, StrategyId, OrderKey,
-    Balance, AssetBalance, Trade, Order, InstrumentAccountSnapshot, AccountSnapshot, OrderEvent,
-    OpenInFlight, Open, CancelInFlight, Cancelled, OrderError, InactiveOrderState, OrderState,
-    RequestOpen, OrderRequestOpen, OrderRequestCancel, OrderResponseCancel,
-    AccountEvent, AccountEventKind
+    AccountEvent,
+    AccountEventKind,
+    AccountSnapshot,
+    AssetBalance,
+    Balance,
+    CancelInFlight,
+    Cancelled,
+    ClientOrderId,
+    ExecutionConfig,
+    InactiveOrderState,
+    InstrumentAccountSnapshot,
+    MockExecutionConfig,
+    Open,
+    OpenInFlight,
+    Order,
+    OrderError,
+    OrderId,
+    OrderKey,
+    OrderKind,
+    OrderResponseCancel,
+    OrderState,
+    StrategyId,
+    TimeInForce,
+    Trade,
 )
 from barter_python.execution import (
     AssetFees,
@@ -70,8 +88,8 @@ class TestOrderKind:
         assert "OrderKind" in repr(market)
 
     def test_order_kind_equality_and_hash(self):
-        assert OrderKind.MARKET == OrderKind.market()
-        assert OrderKind.LIMIT == OrderKind.limit()
+        assert OrderKind.market() == OrderKind.MARKET
+        assert OrderKind.limit() == OrderKind.LIMIT
         assert OrderKind.MARKET != OrderKind.LIMIT
         assert hash(OrderKind.MARKET) == hash(OrderKind.market())
 

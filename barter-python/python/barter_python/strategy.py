@@ -315,11 +315,9 @@ class DefaultStrategy:
 
     def on_disconnect(self, exchange_id: str) -> None:
         """Do nothing when an exchange disconnects."""
-        pass
 
     def on_trading_disabled(self) -> None:
         """Do nothing when trading is disabled."""
-        pass
 
 
 class OnDisconnectStrategy(Protocol):

@@ -7,6 +7,12 @@ __pycache__/
 *.pyc
 barter-python/python/barter_python/*.so
 
+# uv
+.venv/
+
+# ruff
+.ruff_cache/
+
 # IDE
 .idea/
 *.iml

@@ -12,6 +12,33 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    name: "Lint and format"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          cd barter-python
+          uv sync --dev
+      - name: Run ruff
+        run: |
+          cd barter-python
+          uv run ruff check . --fix
+          uv run ruff format . --check
+      - name: Run rustfmt
+        run: cargo fmt --check
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
   build:
     name: "Wheel build (${{ matrix.target }} | py${{ matrix.python }})"
     runs-on: ${{ matrix.os }}

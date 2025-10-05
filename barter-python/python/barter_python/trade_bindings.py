@@ -15,17 +15,18 @@ from typing import Any, Generic, TypeVar
 from .barter_python import (
     AssetFees as _AssetFees,
 )
+from .barter_python import OrderId as _OrderId
 from .barter_python import (
     QuoteAsset as _QuoteAsset,
 )
+from .barter_python import StrategyId as _StrategyId
 from .barter_python import (
     Trade as _Trade,
 )
 from .barter_python import (
     TradeId as _TradeId,
 )
-from .barter_python import OrderId as _OrderId, StrategyId as _StrategyId
-from .instrument import Side, QuoteAsset
+from .instrument import QuoteAsset, Side
 
 AssetKey = TypeVar("AssetKey")
 InstrumentKey = TypeVar("InstrumentKey")

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import barter_python as bp
-from barter_python.instrument import Instrument, Underlying, Asset, ExchangeId
 
 
 def main():

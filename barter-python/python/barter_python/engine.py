@@ -52,20 +52,17 @@ State = TypeVar("State")
 class GlobalData(Protocol):
     """Protocol for global engine data."""
 
-    pass
 
 
 @dataclass(frozen=True)
 class DefaultGlobalData:
     """Default implementation of global data with no additional state."""
 
-    pass
 
 
 class InstrumentMarketData(Protocol):
     """Protocol for instrument-specific market data."""
 
-    pass
 
 
 @dataclass(frozen=True)
@@ -217,7 +214,6 @@ class SendRequests:
     def execute(self, engine_state: EngineState) -> None:
         """Send the requests (placeholder for actual execution)."""
         # TODO: Integrate with execution layer
-        pass
 
 
 @dataclass

@@ -526,6 +526,56 @@ sharpe = bp.calculate_sharpe_ratio(
 )
 ```
 
+## Development
+
+### Prerequisites
+- **uv** (modern Python package manager): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- **Rust toolchain** with components: `rustup component add rustfmt clippy`
+
+### Setup
+```bash
+# Clone the repository
+git clone https://github.com/barter-rs/barter-rs.git
+cd barter-rs/barter-python
+
+# Install all dependencies
+uv sync --dev
+
+# Install pre-commit hooks
+uv run pre-commit install
+```
+
+### Development Workflow
+```bash
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Run tests
+make test
+
+# Run all checks
+make check
+
+# Build package
+make build
+```
+
+### Pre-commit Hooks
+The project uses pre-commit hooks to ensure code quality:
+
+- **ruff**: Linting and formatting for Python
+- **rustfmt**: Code formatting for Rust
+- **clippy**: Linting for Rust
+- **General**: Trailing whitespace, file size checks, YAML validation
+
+Run hooks manually:
+```bash
+uv run pre-commit run --all-files
+```
+
 ## Core Concepts
 
 ### System Configuration
