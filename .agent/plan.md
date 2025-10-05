@@ -16,6 +16,8 @@
   - [x] Capture binding requirements in `.agent/specs/python-execution-instrument-map.md`.
   - [x] Expose `ExecutionInstrumentMap` wrappers & generator functions via PyO3.
   - [x] Add pytest coverage validating lookup helpers and error handling.
+- [x] Replace pure Python instrument name wrappers with Rust-backed bindings and align pytest
+  coverage (`.agent/specs/python-instrument-name-bindings.md`).
 
 ## Completed (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.

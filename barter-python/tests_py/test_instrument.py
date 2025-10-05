@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import barter_python as bp
+from barter_python import instrument as instrument_module
 from barter_python.instrument import (
     Asset,
     AssetNameExchange,
@@ -61,6 +62,28 @@ class TestExchangeId:
         assert str(ExchangeId.OTHER) == "other"
         assert str(ExchangeId.COINBASE_INTERNATIONAL) == "coinbase_international"
         assert str(ExchangeId.GATEIO_OPTIONS) == "gateio_options"
+
+
+class TestRustNameBindings:
+    def test_asset_name_binding_alias(self):
+        assert hasattr(bp, "AssetNameInternal"), "Rust binding should be exported"
+        assert instrument_module.AssetNameInternal is bp.AssetNameInternal
+
+        name = bp.AssetNameInternal("BTC")
+        assert name.name == "btc"
+        assert str(name) == "btc"
+        assert repr(name) == "AssetNameInternal('btc')"
+
+    def test_instrument_name_exchange_helper(self):
+        assert hasattr(bp, "InstrumentNameInternal")
+        assert instrument_module.InstrumentNameInternal is bp.InstrumentNameInternal
+
+        name = bp.InstrumentNameInternal.new_from_exchange(
+            bp.ExchangeId.BINANCE_SPOT,
+            "BTCUSDT",
+        )
+        assert name.name == "binance_spot-btcusdt"
+        assert "binance_spot-btcusdt" in repr(name)
 
 
 class TestAssetNameInternal:

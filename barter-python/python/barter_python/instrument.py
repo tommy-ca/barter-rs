@@ -9,7 +9,19 @@ from decimal import Decimal
 from enum import Enum
 from typing import Generic, TypeVar, Union
 
+from .barter_python import (
+    AssetNameExchange as _AssetNameExchange,
+    AssetNameInternal as _AssetNameInternal,
+    InstrumentNameExchange as _InstrumentNameExchange,
+    InstrumentNameInternal as _InstrumentNameInternal,
+)
+
 AssetKey = TypeVar("AssetKey")
+
+AssetNameInternal = _AssetNameInternal
+AssetNameExchange = _AssetNameExchange
+InstrumentNameInternal = _InstrumentNameInternal
+InstrumentNameExchange = _InstrumentNameExchange
 
 
 class Side(Enum):
@@ -70,56 +82,6 @@ class ExchangeId(Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-class AssetNameInternal:
-    """Barter lowercase string representation for an Asset."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name.lower()
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def __str__(self) -> str:
-        return self._name
-
-    def __repr__(self) -> str:
-        return f"AssetNameInternal({self._name!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, AssetNameInternal):
-            return NotImplemented
-        return self._name == other._name
-
-    def __hash__(self) -> int:
-        return hash(self._name)
-
-
-class AssetNameExchange:
-    """Exchange string representation for an Asset."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def __str__(self) -> str:
-        return self._name
-
-    def __repr__(self) -> str:
-        return f"AssetNameExchange({self._name!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, AssetNameExchange):
-            return NotImplemented
-        return self._name == other._name
-
-    def __hash__(self) -> int:
-        return hash(self._name)
 
 
 class Asset:
@@ -224,66 +186,6 @@ class Keyed(Generic[KeyType, ValueType]):
 
     def __hash__(self) -> int:
         return hash((self.key, self.value))
-
-
-class InstrumentNameInternal:
-    """Barter lowercase string representation for an Instrument."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name.lower()
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @classmethod
-    def new_from_exchange(
-        cls, exchange: ExchangeId, name_exchange: str | InstrumentNameExchange
-    ) -> InstrumentNameInternal:
-        """Create from exchange and exchange name."""
-        name_exchange = (
-            name_exchange if isinstance(name_exchange, str) else name_exchange.name
-        )
-        return cls(f"{exchange.value}-{name_exchange}")
-
-    def __str__(self) -> str:
-        return self._name
-
-    def __repr__(self) -> str:
-        return f"InstrumentNameInternal({self._name!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, InstrumentNameInternal):
-            return NotImplemented
-        return self._name == other._name
-
-    def __hash__(self) -> int:
-        return hash(self._name)
-
-
-class InstrumentNameExchange:
-    """Exchange string representation for an Instrument."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def __str__(self) -> str:
-        return self._name
-
-    def __repr__(self) -> str:
-        return f"InstrumentNameExchange({self._name!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, InstrumentNameExchange):
-            return NotImplemented
-        return self._name == other._name
-
-    def __hash__(self) -> int:
-        return hash(self._name)
 
 
 class InstrumentQuoteAsset(Enum):

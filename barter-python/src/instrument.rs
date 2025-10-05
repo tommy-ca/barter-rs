@@ -3,13 +3,15 @@ use std::str::FromStr;
 use barter::system::config::InstrumentConfig;
 use barter_instrument::{
     Side,
-    asset::name::AssetNameInternal,
-    asset::{Asset, AssetIndex, QuoteAsset},
-    exchange::ExchangeIndex,
+    asset::{
+        Asset, AssetIndex, QuoteAsset,
+        name::{AssetNameExchange, AssetNameInternal},
+    },
+    exchange::{ExchangeId, ExchangeIndex},
     index::{IndexedInstruments, error::IndexError},
     instrument::{
         InstrumentIndex,
-        name::InstrumentNameExchange,
+        name::{InstrumentNameExchange, InstrumentNameInternal},
         spec::{
             InstrumentSpec, InstrumentSpecNotional, InstrumentSpecPrice, InstrumentSpecQuantity,
             OrderQuantityUnits,
@@ -18,6 +20,7 @@ use barter_instrument::{
 };
 use pyo3::{Bound, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*, types::PyType};
 use rust_decimal::{Decimal, prelude::FromPrimitive};
+use serde_json;
 
 use crate::{
     config::PySystemConfig,
@@ -25,6 +28,207 @@ use crate::{
     execution::{instrument_configs_from_py, serialize_to_py_dict},
     summary::decimal_to_py,
 };
+
+fn exchange_id_from_str(value: &str) -> PyResult<ExchangeId> {
+    let quoted = format!("\"{value}\"");
+    serde_json::from_str::<ExchangeId>(&quoted).map_err(|_| {
+        PyValueError::new_err(format!(
+            "unknown exchange id '{value}'; provide a valid ExchangeId",
+        ))
+    })
+}
+
+fn coerce_exchange_id(value: &Bound<'_, PyAny>) -> PyResult<ExchangeId> {
+    if let Ok(py_exchange) = value.extract::<PyExchangeId>() {
+        Ok(py_exchange.as_inner())
+    } else if let Ok(text) = value.extract::<&str>() {
+        exchange_id_from_str(text)
+    } else if let Ok(attr) = value.getattr("value") {
+        let text = attr.extract::<&str>()?;
+        exchange_id_from_str(text)
+    } else {
+        Err(PyValueError::new_err(
+            "exchange must be barter_python.ExchangeId or string",
+        ))
+    }
+}
+
+/// Wrapper around [`AssetNameInternal`] for Python exposure.
+#[pyclass(module = "barter_python", name = "AssetNameInternal", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyAssetNameInternal {
+    inner: AssetNameInternal,
+}
+
+#[pymethods]
+impl PyAssetNameInternal {
+    /// Create a new [`AssetNameInternal`], normalising to lowercase.
+    #[new]
+    #[pyo3(signature = (name))]
+    pub fn new(name: &str) -> Self {
+        Self {
+            inner: AssetNameInternal::new(name),
+        }
+    }
+
+    /// Underlying lowercase identifier.
+    #[getter]
+    pub fn name(&self) -> &str {
+        self.inner.name().as_str()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        self.inner.name().as_str().to_string()
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("AssetNameInternal('{}')", self.name())
+    }
+}
+
+/// Wrapper around [`AssetNameExchange`] for Python exposure.
+#[pyclass(module = "barter_python", name = "AssetNameExchange", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyAssetNameExchange {
+    inner: AssetNameExchange,
+}
+
+#[pymethods]
+impl PyAssetNameExchange {
+    /// Create a new [`AssetNameExchange`].
+    #[new]
+    #[pyo3(signature = (name))]
+    pub fn new(name: &str) -> Self {
+        Self {
+            inner: AssetNameExchange::new(name),
+        }
+    }
+
+    /// Exchange-specific identifier.
+    #[getter]
+    pub fn name(&self) -> &str {
+        self.inner.name().as_str()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        self.inner.name().as_str().to_string()
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("AssetNameExchange('{}')", self.name())
+    }
+}
+
+/// Wrapper around [`InstrumentNameExchange`] for Python exposure.
+#[pyclass(
+    module = "barter_python",
+    name = "InstrumentNameExchange",
+    eq,
+    hash,
+    frozen
+)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyInstrumentNameExchange {
+    inner: InstrumentNameExchange,
+}
+
+#[pymethods]
+impl PyInstrumentNameExchange {
+    /// Create a new [`InstrumentNameExchange`].
+    #[new]
+    #[pyo3(signature = (name))]
+    pub fn new(name: &str) -> Self {
+        Self {
+            inner: InstrumentNameExchange::new(name),
+        }
+    }
+
+    /// Exchange-level identifier.
+    #[getter]
+    pub fn name(&self) -> &str {
+        self.inner.name().as_str()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        self.inner.name().as_str().to_string()
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("InstrumentNameExchange('{}')", self.name())
+    }
+}
+
+/// Wrapper around [`InstrumentNameInternal`] for Python exposure.
+#[pyclass(
+    module = "barter_python",
+    name = "InstrumentNameInternal",
+    eq,
+    hash,
+    frozen
+)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyInstrumentNameInternal {
+    inner: InstrumentNameInternal,
+}
+
+#[pymethods]
+impl PyInstrumentNameInternal {
+    /// Create a new [`InstrumentNameInternal`], normalising to lowercase.
+    #[new]
+    #[pyo3(signature = (name))]
+    pub fn new(name: &str) -> Self {
+        Self {
+            inner: InstrumentNameInternal::new(name),
+        }
+    }
+
+    /// Construct from an exchange and exchange-level identifier.
+    #[classmethod]
+    #[pyo3(signature = (exchange, name_exchange))]
+    pub fn new_from_exchange(
+        _cls: &Bound<'_, PyType>,
+        exchange: &Bound<'_, PyAny>,
+        name_exchange: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let exchange_id = coerce_exchange_id(exchange)?;
+        if let Ok(wrapper) = name_exchange.extract::<PyInstrumentNameExchange>() {
+            let inner = InstrumentNameInternal::new_from_exchange(
+                exchange_id,
+                InstrumentNameExchange::new(wrapper.name()),
+            );
+            Ok(Self { inner })
+        } else {
+            let name = name_exchange.extract::<&str>()?;
+            let inner = InstrumentNameInternal::new_from_exchange(
+                exchange_id,
+                InstrumentNameExchange::new(name),
+            );
+            Ok(Self { inner })
+        }
+    }
+
+    /// Internal identifier.
+    #[getter]
+    pub fn name(&self) -> &str {
+        self.inner.name().as_str()
+    }
+
+    /// Return the string representation.
+    fn __str__(&self) -> String {
+        self.inner.name().as_str().to_string()
+    }
+
+    /// Return the debug representation.
+    fn __repr__(&self) -> String {
+        format!("InstrumentNameInternal('{}')", self.name())
+    }
+}
 
 /// Wrapper around [`Asset`] for Python exposure.
 #[pyclass(module = "barter_python", name = "Asset", unsendable)]
