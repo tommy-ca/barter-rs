@@ -1,7 +1,6 @@
 use barter_integration::error::SocketError as IntegrationSocketError;
 use pyo3::{
-    PyErr, PyResult,
-    create_exception,
+    PyErr, PyResult, create_exception,
     exceptions::PyException,
     prelude::*,
     types::{PyBytes, PyDict},
@@ -125,10 +124,7 @@ impl SocketErrorInfoInner {
                     error: error.to_string(),
                 }),
             ),
-            Subscribe(message) => (
-                "Subscribe",
-                Some(SocketErrorDetails::Subscribe { message }),
-            ),
+            Subscribe(message) => ("Subscribe", Some(SocketErrorDetails::Subscribe { message })),
             Terminated(reason) => (
                 "Terminated",
                 Some(SocketErrorDetails::Terminated { reason }),
@@ -168,10 +164,7 @@ impl SocketErrorInfoInner {
                     subscription_id: id.to_string(),
                 }),
             ),
-            Exchange(message) => (
-                "Exchange",
-                Some(SocketErrorDetails::Exchange { message }),
-            ),
+            Exchange(message) => ("Exchange", Some(SocketErrorDetails::Exchange { message })),
         };
 
         Self {
@@ -245,7 +238,11 @@ fn build_socket_error(py: Python<'_>, error: IntegrationSocketError) -> PyResult
     let (kind, message, details) = {
         let info_ref = info_obj.borrow(py);
         let details = info_ref.details(py)?;
-        (info_ref.kind().to_string(), info_ref.message().to_string(), details)
+        (
+            info_ref.kind().to_string(),
+            info_ref.message().to_string(),
+            details,
+        )
     };
 
     let args = (message.clone(), info_obj.clone_ref(py));
@@ -279,7 +276,7 @@ pub fn _testing_raise_socket_error(kind: &str) -> PyResult<()> {
         other => {
             return Err(PyErr::new::<PyValueError, _>(format!(
                 "unsupported socket error test kind: {other}"
-            )))
+            )));
         }
     };
 
@@ -300,10 +297,7 @@ mod tests {
             assert_eq!(info.kind(), "Subscribe");
             let details = info.details(py).unwrap().unwrap();
             let bound = details.bind(py);
-            let message_obj = bound
-                .get_item("message")
-                .unwrap()
-                .expect("message entry");
+            let message_obj = bound.get_item("message").unwrap().expect("message entry");
             let message: String = message_obj.extract().unwrap();
             assert_eq!(message, "subscription failed");
         });

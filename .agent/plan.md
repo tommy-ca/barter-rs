@@ -21,6 +21,10 @@
   - [x] Capture feed mode specification under `.agent/specs/python-system-feed-mode.md`.
   - [x] Wire bindings for configuring `EngineFeedMode` from Python entry points.
   - [x] Cover new argument via integration tests for live and backtest flows.
+- Expose account event bindings via PyO3 wrappers.
+  - [x] Capture requirements under `.agent/specs/python-account-event-bindings.md`.
+  - [x] Replace pure Python `AccountEvent`/`AccountEventKind` with Rust-backed bindings.
+  - [x] Update `PyMockExecutionClient` to emit typed account events and extend pytest coverage.
 
 ## Completed (2025-10-05)
 - Add integration coverage for backtest argument wrappers.

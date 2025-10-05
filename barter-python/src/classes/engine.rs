@@ -1,14 +1,11 @@
 use chrono::{DateTime, Utc};
-use pyo3::{prelude::*, types::PyModule, PyObject, exceptions::PyValueError};
+use pyo3::{PyObject, exceptions::PyValueError, prelude::*, types::PyModule};
 use rust_decimal::prelude::ToPrimitive;
 use serde_json::Value as JsonValue;
 
 use barter::{
     EngineEvent,
-    engine::{
-        command::Command,
-        state::trading::TradingState,
-    },
+    engine::{command::Command, state::trading::TradingState},
     execution::AccountStreamEvent,
 };
 
@@ -24,17 +21,12 @@ use barter_data::{
     },
 };
 
-use barter_instrument::{
-    exchange::ExchangeId,
-    instrument::InstrumentIndex,
-};
+use barter_instrument::{exchange::ExchangeId, instrument::InstrumentIndex};
 use barter_integration::Terminal;
 
-use crate::{
-    command::{
-        collect_cancel_requests, collect_open_requests, PyInstrumentFilter,
-        PyOrderRequestCancel, PyOrderRequestOpen,
-    },
+use crate::command::{
+    PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen, collect_cancel_requests,
+    collect_open_requests,
 };
 
 /// Wrapper around [`EngineEvent`] value for Python.
@@ -452,14 +444,8 @@ impl PyEngineEvent {
         let time_exchange_unwrapped = time_exchange.unwrap_or(Utc::now());
         let time_received = time_received.unwrap_or(time_exchange_unwrapped);
 
-        let bid = parse_order_book_level(
-            bid_price.zip(bid_amount),
-            "bid",
-        )?;
-        let ask = parse_order_book_level(
-            ask_price.zip(ask_amount),
-            "ask",
-        )?;
+        let bid = parse_order_book_level(bid_price.zip(bid_amount), "bid")?;
+        let ask = parse_order_book_level(ask_price.zip(ask_amount), "ask")?;
 
         let order_book_l1 = OrderBookL1 {
             last_update_time: time_exchange_unwrapped,

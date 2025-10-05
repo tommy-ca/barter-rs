@@ -749,3 +749,11 @@ class OrderResponseCancel(Generic[ExchangeKey, AssetKey, InstrumentKey]):
 
     def __repr__(self) -> str:
         return f"OrderResponseCancel(key={self.key!r}, state={self.state!r})"
+
+
+try:  # pragma: no cover - these bindings are provided by the Rust extension
+    AccountEvent = _core.AccountEvent
+    AccountEventKind = _core.AccountEventKind
+    OrderResponseCancel = _core.OrderResponseCancel
+except AttributeError:  # pragma: no cover - extension not built
+    pass

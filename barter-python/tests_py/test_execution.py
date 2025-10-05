@@ -37,6 +37,7 @@ from barter_python.execution import (
     AssetFees,
     TradeId,
 )
+from barter_python.integration import Snapshot
 from barter_python.instrument import QuoteAsset, Side
 
 BINANCE_INDEX = 1
@@ -960,23 +961,40 @@ class TestAccountSnapshot:
 
 
 class TestAccountEventKind:
-    def test_snapshot(self):
-        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
-        aek = AccountEventKind.snapshot(snapshot)
-        assert aek.kind == "snapshot"
-        assert aek.data == snapshot
+    def _build_snapshot(self) -> AccountSnapshot:
+        return AccountSnapshot(
+            BINANCE_INDEX,
+            [
+                (
+                    BTC_ASSET_INDEX,
+                    1000.0,
+                    750.0,
+                    datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+                )
+            ],
+            [],
+        )
 
-    def test_balance_snapshot(self):
-        balance = AssetBalance(
+    def test_snapshot_variant_and_value(self):
+        kind = AccountEventKind.snapshot(self._build_snapshot())
+        assert kind.variant == "snapshot"
+        value = kind.value
+        assert isinstance(value, AccountSnapshot)
+        assert value.exchange == BINANCE_INDEX
+
+    def test_balance_snapshot_variant_and_value(self):
+        asset_balance = AssetBalance(
             BTC_ASSET_INDEX,
             Balance(Decimal("1.0"), Decimal("0.9")),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
-        aek = AccountEventKind.balance_snapshot(balance)
-        assert aek.kind == "balance_snapshot"
-        assert aek.data == balance
+        kind = AccountEventKind.balance_snapshot(asset_balance)
+        assert kind.variant == "balance_snapshot"
+        snapshot = kind.value
+        assert isinstance(snapshot, Snapshot)
+        assert snapshot.value.asset == BTC_ASSET_INDEX
 
-    def test_order_snapshot(self):
+    def test_order_snapshot_variant_and_value(self):
         order = Order(
             OrderKey(
                 BINANCE_INDEX,
@@ -991,11 +1009,15 @@ class TestAccountEventKind:
             TimeInForce.GOOD_UNTIL_CANCELLED,
             OrderState.fully_filled(),
         )
-        aek = AccountEventKind.order_snapshot(order)
-        assert aek.kind == "order_snapshot"
-        assert aek.data == order
+        kind = AccountEventKind.order_snapshot(order)
+        assert kind.variant == "order_snapshot"
+        value = kind.value
+        assert isinstance(value, Snapshot)
+        order_value = value.value
+        assert isinstance(order_value, Order)
+        assert order_value.key == order.key
 
-    def test_order_cancelled(self):
+    def test_order_cancelled_variant_and_value(self):
         response = OrderResponseCancel(
             OrderKey(
                 BINANCE_INDEX,
@@ -1008,11 +1030,13 @@ class TestAccountEventKind:
                 datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
             ),
         )
-        aek = AccountEventKind.order_cancelled(response)
-        assert aek.kind == "order_cancelled"
-        assert aek.data == response
+        kind = AccountEventKind.order_cancelled(response)
+        assert kind.variant == "order_cancelled"
+        value = kind.value
+        assert isinstance(value, OrderResponseCancel)
+        assert value.key == response.key
 
-    def test_trade(self):
+    def test_trade_variant_and_value(self):
         trade = Trade(
             TradeId.new("trade-123"),
             OrderId.new("order-456"),
@@ -1024,57 +1048,54 @@ class TestAccountEventKind:
             Decimal("0.1"),
             AssetFees(QuoteAsset(), Decimal("0.005")),
         )
-        aek = AccountEventKind.trade(trade)
-        assert aek.kind == "trade"
-        assert aek.data == trade
+        kind = AccountEventKind.trade(trade)
+        assert kind.variant == "trade"
+        value = kind.value
+        assert isinstance(value, Trade)
+        assert value.id == trade.id
 
-    def test_equality(self):
-        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
-        aek1 = AccountEventKind.snapshot(snapshot)
-        aek2 = AccountEventKind.snapshot(snapshot)
-        balance = AssetBalance(
-            BTC_ASSET_INDEX,
-            Balance(Decimal("1.0"), Decimal("0.9")),
-            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+    def test_equality_and_hash(self):
+        kind_a = AccountEventKind.snapshot(self._build_snapshot())
+        kind_b = AccountEventKind.snapshot(self._build_snapshot())
+        kind_c = AccountEventKind.balance_snapshot(
+            AssetBalance(
+                BTC_ASSET_INDEX,
+                Balance(Decimal("1.0"), Decimal("0.9")),
+                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            )
         )
-        aek3 = AccountEventKind.balance_snapshot(balance)
-        assert aek1 == aek2
-        assert aek1 != aek3
-
-    def test_str_repr(self):
-        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
-        aek = AccountEventKind.snapshot(snapshot)
-        assert "AccountEventKind(" in repr(aek)
+        assert kind_a == kind_b
+        assert hash(kind_a) == hash(kind_b)
+        assert kind_a != kind_c
+        assert "AccountEventKind" in repr(kind_c)
 
 
 class TestAccountEvent:
-    def test_creation(self):
-        exchange = BINANCE_INDEX
-        snapshot = AccountSnapshot(exchange, [], [])
+    def _build_event(self) -> AccountEvent:
+        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
         kind = AccountEventKind.snapshot(snapshot)
+        return AccountEvent.new(BINANCE_INDEX, kind)
 
-        event = AccountEvent.new(exchange, kind)
-        assert event.exchange == exchange
-        assert event.kind == kind
+    def test_creation_and_accessors(self):
+        event = self._build_event()
+        assert event.exchange == BINANCE_INDEX
+        assert isinstance(event.exchange_index, bp.ExchangeIndex)
+        assert event.exchange_index.index == BINANCE_INDEX
+        assert event.kind.variant == "snapshot"
 
-    def test_equality(self):
-        exchange = BINANCE_INDEX
-        snapshot = AccountSnapshot(exchange, [], [])
-        kind = AccountEventKind.snapshot(snapshot)
+    def test_equality_and_hash(self):
+        event_a = self._build_event()
+        event_b = self._build_event()
+        event_c = AccountEvent.new(KRAKEN_INDEX, event_a.kind)
+        assert event_a == event_b
+        assert hash(event_a) == hash(event_b)
+        assert event_a != event_c
 
-        event1 = AccountEvent.new(exchange, kind)
-        event2 = AccountEvent.new(exchange, kind)
-        event3 = AccountEvent.new(KRAKEN_INDEX, kind)
-        assert event1 == event2
-        assert event1 != event3
-
-    def test_str_repr(self):
-        exchange = BINANCE_INDEX
-        snapshot = AccountSnapshot(exchange, [], [])
-        kind = AccountEventKind.snapshot(snapshot)
-
-        event = AccountEvent.new(exchange, kind)
-        assert "AccountEvent(" in repr(event)
+    def test_json_round_trip(self):
+        event = self._build_event()
+        payload = event.to_json()
+        restored = AccountEvent.from_json(payload)
+        assert restored == event
 
 
 class TestMockExecutionConfigBindings:
@@ -1201,7 +1222,7 @@ class TestMockExecutionClientBindings:
             response = client.open_market_order("BTCUSDT", "buy", Decimal("0.1"))
             assert response is not None
 
-            observed = None
+            observed: AccountEvent | None = None
             for _ in range(5):
                 candidate = client.poll_event(timeout=0.5)
                 if candidate is not None:
@@ -1209,8 +1230,9 @@ class TestMockExecutionClientBindings:
                     break
 
             if observed is not None:
-                assert observed["exchange"] == "mock"
-                assert "kind" in observed
+                assert isinstance(observed, AccountEvent)
+                assert observed.exchange == instrument_map.exchange_index.index
+                assert observed.kind.variant in {"order_snapshot", "trade", "snapshot"}
 
     def test_open_limit_order_with_post_only(self):
         config = self._config()
@@ -1238,7 +1260,8 @@ class TestMockExecutionClientBindings:
 
             observed = client.poll_event(timeout=0.5)
             if observed is not None:
-                assert observed["exchange"] == "mock"
+                assert isinstance(observed, AccountEvent)
+                assert observed.exchange == instrument_map.exchange_index.index
 
     def test_open_limit_order_rejects_invalid_price(self):
         config = self._config()

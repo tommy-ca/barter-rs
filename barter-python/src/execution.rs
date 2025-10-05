@@ -10,11 +10,12 @@ use barter_execution::{
     },
     error::{ApiError, KeyError, OrderError, UnindexedClientError},
     exchange::mock::MockExchange,
+    indexer::AccountEventIndexer,
     map::{ExecutionInstrumentMap, generate_execution_instrument_map},
     order::{
         OrderEvent, OrderKey, OrderKind, TimeInForce,
         id::{ClientOrderId, OrderId, StrategyId},
-        request::{OrderRequestOpen, RequestOpen},
+        request::{OrderRequestOpen, OrderResponseCancel, RequestOpen},
         state::{
             ActiveOrderState, CancelInFlight, Cancelled, InactiveOrderState, Open, OrderState,
         },
@@ -34,7 +35,8 @@ use fnv::FnvHashMap;
 use futures::{StreamExt, stream::BoxStream};
 use pyo3::{
     Bound, Py, PyAny, PyObject, PyRefMut, PyResult, Python,
-    exceptions::PyValueError,
+    basic::CompareOp,
+    exceptions::{PyNotImplementedError, PyValueError},
     prelude::*,
     types::{PyModule, PyType},
 };
@@ -45,6 +47,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{Duration, timeout};
 
 use crate::{
+    account::PyAccountEvent,
     command::{PyOrderKey, parse_side, parse_time_in_force},
     config::{PyMockExecutionConfig, PySystemConfig},
     data::PyExchangeId,
@@ -607,7 +610,8 @@ impl PyTimeInForce {
                 if let Ok(wrapper) = bound.extract::<Py<PyTimeInForce>>() {
                     let borrowed = wrapper.borrow(bound.py());
                     if let Some(flag) = post_only
-                        && flag != borrowed.is_post_only() {
+                        && flag != borrowed.is_post_only()
+                    {
                         return Err(PyValueError::new_err(
                             "post_only argument must match provided TimeInForce value",
                         ));
@@ -1344,6 +1348,10 @@ impl PyCancelledState {
     fn from_inner(inner: DefaultCancelledState) -> Self {
         Self { inner }
     }
+
+    pub(crate) fn clone_inner(&self) -> DefaultCancelledState {
+        self.inner.clone()
+    }
 }
 
 #[pymethods]
@@ -1382,6 +1390,10 @@ pub struct PyOrderError {
 impl PyOrderError {
     fn from_inner(inner: DefaultOrderError) -> Self {
         Self { inner }
+    }
+
+    pub(crate) fn clone_inner(&self) -> DefaultOrderError {
+        self.inner.clone()
     }
 
     fn variant_inner(&self) -> &'static str {
@@ -1436,6 +1448,96 @@ impl PyOrderError {
     fn __repr__(&self) -> PyResult<String> {
         let json = self.to_json()?;
         Ok(format!("OrderError({json})"))
+    }
+}
+
+/// Wrapper around [`OrderResponseCancel`] for Python exposure.
+#[pyclass(module = "barter_python", name = "OrderResponseCancel", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyOrderResponseCancel {
+    inner: OrderResponseCancel<ExchangeIndex, AssetIndex, InstrumentIndex>,
+}
+
+impl PyOrderResponseCancel {
+    pub(crate) fn from_inner(
+        inner: OrderResponseCancel<ExchangeIndex, AssetIndex, InstrumentIndex>,
+    ) -> Self {
+        Self { inner }
+    }
+
+    pub(crate) fn clone_inner(
+        &self,
+    ) -> OrderResponseCancel<ExchangeIndex, AssetIndex, InstrumentIndex> {
+        self.inner.clone()
+    }
+
+    fn state_object(&self, py: Python<'_>) -> PyResult<PyObject> {
+        match &self.inner.state {
+            Ok(cancelled) => Py::new(py, PyCancelledState::from_inner(cancelled.clone()))
+                .map(|value| value.into_py(py)),
+            Err(error) => {
+                Py::new(py, PyOrderError::from_inner(error.clone())).map(|value| value.into_py(py))
+            }
+        }
+    }
+}
+
+#[pymethods]
+impl PyOrderResponseCancel {
+    #[new]
+    #[pyo3(signature = (key, state))]
+    pub fn __new__(py: Python<'_>, key: &PyOrderKey, state: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let key_inner = key.clone_inner();
+        let state_inner = if let Ok(cancelled) = state.extract::<Py<PyCancelledState>>() {
+            Ok(cancelled.borrow(py).clone_inner())
+        } else if let Ok(error) = state.extract::<Py<PyOrderError>>() {
+            Err(error.borrow(py).clone_inner())
+        } else {
+            return Err(PyValueError::new_err(
+                "state must be a Cancelled or OrderError value",
+            ));
+        };
+
+        Ok(Self {
+            inner: OrderResponseCancel::new(key_inner, state_inner),
+        })
+    }
+
+    #[getter]
+    pub fn key(&self) -> PyOrderKey {
+        PyOrderKey::from_inner(self.inner.key.clone())
+    }
+
+    #[getter]
+    pub fn state(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.state_object(py)
+    }
+
+    pub fn is_ok(&self) -> bool {
+        self.inner.state.is_ok()
+    }
+
+    pub fn to_json(&self) -> PyResult<String> {
+        serialize_to_json(&self.inner)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        serialize_to_py_dict(py, &self.inner)
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let json = self.to_json()?;
+        Ok(format!("OrderResponseCancel({json})"))
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
+        match op {
+            CompareOp::Eq => Ok(self.inner == other.inner),
+            CompareOp::Ne => Ok(self.inner != other.inner),
+            _ => Err(PyNotImplementedError::new_err(
+                "ordering comparisons are not supported for OrderResponseCancel",
+            )),
+        }
     }
 }
 
@@ -1515,7 +1617,13 @@ impl PyTradeId {
 }
 
 /// Wrapper around [`AssetFees`] for Python exposure.
-#[pyclass(module = "barter_python.execution", name = "AssetFees", eq, hash, frozen)]
+#[pyclass(
+    module = "barter_python.execution",
+    name = "AssetFees",
+    eq,
+    hash,
+    frozen
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyAssetFees {
     inner: PyAssetFeesInner,
@@ -1620,10 +1728,27 @@ impl PyAssetFees {
 }
 
 /// Wrapper around [`Trade`] for Python exposure.
-#[pyclass(module = "barter_python.execution", name = "Trade", unsendable, eq, hash, frozen)]
+#[pyclass(
+    module = "barter_python.execution",
+    name = "Trade",
+    unsendable,
+    eq,
+    hash,
+    frozen
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PyTrade {
     pub(crate) inner: ExecutionTrade<QuoteAsset, InstrumentIndex>,
+}
+
+impl PyTrade {
+    pub(crate) fn from_inner(inner: ExecutionTrade<QuoteAsset, InstrumentIndex>) -> Self {
+        Self { inner }
+    }
+
+    pub(crate) fn clone_inner(&self) -> ExecutionTrade<QuoteAsset, InstrumentIndex> {
+        self.inner.clone()
+    }
 }
 
 #[pymethods]
@@ -1819,7 +1944,6 @@ impl PyExecutionInstrumentMap {
             let converted = mapped
                 .map_asset_key_with_lookup(|asset| asset_name_for_index(&asset_lookup, *asset))?;
 
-
             if !matches!(converted.kind, InstrumentKind::Spot) {
                 return Err(PyValueError::new_err(format!(
                     "MockExecutionClient only supports spot instruments; found {:?}",
@@ -1934,6 +2058,7 @@ pub struct PyMockExecutionClient {
     asset_filters: Vec<AssetNameExchange>,
     instrument_filters: Vec<InstrumentNameExchange>,
     exchange_id: ExchangeId,
+    instrument_map: Arc<ExecutionInstrumentMap>,
 }
 
 impl PyMockExecutionClient {
@@ -1979,6 +2104,12 @@ impl PyMockExecutionClient {
             })
             .unwrap_or_else(|| self.instrument_filters.clone())
     }
+
+    fn index_account_event(&self, event: UnindexedAccountEvent) -> PyResult<PyAccountEvent> {
+        let indexer = AccountEventIndexer::new(Arc::clone(&self.instrument_map));
+        let indexed = indexer.account_event(event).map_err(index_error_to_py)?;
+        Ok(PyAccountEvent::from_inner(indexed))
+    }
 }
 
 #[pymethods]
@@ -2008,6 +2139,7 @@ impl PyMockExecutionClient {
         let instruments = instrument_map.mock_exchange_instruments()?;
         let asset_filters = instrument_map.asset_filters();
         let instrument_filters = instrument_map.instrument_filters();
+        let instrument_map_arc = Arc::new(instrument_map.inner.clone());
 
         let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (event_tx, event_rx) = broadcast::channel(MOCK_ACCOUNT_STREAM_CAPACITY);
@@ -2037,6 +2169,7 @@ impl PyMockExecutionClient {
             asset_filters,
             instrument_filters,
             exchange_id,
+            instrument_map: instrument_map_arc,
         })
     }
 
@@ -2249,7 +2382,7 @@ impl PyMockExecutionClient {
         &self,
         py: Python<'_>,
         timeout_secs: Option<f64>,
-    ) -> PyResult<Option<PyObject>> {
+    ) -> PyResult<Option<Py<PyAccountEvent>>> {
         let mut guard = self
             .account_stream
             .lock()
@@ -2287,14 +2420,20 @@ impl PyMockExecutionClient {
             });
 
             match event {
-                Ok(Some(event)) => serialize_to_py_dict(py, &event).map(Some),
+                Ok(Some(event)) => {
+                    let indexed = self.index_account_event(event)?;
+                    Py::new(py, indexed).map(Some)
+                }
                 Ok(None) => Ok(None),
                 Err(_) => Ok(None),
             }
         } else {
             let event = py.allow_threads(move || runtime.block_on(stream.next()));
             match event {
-                Some(event) => serialize_to_py_dict(py, &event).map(Some),
+                Some(event) => {
+                    let indexed = self.index_account_event(event)?;
+                    Py::new(py, indexed).map(Some)
+                }
                 None => Ok(None),
             }
         }
@@ -2320,7 +2459,8 @@ impl PyMockExecutionClient {
             let runtime = Arc::clone(&self.runtime);
             let join_result = py.allow_threads(move || runtime.block_on(handle));
             if let Err(err) = join_result
-                && !err.is_cancelled() {
+                && !err.is_cancelled()
+            {
                 return Err(PyValueError::new_err(err.to_string()));
             }
         }
@@ -2351,7 +2491,8 @@ impl Drop for PyMockExecutionClient {
             guard.take();
         }
         if let Ok(mut guard) = self.exchange_handle.lock()
-            && let Some(handle) = guard.take() {
+            && let Some(handle) = guard.take()
+        {
             handle.abort();
         }
     }

@@ -29,7 +29,7 @@ mod strategy;
 mod summary;
 mod system;
 
-use account::{PyAccountSnapshot, PyInstrumentAccountSnapshot};
+use account::{PyAccountEvent, PyAccountEventKind, PyAccountSnapshot, PyInstrumentAccountSnapshot};
 use analytics::{
     calculate_calmar_ratio, calculate_max_drawdown, calculate_mean_drawdown,
     calculate_profit_factor, calculate_rate_of_return, calculate_sharpe_ratio,
@@ -40,16 +40,11 @@ use analytics::{
 use backtest::{PyBacktestArgsConstant, PyBacktestArgsDynamic, PyMarketDataInMemory};
 use books::{PyLevel, PyOrderBook, calculate_mid_price, calculate_volume_weighted_mid_price};
 
-
+use barter_data::books::Level;
 use classes::core::{PySequence, PyTimedF64, shutdown_event, timed_f64};
 use classes::engine::PyEngineEvent;
-use barter_data::{
-    books::Level,
-};
 
-use barter_instrument::{
-    exchange::ExchangeId,
-};
+use barter_instrument::exchange::ExchangeId;
 
 use collection::{PyNoneOneOrMany, PyOneOrMany};
 use command::{
@@ -60,21 +55,22 @@ use config::{PyExecutionConfig, PyMockExecutionConfig, PySystemConfig};
 #[cfg(feature = "python-tests")]
 use data::_testing_dynamic_trades;
 use data::{
-    PyAsyncMarketStream, PyDynamicStreams, PyExchangeId, PyMarketStream, PySubKind, PySubscription, PySubscriptionId,
-    exchange_supports_instrument_kind, init_dynamic_streams,
+    PyAsyncMarketStream, PyDynamicStreams, PyExchangeId, PyMarketStream, PySubKind, PySubscription,
+    PySubscriptionId, exchange_supports_instrument_kind, init_dynamic_streams,
 };
 use error::{PySocketErrorInfo, SocketError as PySocketErrorExc};
 use execution::{
     PyActiveOrderState, PyAssetFees, PyCancelInFlightState, PyCancelledState, PyClientOrderId,
     PyExecutionAssetBalance, PyExecutionBalance, PyExecutionInstrumentMap, PyInactiveOrderState,
-    PyMockExecutionClient, PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderKind, PyOrderState, PyStrategyId,
-    PyTimeInForce, PyTrade, PyTradeId, asset_balance_new, balance_new,
+    PyMockExecutionClient, PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderKind,
+    PyOrderResponseCancel, PyOrderState, PyStrategyId, PyTimeInForce, PyTrade, PyTradeId,
+    asset_balance_new, balance_new,
 };
 use instrument::{
     PyAsset, PyAssetIndex, PyAssetNameExchange, PyAssetNameInternal, PyExchangeIndex,
     PyIndexedInstruments, PyInstrumentIndex, PyInstrumentNameExchange, PyInstrumentNameInternal,
-    PyOrderQuantityUnits, PyInstrumentSpec, PyInstrumentSpecNotional, PyInstrumentSpecPrice,
-    PyInstrumentSpecQuantity, PyQuoteAsset, PySide,
+    PyInstrumentSpec, PyInstrumentSpecNotional, PyInstrumentSpecPrice, PyInstrumentSpecQuantity,
+    PyOrderQuantityUnits, PyQuoteAsset, PySide,
 };
 use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
@@ -89,24 +85,13 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use strategy::build_ioc_market_order_to_close_position;
 use summary::{
-    PyAssetTearSheet, PyBacktestSummary, PyDrawdown, PyInstrumentTearSheet,
-    PyMeanDrawdown, PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
+    PyAssetTearSheet, PyBacktestSummary, PyDrawdown, PyInstrumentTearSheet, PyMeanDrawdown,
+    PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
 use system::{
     PyAuditContext, PyAuditEvent, PyAuditTick, PyAuditUpdates, PySystemHandle,
     run_historic_backtest, start_system,
 };
-
-
-
-
-
-
-
-
-
-
-
 
 static EXCHANGE_ID_CACHE: Mutex<Option<HashMap<String, ExchangeId>>> = Mutex::new(None);
 
@@ -120,7 +105,8 @@ fn parse_exchange_id(value: &str) -> PyResult<ExchangeId> {
 
     // Check cache first
     if let Some(cache) = EXCHANGE_ID_CACHE.lock().unwrap().as_ref()
-        && let Some(&exchange_id) = cache.get(&normalized) {
+        && let Some(&exchange_id) = cache.get(&normalized)
+    {
         return Ok(exchange_id);
     }
 
@@ -184,8 +170,6 @@ fn parse_level(price: f64, amount: f64) -> PyResult<Level> {
     Ok(Level::new(price, amount))
 }
 
-
-
 /// Python module definition entry point.
 #[pymodule]
 pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -214,8 +198,11 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     execution.add_class::<PyCancelInFlightState>()?;
     execution.add_class::<PyCancelledState>()?;
     execution.add_class::<PyOrderError>()?;
+    execution.add_class::<PyOrderResponseCancel>()?;
     execution.add_class::<PyInstrumentAccountSnapshot>()?;
     execution.add_class::<PyAccountSnapshot>()?;
+    execution.add_class::<PyAccountEventKind>()?;
+    execution.add_class::<PyAccountEvent>()?;
     execution.add_class::<PyTimeInForce>()?;
     m.add_submodule(&execution)?;
 
@@ -235,52 +222,52 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDrawdown>()?;
     m.add_class::<PyMeanDrawdown>()?;
 
-     m.add_class::<PyExchangeId>()?;
-     m.add_class::<PySubKind>()?;
-     m.add_class::<PySubscription>()?;
-     m.add_class::<PySubscriptionId>()?;
-     m.add_class::<PyDynamicStreams>()?;
-     m.add_class::<PyMarketStream>()?;
-     m.add_class::<PyAsyncMarketStream>()?;
-     m.add_class::<PyAssetNameInternal>()?;
-     m.add_class::<PyAssetNameExchange>()?;
-     m.add_class::<PyInstrumentNameInternal>()?;
-     m.add_class::<PyInstrumentNameExchange>()?;
-     m.add_class::<PyAsset>()?;
-     m.add_class::<PyAssetIndex>()?;
-     m.add_class::<PyQuoteAsset>()?;
-     m.add_class::<PyExchangeIndex>()?;
-     m.add_class::<PyInstrumentIndex>()?;
-     m.add_class::<PyIndexedInstruments>()?;
-     m.add_class::<PyOrderQuantityUnits>()?;
-     m.add_class::<PyInstrumentSpecPrice>()?;
-     m.add_class::<PyInstrumentSpecQuantity>()?;
-     m.add_class::<PyInstrumentSpecNotional>()?;
-     m.add_class::<PyInstrumentSpec>()?;
-     m.add_class::<PySide>()?;
-     m.add_class::<PyRiskApproved>()?;
-     m.add_class::<PyRiskRefused>()?;
-     m.add_class::<PyDefaultRiskManager>()?;
-     m.add_class::<PyMetric>()?;
-     m.add_class::<PyTag>()?;
-     m.add_class::<PyBacktestArgsConstant>()?;
-     m.add_class::<PyBacktestArgsDynamic>()?;
-     m.add_class::<PyMarketDataInMemory>()?;
-     m.add_class::<PyField>()?;
-     m.add_class::<PyValue>()?;
-     m.add_class::<PyBacktestSummary>()?;
-     m.add_class::<PyMultiBacktestSummary>()?;
-     m.add_class::<PyLevel>()?;
-     m.add_class::<PyOrderBook>()?;
-     m.add_class::<PySnapshot>()?;
-     m.add_class::<PySnapUpdates>()?;
-     m.add_class::<PyAuditContext>()?;
-     m.add_class::<PyAuditEvent>()?;
-     m.add_class::<PyAuditTick>()?;
-     m.add_class::<PyNoneOneOrMany>()?;
-     m.add_class::<PyOneOrMany>()?;
-     m.add_class::<PyAuditUpdates>()?;
-     m.add_class::<PyTradeId>()?;
+    m.add_class::<PyExchangeId>()?;
+    m.add_class::<PySubKind>()?;
+    m.add_class::<PySubscription>()?;
+    m.add_class::<PySubscriptionId>()?;
+    m.add_class::<PyDynamicStreams>()?;
+    m.add_class::<PyMarketStream>()?;
+    m.add_class::<PyAsyncMarketStream>()?;
+    m.add_class::<PyAssetNameInternal>()?;
+    m.add_class::<PyAssetNameExchange>()?;
+    m.add_class::<PyInstrumentNameInternal>()?;
+    m.add_class::<PyInstrumentNameExchange>()?;
+    m.add_class::<PyAsset>()?;
+    m.add_class::<PyAssetIndex>()?;
+    m.add_class::<PyQuoteAsset>()?;
+    m.add_class::<PyExchangeIndex>()?;
+    m.add_class::<PyInstrumentIndex>()?;
+    m.add_class::<PyIndexedInstruments>()?;
+    m.add_class::<PyOrderQuantityUnits>()?;
+    m.add_class::<PyInstrumentSpecPrice>()?;
+    m.add_class::<PyInstrumentSpecQuantity>()?;
+    m.add_class::<PyInstrumentSpecNotional>()?;
+    m.add_class::<PyInstrumentSpec>()?;
+    m.add_class::<PySide>()?;
+    m.add_class::<PyRiskApproved>()?;
+    m.add_class::<PyRiskRefused>()?;
+    m.add_class::<PyDefaultRiskManager>()?;
+    m.add_class::<PyMetric>()?;
+    m.add_class::<PyTag>()?;
+    m.add_class::<PyBacktestArgsConstant>()?;
+    m.add_class::<PyBacktestArgsDynamic>()?;
+    m.add_class::<PyMarketDataInMemory>()?;
+    m.add_class::<PyField>()?;
+    m.add_class::<PyValue>()?;
+    m.add_class::<PyBacktestSummary>()?;
+    m.add_class::<PyMultiBacktestSummary>()?;
+    m.add_class::<PyLevel>()?;
+    m.add_class::<PyOrderBook>()?;
+    m.add_class::<PySnapshot>()?;
+    m.add_class::<PySnapUpdates>()?;
+    m.add_class::<PyAuditContext>()?;
+    m.add_class::<PyAuditEvent>()?;
+    m.add_class::<PyAuditTick>()?;
+    m.add_class::<PyNoneOneOrMany>()?;
+    m.add_class::<PyOneOrMany>()?;
+    m.add_class::<PyAuditUpdates>()?;
+    m.add_class::<PyTradeId>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(init_json_logging_py, m)?)?;
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
@@ -337,32 +324,27 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
     use barter::{
-        EngineEvent,
-        engine::state::trading::TradingState,
-        Sequence,
-        Timed,
+        EngineEvent, Sequence, Timed, engine::state::trading::TradingState,
         execution::AccountStreamEvent,
     };
     use barter_data::{
-        event::DataKind,
-        streams::consumer::MarketStreamEvent,
-        subscription::book::OrderBookEvent,
+        event::DataKind, streams::consumer::MarketStreamEvent, subscription::book::OrderBookEvent,
     };
     use barter_execution::{
+        AccountEventKind,
         order::{
             OrderKind, TimeInForce,
             id::{ClientOrderId, OrderId, StrategyId},
             state::{ActiveOrderState, OrderState},
         },
         trade::TradeId,
-        AccountEventKind,
     };
     use barter_instrument::{
         Side,
         exchange::{ExchangeId, ExchangeIndex},
         instrument::InstrumentIndex,
     };
-    use barter_integration::{error::SocketError as IntegrationSocketError, Terminal};
+    use barter_integration::{Terminal, error::SocketError as IntegrationSocketError};
     use chrono::{TimeDelta, TimeZone, Utc};
     use pyo3::{
         Python,
@@ -458,9 +440,17 @@ mod tests {
     fn engine_event_market_trade_defaults() {
         let time_exchange = Utc.with_ymd_and_hms(2024, 5, 6, 7, 8, 9).unwrap();
 
-        let event =
-            PyEngineEvent::market_trade("mock", 0, "trade-123", 1.25, 3.5, "sell", Some(time_exchange), None)
-                .unwrap();
+        let event = PyEngineEvent::market_trade(
+            "mock",
+            0,
+            "trade-123",
+            1.25,
+            3.5,
+            "sell",
+            Some(time_exchange),
+            None,
+        )
+        .unwrap();
 
         match event.inner {
             EngineEvent::Market(MarketStreamEvent::Item(item)) => {
@@ -1034,17 +1024,11 @@ mod tests {
             let details = details.expect("details dictionary");
             let details = details.bind(py);
 
-            let payload_obj = details
-                .get_item("payload")
-                .unwrap()
-                .expect("payload entry");
+            let payload_obj = details.get_item("payload").unwrap().expect("payload entry");
             let payload: String = payload_obj.extract().expect("payload string");
             assert_eq!(payload, "not-json");
 
-            let error_obj = details
-                .get_item("error")
-                .unwrap()
-                .expect("error entry");
+            let error_obj = details.get_item("error").unwrap().expect("error entry");
             let error_message: String = error_obj.extract().expect("error string");
             let expected_error = serde_json::from_str::<serde_json::Value>("not-json")
                 .unwrap_err()
@@ -1072,10 +1056,7 @@ mod tests {
 
             let details_any = instance.getattr("details").unwrap();
             let details = details_any.downcast::<PyDict>().unwrap();
-            let payload_obj = details
-                .get_item("payload")
-                .unwrap()
-                .expect("payload entry");
+            let payload_obj = details.get_item("payload").unwrap().expect("payload entry");
             let payload: Vec<u8> = payload_obj.extract().unwrap();
             assert_eq!(payload, vec![1, 2, 3]);
 
