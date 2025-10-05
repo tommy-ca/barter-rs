@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     command::{PyOrderSnapshot, parse_decimal},
-    summary::decimal_to_py,
+    execution::PyExecutionAssetBalance,
 };
 use barter_execution::{
     AccountSnapshot, InstrumentAccountSnapshot,
@@ -11,7 +11,8 @@ use barter_execution::{
 use barter_instrument::{asset::AssetIndex, exchange::ExchangeIndex, instrument::InstrumentIndex};
 use chrono::{DateTime, Utc};
 use pyo3::{
-    Bound, Py, PyObject, PyResult, Python, exceptions::PyValueError, prelude::*, types::PyModule,
+    Bound, Py, PyAny, PyObject, PyResult, Python, basic::CompareOp, exceptions::PyValueError,
+    prelude::*,
 };
 
 /// Wrapper around [`InstrumentAccountSnapshot`] for Python exposure.
@@ -92,6 +93,35 @@ impl PyInstrumentAccountSnapshot {
             self.inner.orders.len()
         ))
     }
+
+    fn __richcmp__(&self, other: &Bound<'_, PyAny>, op: CompareOp) -> PyObject {
+        let py = other.py();
+        let other_handle = other.extract::<Py<Self>>().ok();
+
+        match op {
+            CompareOp::Eq => {
+                let result = other_handle
+                    .map(|handle| {
+                        let other = handle.borrow(py);
+                        self.inner.instrument == other.inner.instrument
+                            && self.inner.orders == other.inner.orders
+                    })
+                    .unwrap_or(false);
+                result.into_py(py)
+            }
+            CompareOp::Ne => {
+                let result = other_handle
+                    .map(|handle| {
+                        let other = handle.borrow(py);
+                        self.inner.instrument != other.inner.instrument
+                            || self.inner.orders != other.inner.orders
+                    })
+                    .unwrap_or(true);
+                result.into_py(py)
+            }
+            _ => py.NotImplemented(),
+        }
+    }
 }
 
 /// Wrapper around [`AccountSnapshot`] for Python exposure.
@@ -106,10 +136,6 @@ impl PyAccountSnapshot {
         &self,
     ) -> AccountSnapshot<ExchangeIndex, AssetIndex, InstrumentIndex> {
         self.inner.clone()
-    }
-
-    fn execution_module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
-        PyModule::import_bound(py, "barter_python.execution")
     }
 }
 
@@ -185,23 +211,12 @@ impl PyAccountSnapshot {
     }
 
     pub fn balances(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
-        let module = Self::execution_module(py)?;
-        let balance_cls = module.getattr("Balance")?;
-        let asset_balance_cls = module.getattr("AssetBalance")?;
-
         self.inner
             .balances
             .iter()
             .map(|balance| {
-                let total = decimal_to_py(py, balance.balance.total)?;
-                let free = decimal_to_py(py, balance.balance.free)?;
-                let balance_obj = balance_cls.call1((total, free))?;
-                let asset_balance_obj = asset_balance_cls.call1((
-                    balance.asset.index(),
-                    balance_obj,
-                    balance.time_exchange,
-                ))?;
-                Ok(asset_balance_obj.into_py(py))
+                let wrapper = PyExecutionAssetBalance::from_inner(balance.clone());
+                Py::new(py, wrapper).map(|value| value.into_py(py))
             })
             .collect()
     }
@@ -247,6 +262,37 @@ impl PyAccountSnapshot {
         }
 
         values
+    }
+
+    fn __richcmp__(&self, other: &Bound<'_, PyAny>, op: CompareOp) -> PyObject {
+        let py = other.py();
+        let other_handle = other.extract::<Py<Self>>().ok();
+
+        match op {
+            CompareOp::Eq => {
+                let result = other_handle
+                    .map(|handle| {
+                        let other = handle.borrow(py);
+                        self.inner.exchange == other.inner.exchange
+                            && self.inner.balances == other.inner.balances
+                            && self.inner.instruments == other.inner.instruments
+                    })
+                    .unwrap_or(false);
+                result.into_py(py)
+            }
+            CompareOp::Ne => {
+                let result = other_handle
+                    .map(|handle| {
+                        let other = handle.borrow(py);
+                        self.inner.exchange != other.inner.exchange
+                            || self.inner.balances != other.inner.balances
+                            || self.inner.instruments != other.inner.instruments
+                    })
+                    .unwrap_or(true);
+                result.into_py(py)
+            }
+            _ => py.NotImplemented(),
+        }
     }
 
     fn __repr__(&self) -> PyResult<String> {

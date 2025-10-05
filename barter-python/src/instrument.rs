@@ -74,7 +74,7 @@ pub struct PyQuoteAsset {
 impl PyQuoteAsset {
     /// Create a new [`QuoteAsset`].
     #[new]
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { inner: QuoteAsset }
     }
 
@@ -248,5 +248,11 @@ impl PyAssetIndex {
     /// Return the debug representation.
     fn __repr__(&self) -> String {
         format!("{:?}", self.inner)
+    }
+}
+
+impl PyAssetIndex {
+    pub(crate) fn inner(&self) -> AssetIndex {
+        self.inner
     }
 }

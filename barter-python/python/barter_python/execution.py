@@ -11,10 +11,14 @@ from typing import Generic, TypeVar, Union
 from .instrument import QuoteAsset, Side
 from .barter_python import (
     AccountSnapshot as _AccountSnapshot,
+    AssetBalance as _AssetBalance,
+    asset_balance_new as _asset_balance_new,
     ClientOrderId as _ClientOrderId,
     InstrumentAccountSnapshot as _InstrumentAccountSnapshot,
     OrderId as _OrderId,
     OrderKey as _OrderKey,
+    balance_new as _balance_new,
+    Balance as _Balance,
     StrategyId as _StrategyId,
 )
 
@@ -24,6 +28,108 @@ StrategyId = _StrategyId
 OrderKey = _OrderKey
 InstrumentAccountSnapshot = _InstrumentAccountSnapshot
 AccountSnapshot = _AccountSnapshot
+
+
+class Balance:
+    """Python-friendly wrapper around the Rust-backed balance type."""
+
+    __slots__ = ("_inner",)
+
+    def __init__(self, total, free):
+        self._inner = _balance_new(total, free)
+
+    @classmethod
+    def new(cls, total, free):
+        return cls(total, free)
+
+    @classmethod
+    def _from_inner(cls, inner: _Balance):
+        obj = object.__new__(cls)
+        obj._inner = inner
+        return obj
+
+    @property
+    def total(self):
+        return self._inner.total
+
+    @property
+    def free(self):
+        return self._inner.free
+
+    def used(self):
+        return self._inner.used()
+
+    def to_dict(self):
+        return self._inner.to_dict()
+
+    def __getattr__(self, name: str):
+        return getattr(self._inner, name)
+
+    def __repr__(self) -> str:
+        return repr(self._inner)
+
+    def __str__(self) -> str:
+        return str(self._inner)
+
+    def __eq__(self, other: object) -> bool:
+        other_inner = getattr(other, "_inner", other)
+        return self._inner == other_inner
+
+    def __hash__(self) -> int:
+        return hash(self._inner)
+
+
+class AssetBalance:
+    """Python wrapper exposing constructors for the Rust asset balance type."""
+
+    __slots__ = ("_inner",)
+
+    def __init__(self, asset, balance, time_exchange):
+        if isinstance(balance, Balance):
+            balance_inner = balance._inner
+        elif isinstance(balance, _Balance):
+            balance_inner = balance
+        else:
+            raise TypeError("balance must be a Balance value")
+        self._inner = _asset_balance_new(asset, balance_inner, time_exchange)
+
+    @classmethod
+    def new(cls, asset, balance, time_exchange):
+        return cls(asset, balance, time_exchange)
+
+    @classmethod
+    def _from_inner(cls, inner: _AssetBalance):
+        obj = object.__new__(cls)
+        obj._inner = inner
+        return obj
+
+    @property
+    def asset(self):
+        return self._inner.asset
+
+    @property
+    def balance(self) -> Balance:
+        return Balance._from_inner(self._inner.balance)
+
+    @property
+    def time_exchange(self):
+        return self._inner.time_exchange
+
+    def __getattr__(self, name: str):
+        return getattr(self._inner, name)
+
+    def __repr__(self) -> str:
+        return repr(self._inner)
+
+    def __str__(self) -> str:
+        return str(self._inner)
+
+    def __eq__(self, other: object) -> bool:
+        other_inner = getattr(other, "_inner", other)
+        return self._inner == other_inner
+
+    def __hash__(self) -> int:
+        return hash(self._inner)
 
 AssetKey = TypeVar("AssetKey")
 InstrumentKey = TypeVar("InstrumentKey")
@@ -50,75 +156,6 @@ class TimeInForce(Enum):
 
     def __str__(self) -> str:
         return self.value
-@dataclass(frozen=True)
-class Balance:
-    """Asset balance with total and free amounts."""
-
-    total: Decimal
-    free: Decimal
-
-    @classmethod
-    def new(cls, total: Decimal, free: Decimal) -> Balance:
-        return cls(total, free)
-
-    def used(self) -> Decimal:
-        """Calculate used balance."""
-        return self.total - self.free
-
-    def __str__(self) -> str:
-        return f"Balance(total={self.total}, free={self.free})"
-
-    def __repr__(self) -> str:
-        return f"Balance(total={self.total!r}, free={self.free!r})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Balance):
-            return NotImplemented
-        return self.total == other.total and self.free == other.free
-
-    def __hash__(self) -> int:
-        return hash((self.total, self.free))
-
-
-@dataclass(frozen=True)
-class AssetBalance(Generic[AssetKey]):
-    """Asset balance with timestamp."""
-
-    asset: AssetKey
-    balance: Balance
-    time_exchange: datetime
-
-    @classmethod
-    def new(
-        cls, asset: AssetKey, balance: Balance, time_exchange: datetime
-    ) -> AssetBalance[AssetKey]:
-        return cls(asset, balance, time_exchange)
-
-    def __str__(self) -> str:
-        return f"AssetBalance(asset={self.asset}, balance={self.balance}, time={self.time_exchange})"
-
-    def __repr__(self) -> str:
-        return (
-            f"AssetBalance("
-            f"asset={self.asset!r}, "
-            f"balance={self.balance!r}, "
-            f"time_exchange={self.time_exchange!r}"
-            f")"
-        )
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, AssetBalance):
-            return NotImplemented
-        return (
-            self.asset == other.asset
-            and self.balance == other.balance
-            and self.time_exchange == other.time_exchange
-        )
-
-    def __hash__(self) -> int:
-        return hash((self.asset, self.balance, self.time_exchange))
-
-
 @dataclass(frozen=True)
 class AssetFees(Generic[AssetKey]):
     """Asset fees."""
@@ -669,7 +706,7 @@ class AccountEvent(Generic[ExchangeKey, AssetKey, InstrumentKey]):
 
 AccountEventKindType = Union[
     "AccountSnapshot[ExchangeKey, AssetKey, InstrumentKey]",
-    AssetBalance[AssetKey],
+    "AssetBalance",
     "Order[ExchangeKey, InstrumentKey, AssetKey]",
     "OrderResponseCancel[ExchangeKey, AssetKey, InstrumentKey]",
     Trade[AssetKey, InstrumentKey],

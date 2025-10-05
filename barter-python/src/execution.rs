@@ -1,10 +1,15 @@
 use std::str::FromStr;
 
 use barter_execution::{
+    balance::{AssetBalance as ExecutionAssetBalance, Balance as ExecutionBalance},
     order::id::{ClientOrderId, OrderId, StrategyId},
     trade::{AssetFees as ExecutionAssetFees, Trade as ExecutionTrade, TradeId},
 };
-use barter_instrument::{Side, asset::QuoteAsset, instrument::InstrumentIndex};
+use barter_instrument::{
+    Side,
+    asset::{AssetIndex, QuoteAsset},
+    instrument::InstrumentIndex,
+};
 use chrono::{DateTime, Utc};
 use pyo3::{
     Bound, Py, PyAny, PyObject, PyResult, Python, exceptions::PyValueError, prelude::*,
@@ -14,7 +19,7 @@ use rust_decimal::Decimal;
 
 use crate::{
     command::parse_side,
-    instrument::{PyInstrumentIndex, PyQuoteAsset, PySide},
+    instrument::{PyAssetIndex, PyInstrumentIndex, PyQuoteAsset, PySide},
     summary::decimal_to_py,
 };
 
@@ -66,6 +71,215 @@ fn extract_instrument_index(value: &Bound<'_, PyAny>, label: &str) -> PyResult<I
     Err(PyValueError::new_err(format!(
         "{label} must be an integer or InstrumentIndex"
     )))
+}
+
+fn extract_asset_index(value: &Bound<'_, PyAny>, label: &str) -> PyResult<AssetIndex> {
+    if let Ok(index) = value.extract::<usize>() {
+        return Ok(AssetIndex(index));
+    }
+
+    if let Ok(wrapper) = value.extract::<Py<PyAssetIndex>>() {
+        let borrowed = wrapper.borrow(value.py());
+        return Ok(borrowed.inner());
+    }
+
+    Err(PyValueError::new_err(format!(
+        "{label} must be an integer or AssetIndex",
+    )))
+}
+
+/// Wrapper around [`ExecutionBalance`] for Python exposure.
+#[pyclass(module = "barter_python", name = "Balance", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyExecutionBalance {
+    inner: ExecutionBalance,
+}
+
+impl PyExecutionBalance {
+    pub(crate) fn inner(&self) -> ExecutionBalance {
+        self.inner
+    }
+
+    pub(crate) fn from_inner(inner: ExecutionBalance) -> Self {
+        Self { inner }
+    }
+
+    fn from_bounds(total: &Bound<'_, PyAny>, free: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let total_decimal = extract_decimal(total, "total")?;
+        let free_decimal = extract_decimal(free, "free")?;
+
+        if total_decimal.is_sign_negative() {
+            return Err(PyValueError::new_err(
+                "total must be a non-negative numeric value",
+            ));
+        }
+
+        if free_decimal.is_sign_negative() {
+            return Err(PyValueError::new_err(
+                "free must be a non-negative numeric value",
+            ));
+        }
+
+        if free_decimal > total_decimal {
+            return Err(PyValueError::new_err(
+                "free balance cannot exceed total balance",
+            ));
+        }
+
+        Ok(Self {
+            inner: ExecutionBalance::new(total_decimal, free_decimal),
+        })
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (total, free))]
+pub fn balance_new(total: PyObject, free: PyObject) -> PyResult<PyExecutionBalance> {
+    Python::with_gil(|py| {
+        let total_bound = total.bind(py);
+        let free_bound = free.bind(py);
+        PyExecutionBalance::from_bounds(&total_bound, &free_bound)
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (asset, balance, time_exchange))]
+pub fn asset_balance_new(
+    asset: PyObject,
+    balance: PyObject,
+    time_exchange: DateTime<Utc>,
+) -> PyResult<PyExecutionAssetBalance> {
+    Python::with_gil(|py| {
+        let asset_bound = asset.bind(py);
+        let balance_bound = balance.bind(py);
+
+        let asset_index = extract_asset_index(&asset_bound, "asset")?;
+        let py_balance = balance_bound
+            .extract::<Py<PyExecutionBalance>>()
+            .map_err(|_| PyValueError::new_err("balance must be a Balance value"))?;
+        let rust_balance = py_balance.borrow(py).inner();
+
+        Ok(PyExecutionAssetBalance {
+            inner: ExecutionAssetBalance::new(asset_index, rust_balance, time_exchange),
+        })
+    })
+}
+
+#[pymethods]
+impl PyExecutionBalance {
+    #[new]
+    #[pyo3(signature = (total, free))]
+    pub fn new(total: PyObject, free: PyObject) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            let total_bound = total.bind(py);
+            let free_bound = free.bind(py);
+            Self::from_bounds(&total_bound, &free_bound)
+        })
+    }
+
+    #[getter]
+    pub fn total(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.inner.total)
+    }
+
+    #[getter]
+    pub fn free(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.inner.free)
+    }
+
+    pub fn used(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.inner.used())
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        Python::with_gil(|py| {
+            let total = decimal_to_py(py, self.inner.total)?;
+            let free = decimal_to_py(py, self.inner.free)?;
+            let total_repr: String = total.bind(py).str()?.extract()?;
+            let free_repr: String = free.bind(py).str()?.extract()?;
+            Ok(format!("Balance(total={total_repr}, free={free_repr})"))
+        })
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Python::with_gil(|py| {
+            let total = decimal_to_py(py, self.inner.total)?;
+            let free = decimal_to_py(py, self.inner.free)?;
+            let total_repr: String = total.bind(py).repr()?.extract()?;
+            let free_repr: String = free.bind(py).repr()?.extract()?;
+            Ok(format!("Balance(total={total_repr}, free={free_repr})"))
+        })
+    }
+}
+
+/// Wrapper around [`ExecutionAssetBalance`] for Python exposure.
+#[pyclass(module = "barter_python", name = "AssetBalance", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyExecutionAssetBalance {
+    inner: ExecutionAssetBalance<AssetIndex>,
+}
+
+impl PyExecutionAssetBalance {
+    pub(crate) fn from_inner(inner: ExecutionAssetBalance<AssetIndex>) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyExecutionAssetBalance {
+    #[new]
+    #[pyo3(signature = (asset, balance, time_exchange))]
+    pub fn new(asset: PyObject, balance: PyObject, time_exchange: DateTime<Utc>) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            let asset_bound = asset.bind(py);
+            let balance_bound = balance.bind(py);
+
+            let asset_index = extract_asset_index(&asset_bound, "asset")?;
+
+            let py_balance = balance_bound
+                .extract::<Py<PyExecutionBalance>>()
+                .map_err(|_| PyValueError::new_err("balance must be a Balance value"))?;
+
+            let rust_balance = py_balance.borrow(py).inner();
+
+            Ok(Self {
+                inner: ExecutionAssetBalance::new(asset_index, rust_balance, time_exchange),
+            })
+        })
+    }
+
+    #[getter]
+    pub fn asset(&self) -> usize {
+        self.inner.asset.index()
+    }
+
+    #[getter]
+    pub fn balance(&self) -> PyExecutionBalance {
+        PyExecutionBalance::from_inner(self.inner.balance)
+    }
+
+    #[getter]
+    pub fn time_exchange(&self) -> DateTime<Utc> {
+        self.inner.time_exchange
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        self.__repr__()
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Python::with_gil(|py| {
+            let balance = PyExecutionBalance::from_inner(self.inner.balance);
+            let balance_py = Py::new(py, balance)?;
+            let balance_repr: String = balance_py.bind(py).repr()?.extract()?;
+            Ok(format!(
+                "AssetBalance(asset={}, balance={}, time_exchange={})",
+                self.asset(),
+                balance_repr,
+                self.inner.time_exchange,
+            ))
+        })
+    }
 }
 
 /// Wrapper around [`ClientOrderId`] for Python exposure.
@@ -446,7 +660,7 @@ impl PyAssetFees {
     pub fn asset(&self, py: Python<'_>) -> PyResult<PyObject> {
         match &self.inner {
             PyAssetFeesInner::Quote(_) => {
-                let quote = PyQuoteAsset::new_internal();
+                let quote = PyQuoteAsset::new();
                 Py::new(py, quote).map(|value| value.into_py(py))
             }
             PyAssetFeesInner::Named(inner) => Ok(inner.asset.clone().into_py(py)),

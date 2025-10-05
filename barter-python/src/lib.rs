@@ -77,7 +77,10 @@ use data::{
     PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId,
     init_dynamic_streams,
 };
-use execution::{PyAssetFees, PyClientOrderId, PyOrderId, PyStrategyId, PyTrade, PyTradeId};
+use execution::{
+    PyAssetFees, PyClientOrderId, PyExecutionAssetBalance, PyExecutionBalance, PyOrderId,
+    PyStrategyId, PyTrade, PyTradeId, asset_balance_new, balance_new,
+};
 use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyQuoteAsset, PySide};
 use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
@@ -828,6 +831,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTradeId>()?;
     m.add_class::<PyTrade>()?;
     m.add_class::<PyAssetFees>()?;
+    m.add_class::<PyExecutionBalance>()?;
+    m.add_class::<PyExecutionAssetBalance>()?;
     m.add_class::<PyOrderKey>()?;
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;
@@ -875,6 +880,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
     m.add_function(wrap_pyfunction!(start_system, m)?)?;
     m.add_function(wrap_pyfunction!(init_dynamic_streams, m)?)?;
+    m.add_function(wrap_pyfunction!(balance_new, m)?)?;
+    m.add_function(wrap_pyfunction!(asset_balance_new, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_sharpe_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_sortino_ratio, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_calmar_ratio, m)?)?;

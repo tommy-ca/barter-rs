@@ -37,6 +37,8 @@ from barter_python.instrument import QuoteAsset, Side
 
 BINANCE_INDEX = 1
 KRAKEN_INDEX = 2
+BTC_ASSET_INDEX = 0
+ETH_ASSET_INDEX = 1
 
 
 class TestRootExecutionIdentifiers:
@@ -195,7 +197,7 @@ class TestOrderKey:
 
 class TestBalance:
     def test_creation(self):
-        balance = Balance.new(Decimal("100.5"), Decimal("95.2"))
+        balance = Balance(Decimal("100.5"), Decimal("95.2"))
         assert balance.total == Decimal("100.5")
         assert balance.free == Decimal("95.2")
 
@@ -215,14 +217,23 @@ class TestBalance:
         assert str(balance) == "Balance(total=100.5, free=95.2)"
         assert "Balance(" in repr(balance)
 
+    def test_accepts_numeric_inputs(self):
+        balance = Balance(100.5, 90.5)
+        assert balance.total == Decimal("100.5")
+        assert balance.free == Decimal("90.5")
+
+    def test_hashable(self):
+        balance = Balance(Decimal("5"), Decimal("3"))
+        assert hash(balance) == hash(Balance(Decimal("5"), Decimal("3")))
+
 
 class TestAssetBalance:
     def test_creation(self):
-        asset = "btc"
+        asset = BTC_ASSET_INDEX
         balance = Balance(Decimal("100.5"), Decimal("95.2"))
         time_exchange = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-        asset_balance = AssetBalance.new(asset, balance, time_exchange)
+        asset_balance = AssetBalance(asset, balance, time_exchange)
         assert asset_balance.asset == asset
         assert asset_balance.balance == balance
         assert asset_balance.time_exchange == time_exchange
@@ -231,17 +242,32 @@ class TestAssetBalance:
         balance = Balance(Decimal("100.5"), Decimal("95.2"))
         time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-        ab1 = AssetBalance("btc", balance, time)
-        ab2 = AssetBalance("btc", balance, time)
-        ab3 = AssetBalance("eth", balance, time)
+        ab1 = AssetBalance(BTC_ASSET_INDEX, balance, time)
+        ab2 = AssetBalance(BTC_ASSET_INDEX, balance, time)
+        ab3 = AssetBalance(ETH_ASSET_INDEX, balance, time)
         assert ab1 == ab2
         assert ab1 != ab3
 
     def test_str_repr(self):
         balance = Balance(Decimal("100.5"), Decimal("95.2"))
         time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-        asset_balance = AssetBalance("btc", balance, time)
+        asset_balance = AssetBalance(BTC_ASSET_INDEX, balance, time)
         assert "AssetBalance(" in repr(asset_balance)
+
+    def test_hashable(self):
+        balance = Balance(Decimal("1.0"), Decimal("0.5"))
+        time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        assert hash(AssetBalance(BTC_ASSET_INDEX, balance, time)) == hash(
+            AssetBalance(BTC_ASSET_INDEX, balance, time)
+        )
+
+    def test_accepts_asset_index_wrapper(self):
+        balance = Balance(Decimal("3.0"), Decimal("1.5"))
+        time = datetime(2024, 2, 1, tzinfo=timezone.utc)
+        asset_index = bp.AssetIndex(7)
+
+        asset_balance = AssetBalance(asset_index, balance, time)
+        assert asset_balance.asset == 7
 
 
 class TestAssetFees:
@@ -729,145 +755,159 @@ class TestOrderResponseCancel:
 class TestInstrumentAccountSnapshot:
     def test_creation(self):
         instrument = 42
+        key = OrderKey(
+            BINANCE_INDEX,
+            instrument,
+            StrategyId.new("alpha"),
+            ClientOrderId.new("cid-1"),
+        )
+        order_request = bp.OrderRequestOpen(
+            key,
+            "buy",
+            Decimal("50000.0"),
+            Decimal("0.1"),
+            "limit",
+            "good_until_cancelled",
+        )
         orders = [
-            Order(
-                OrderKey(
-                    BINANCE_INDEX,
-                    42,
-                    StrategyId.new("alpha"),
-                    ClientOrderId.new("cid-1"),
-                ),
-                Side.BUY,
-                Decimal("50000.0"),
-                Decimal("0.1"),
-                OrderKind.LIMIT,
-                TimeInForce.GOOD_UNTIL_CANCELLED,
-                OrderState.fully_filled(),
+            bp.OrderSnapshot.from_open_request(
+                order_request,
+                order_id="order-123",
+                time_exchange=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+                filled_quantity=Decimal("0.0"),
             )
         ]
 
-        snapshot = InstrumentAccountSnapshot.new(instrument, orders)
+        snapshot = InstrumentAccountSnapshot(instrument, orders)
         assert snapshot.instrument == instrument
-        assert snapshot.orders == orders
+        returned_orders = snapshot.orders()
+        assert len(returned_orders) == 1
+        assert isinstance(returned_orders[0], bp.OrderSnapshot)
 
     def test_creation_empty_orders(self):
-        snapshot = InstrumentAccountSnapshot.new(42)
+        snapshot = InstrumentAccountSnapshot(42, [])
         assert snapshot.instrument == 42
-        assert snapshot.orders == []
+        assert snapshot.orders() == []
 
     def test_equality(self):
-        snapshot1 = InstrumentAccountSnapshot.new(42)
-        snapshot2 = InstrumentAccountSnapshot.new(42)
-        snapshot3 = InstrumentAccountSnapshot.new(43)
+        snapshot1 = InstrumentAccountSnapshot(42, [])
+        snapshot2 = InstrumentAccountSnapshot(42, [])
+        snapshot3 = InstrumentAccountSnapshot(43, [])
         assert snapshot1 == snapshot2
         assert snapshot1 != snapshot3
 
     def test_str_repr(self):
-        snapshot = InstrumentAccountSnapshot.new(42)
+        snapshot = InstrumentAccountSnapshot(42, [])
         assert "InstrumentAccountSnapshot(" in repr(snapshot)
 
 
 class TestAccountSnapshot:
     def test_creation(self):
         exchange = BINANCE_INDEX
-        balances = [
-            AssetBalance.new(
-                "btc",
-                Balance(Decimal("1.0"), Decimal("0.9")),
-                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            )
-        ]
-        instruments = [InstrumentAccountSnapshot.new(42)]
+        balance_tuple = (
+            BTC_ASSET_INDEX,
+            1.0,
+            0.9,
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        instruments = [InstrumentAccountSnapshot(42, [])]
 
-        snapshot = AccountSnapshot.new(exchange, balances, instruments)
+        snapshot = AccountSnapshot(exchange, [balance_tuple], instruments)
         assert snapshot.exchange == exchange
-        assert snapshot.balances == balances
-        assert snapshot.instruments == instruments
+        returned_balances = snapshot.balances()
+        assert len(returned_balances) == 1
+        assert returned_balances[0].asset == BTC_ASSET_INDEX
+        assert snapshot.instruments() == instruments
+
+    def test_balances_returns_wrappers(self):
+        exchange = BINANCE_INDEX
+        balance_tuple = (
+            BTC_ASSET_INDEX,
+            2.0,
+            1.0,
+            datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        snapshot = AccountSnapshot(exchange, [balance_tuple], [])
+
+        returned = snapshot.balances()
+        assert len(returned) == 1
+        first = returned[0]
+        assert first.asset == BTC_ASSET_INDEX
+        assert first.balance.total == Decimal("2")
+        assert first.balance.free == Decimal("1")
 
     def test_time_most_recent(self):
         time1 = datetime(2024, 1, 1, 11, 0, 0, tzinfo=timezone.utc)
         time2 = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-        balances = [
-            AssetBalance.new("btc", Balance(Decimal("1.0"), Decimal("0.9")), time1)
-        ]
-        instruments = [
-            InstrumentAccountSnapshot.new(
-                42,
-                [
-                    Order(
-                        OrderKey(
-                            BINANCE_INDEX,
-                            42,
-                            StrategyId.new("alpha"),
-                            ClientOrderId.new("cid-1"),
-                        ),
-                        Side.BUY,
-                        Decimal("50000.0"),
-                        Decimal("0.1"),
-                        OrderKind.LIMIT,
-                        TimeInForce.GOOD_UNTIL_CANCELLED,
-                        OrderState.active(
-                            Open(OrderId.new("order-123"), time2, Decimal("0.0"))
-                        ),
-                    )
-                ],
-            )
-        ]
+        balances = [(BTC_ASSET_INDEX, 1.0, 0.9, time1)]
+        key = OrderKey(
+            BINANCE_INDEX,
+            42,
+            StrategyId.new("alpha"),
+            ClientOrderId.new("cid-1"),
+        )
+        order_request = bp.OrderRequestOpen(
+            key,
+            "buy",
+            Decimal("50000.0"),
+            Decimal("0.1"),
+            "limit",
+            "good_until_cancelled",
+        )
+        order_snapshot = bp.OrderSnapshot.from_open_request(
+            order_request,
+            order_id="order-999",
+            time_exchange=time2,
+            filled_quantity=Decimal("0.0"),
+        )
+        instruments = [InstrumentAccountSnapshot(42, [order_snapshot])]
 
-        snapshot = AccountSnapshot.new(BINANCE_INDEX, balances, instruments)
+        snapshot = AccountSnapshot(BINANCE_INDEX, balances, instruments)
         assert snapshot.time_most_recent() == time2
 
     def test_assets_instruments_iter(self):
         balances = [
-            AssetBalance.new(
-                "btc",
-                Balance(Decimal("1.0"), Decimal("0.9")),
-                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            ),
-            AssetBalance.new(
-                "eth",
-                Balance(Decimal("10.0"), Decimal("9.0")),
-                datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-            ),
+            (BTC_ASSET_INDEX, 1.0, 0.9, datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)),
+            (ETH_ASSET_INDEX, 10.0, 9.0, datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)),
         ]
         instruments = [
-            InstrumentAccountSnapshot.new(42),
-            InstrumentAccountSnapshot.new(43),
+            InstrumentAccountSnapshot(42, []),
+            InstrumentAccountSnapshot(43, []),
         ]
 
-        snapshot = AccountSnapshot.new(BINANCE_INDEX, balances, instruments)
+        snapshot = AccountSnapshot(BINANCE_INDEX, balances, instruments)
 
         assets = list(snapshot.assets())
-        assert "btc" in assets
-        assert "eth" in assets
+        assert BTC_ASSET_INDEX in assets
+        assert ETH_ASSET_INDEX in assets
 
         instruments_list = list(snapshot.instruments_iter())
         assert 42 in instruments_list
         assert 43 in instruments_list
 
     def test_equality(self):
-        snapshot1 = AccountSnapshot.new(BINANCE_INDEX, [], [])
-        snapshot2 = AccountSnapshot.new(BINANCE_INDEX, [], [])
-        snapshot3 = AccountSnapshot.new(KRAKEN_INDEX, [], [])
+        snapshot1 = AccountSnapshot(BINANCE_INDEX, [], [])
+        snapshot2 = AccountSnapshot(BINANCE_INDEX, [], [])
+        snapshot3 = AccountSnapshot(KRAKEN_INDEX, [], [])
         assert snapshot1 == snapshot2
         assert snapshot1 != snapshot3
 
     def test_str_repr(self):
-        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
+        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
         assert "AccountSnapshot(" in repr(snapshot)
 
 
 class TestAccountEventKind:
     def test_snapshot(self):
-        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
+        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
         aek = AccountEventKind.snapshot(snapshot)
         assert aek.kind == "snapshot"
         assert aek.data == snapshot
 
     def test_balance_snapshot(self):
-        balance = AssetBalance.new(
-            "btc",
+        balance = AssetBalance(
+            BTC_ASSET_INDEX,
             Balance(Decimal("1.0"), Decimal("0.9")),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
@@ -928,11 +968,11 @@ class TestAccountEventKind:
         assert aek.data == trade
 
     def test_equality(self):
-        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
+        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
         aek1 = AccountEventKind.snapshot(snapshot)
         aek2 = AccountEventKind.snapshot(snapshot)
-        balance = AssetBalance.new(
-            "btc",
+        balance = AssetBalance(
+            BTC_ASSET_INDEX,
             Balance(Decimal("1.0"), Decimal("0.9")),
             datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
         )
@@ -941,7 +981,7 @@ class TestAccountEventKind:
         assert aek1 != aek3
 
     def test_str_repr(self):
-        snapshot = AccountSnapshot.new(BINANCE_INDEX, [], [])
+        snapshot = AccountSnapshot(BINANCE_INDEX, [], [])
         aek = AccountEventKind.snapshot(snapshot)
         assert "AccountEventKind(" in repr(aek)
 
@@ -949,7 +989,7 @@ class TestAccountEventKind:
 class TestAccountEvent:
     def test_creation(self):
         exchange = BINANCE_INDEX
-        snapshot = AccountSnapshot.new(exchange, [], [])
+        snapshot = AccountSnapshot(exchange, [], [])
         kind = AccountEventKind.snapshot(snapshot)
 
         event = AccountEvent.new(exchange, kind)
@@ -958,7 +998,7 @@ class TestAccountEvent:
 
     def test_equality(self):
         exchange = BINANCE_INDEX
-        snapshot = AccountSnapshot.new(exchange, [], [])
+        snapshot = AccountSnapshot(exchange, [], [])
         kind = AccountEventKind.snapshot(snapshot)
 
         event1 = AccountEvent.new(exchange, kind)
@@ -969,7 +1009,7 @@ class TestAccountEvent:
 
     def test_str_repr(self):
         exchange = BINANCE_INDEX
-        snapshot = AccountSnapshot.new(exchange, [], [])
+        snapshot = AccountSnapshot(exchange, [], [])
         kind = AccountEventKind.snapshot(snapshot)
 
         event = AccountEvent.new(exchange, kind)
