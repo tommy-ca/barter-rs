@@ -14,9 +14,9 @@
 
 ## Current Focus (2025-10-05)
 - Introduce typed Python wrappers for engine `ActionOutput` results produced by audit streams.
-  - [ ] Capture spec under `.agent/specs/python-engine-action-output-bindings.md`.
-  - [ ] Add TDD coverage (Rust + Python) for the new wrappers.
-  - [ ] Implement PyO3 bindings and expose modules to Python consumers.
+  - [x] Capture spec under `.agent/specs/python-engine-action-output-bindings.md`.
+  - [x] Add TDD coverage (Rust + Python) for the new wrappers.
+  - [x] Implement PyO3 bindings and expose modules to Python consumers.
 
 ## Completed (2025-10-05)
 - Add integration coverage for backtest argument wrappers.
