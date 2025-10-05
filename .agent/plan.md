@@ -16,6 +16,8 @@
   - [x] Capture binding gaps for sequencing and audit metadata in `.agent/specs`.
   - [x] Extend PyO3 surface with strongly typed wrappers for engine sequencing.
   - [x] Update Python integration layers & tests to exercise new bindings end-to-end.
+- [ ] Bridge execution `OrderEvent` updates into Python bindings (spec:
+  `.agent/specs/python-order-event-bindings.md`).
 
 ## Completed (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.
