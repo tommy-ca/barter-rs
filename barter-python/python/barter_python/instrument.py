@@ -534,7 +534,7 @@ class Instrument(Generic[AssetKey]):
         underlying: Underlying[AssetKey],
         quote: InstrumentQuoteAsset,
         kind: InstrumentKind[AssetKey],
-        spec: object | None = None,  # TODO: Add spec structures later
+        spec: object | None = None,  # Structured specs available via Rust bindings
     ) -> None:
         self.exchange = exchange
         self.name_internal = (

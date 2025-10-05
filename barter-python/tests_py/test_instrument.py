@@ -519,3 +519,32 @@ class TestPyAssetIndex:
         index = bp.AssetIndex(42)
         assert str(index) == "AssetIndex(42)"
         assert "AssetIndex(" in repr(index)
+
+
+class TestInstrumentSpecBindings:
+    def test_order_quantity_units_asset_variant(self):
+        asset = bp.Asset("btc", "BTC")
+        units = bp.OrderQuantityUnits.asset(asset)
+        assert units.kind == "asset"
+        asset_value = units.asset_value
+        assert asset_value is not None
+        assert asset_value.name_internal == "btc"
+        assert asset_value.name_exchange == "BTC"
+
+    def test_instrument_spec_round_trip(self):
+        price = bp.InstrumentSpecPrice(min=Decimal("0.01"), tick_size=Decimal("0.02"))
+        units = bp.OrderQuantityUnits.contract()
+        quantity = bp.InstrumentSpecQuantity(
+            unit=units,
+            min=Decimal("0.1"),
+            increment=Decimal("0.1"),
+        )
+        notional = bp.InstrumentSpecNotional(min=Decimal("5"))
+        spec = bp.InstrumentSpec(price=price, quantity=quantity, notional=notional)
+
+        assert spec.price.min == Decimal("0.01")
+        assert spec.price.tick_size == Decimal("0.02")
+        assert spec.quantity.unit == units
+        assert spec.quantity.min == Decimal("0.1")
+        assert spec.quantity.increment == Decimal("0.1")
+        assert spec.notional.min == Decimal("5")

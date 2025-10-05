@@ -85,7 +85,11 @@ use execution::{
     PyAssetFees, PyClientOrderId, PyExecutionAssetBalance, PyExecutionBalance, PyOrderId,
     PyStrategyId, PyTrade, PyTradeId, asset_balance_new, balance_new,
 };
-use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyQuoteAsset, PySide};
+use instrument::{
+    PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyInstrumentSpec,
+    PyInstrumentSpecNotional, PyInstrumentSpecPrice, PyInstrumentSpecQuantity,
+    PyOrderQuantityUnits, PyQuoteAsset, PySide,
+};
 use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
 use metric::{PyField, PyMetric, PyTag, PyValue};
@@ -928,6 +932,11 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyQuoteAsset>()?;
     m.add_class::<PyExchangeIndex>()?;
     m.add_class::<PyInstrumentIndex>()?;
+    m.add_class::<PyOrderQuantityUnits>()?;
+    m.add_class::<PyInstrumentSpecPrice>()?;
+    m.add_class::<PyInstrumentSpecQuantity>()?;
+    m.add_class::<PyInstrumentSpecNotional>()?;
+    m.add_class::<PyInstrumentSpec>()?;
     m.add_class::<PySide>()?;
     m.add_class::<PyRiskApproved>()?;
     m.add_class::<PyRiskRefused>()?;

@@ -1,9 +1,6 @@
 use std::fmt;
 
-use barter_integration::collection::{
-    none_one_or_many::NoneOneOrMany,
-    one_or_many::OneOrMany,
-};
+use barter_integration::collection::{none_one_or_many::NoneOneOrMany, one_or_many::OneOrMany};
 use pyo3::{
     Bound, Py, Python,
     exceptions::PyValueError,
