@@ -12,6 +12,7 @@ mod account;
 mod analytics;
 mod backtest;
 mod books;
+mod collection;
 mod command;
 mod common;
 mod config;
@@ -68,6 +69,7 @@ use barter_instrument::{
 };
 use barter_integration::{Terminal, snapshot::Snapshot};
 use chrono::{DateTime, Utc};
+use collection::{PyNoneOneOrMany, PyOneOrMany};
 use command::{
     PyInstrumentFilter, PyOrderKey, PyOrderRequestCancel, PyOrderRequestOpen, PyOrderSnapshot,
     clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
@@ -941,6 +943,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOrderBook>()?;
     m.add_class::<PySnapshot>()?;
     m.add_class::<PySnapUpdates>()?;
+    m.add_class::<PyNoneOneOrMany>()?;
+    m.add_class::<PyOneOrMany>()?;
     m.add_class::<PyAuditUpdates>()?;
     m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
     m.add_function(wrap_pyfunction!(init_json_logging_py, m)?)?;

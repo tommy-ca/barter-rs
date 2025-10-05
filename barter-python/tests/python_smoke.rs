@@ -3,7 +3,7 @@
 use barter_python::barter_python;
 use pyo3::{
     prelude::*,
-    types::{PyDict, PyList, PyModule},
+    types::{PyDict, PyList, PyModule, PyTuple},
 };
 
 #[test]
@@ -262,6 +262,71 @@ fn system_config_risk_limits_round_trip() {
         let cleared_global = config.call_method0("risk_limits")?;
         let cleared_global = cleared_global.downcast::<PyDict>()?;
         assert!(cleared_global.get_item("global").unwrap().is_none());
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn none_one_or_many_python_semantics() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let container_cls = module.getattr("NoneOneOrMany")?;
+
+        let empty = container_cls.call0()?;
+        assert_eq!(empty.len()?, 0);
+        assert!(empty.getattr("is_none")?.extract::<bool>()?);
+        let empty_list: Vec<PyObject> = empty.call_method0("to_list")?.extract()?;
+        assert!(empty_list.is_empty());
+
+        let single = container_cls.call1(("value",))?;
+        assert_eq!(single.len()?, 1);
+        assert!(single.getattr("is_one")?.extract::<bool>()?);
+        let single_list: Vec<String> = single.call_method0("to_list")?.extract()?;
+        assert_eq!(single_list, vec!["value".to_string()]);
+
+        let sequence = PyList::new_bound(py, &[1, 2, 3]);
+        let many = container_cls.call1((sequence,))?;
+        assert_eq!(many.len()?, 3);
+        assert!(many.getattr("is_many")?.extract::<bool>()?);
+        let many_list: Vec<i64> = many.call_method0("to_list")?.extract()?;
+        assert_eq!(many_list, vec![1, 2, 3]);
+
+        let repr: String = many.repr()?.extract()?;
+        assert!(repr.contains("Many"));
+
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn one_or_many_python_semantics() {
+    Python::with_gil(|py| -> PyResult<()> {
+        let module = PyModule::new_bound(py, "barter_python")?;
+        barter_python(py, &module)?;
+
+        let container_cls = module.getattr("OneOrMany")?;
+
+        let one = container_cls.call1((42,))?;
+        assert_eq!(one.len()?, 1);
+        assert!(one.getattr("is_one")?.extract::<bool>()?);
+        let one_list: Vec<i64> = one.call_method0("to_list")?.extract()?;
+        assert_eq!(one_list, vec![42]);
+
+        let sequence = PyTuple::new_bound(py, &["alpha", "beta"]);
+        let many = container_cls.call1((sequence,))?;
+        assert_eq!(many.len()?, 2);
+        assert!(many.getattr("is_many")?.extract::<bool>()?);
+        let many_list: Vec<String> = many.call_method0("to_list")?.extract()?;
+        assert_eq!(many_list, vec!["alpha".to_string(), "beta".to_string()]);
+
+        let also_one = container_cls.call1((42,))?;
+        assert!(one.eq(&also_one)?);
+        assert!(!one.eq(&many)?);
 
         Ok(())
     })

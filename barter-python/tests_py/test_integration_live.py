@@ -111,6 +111,16 @@ def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
         assert isinstance(next_sequence, bp.Sequence)
         assert int(next_sequence) >= int(sequence)
 
+        event = next_tick["event"]
+        outputs = event["outputs"]
+        errors = event["errors"]
+        assert isinstance(outputs, bp.NoneOneOrMany)
+        assert isinstance(errors, bp.NoneOneOrMany)
+        assert len(outputs) >= 0
+        assert len(errors) >= 0
+        assert isinstance(outputs.to_list(), list)
+        assert isinstance(errors.to_list(), list)
+
         # Audit channel is single-use; subsequent calls return None
         assert handle.take_audit() is None
     finally:

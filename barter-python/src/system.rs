@@ -1,5 +1,6 @@
 use crate::{
     PyEngineEvent, PySequence,
+    collection::{PyNoneOneOrMany, wrap_none_one_or_many},
     command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen},
     common::{SummaryInterval, parse_initial_balances, parse_summary_interval},
     config::PySystemConfig,
@@ -34,10 +35,7 @@ use barter_data::{
         reconnect::{Event, stream::ReconnectingStream},
     },
 };
-use barter_instrument::{
-    index::IndexedInstruments,
-    instrument::InstrumentIndex,
-};
+use barter_instrument::{index::IndexedInstruments, instrument::InstrumentIndex};
 use barter_integration::{
     channel::{Tx, UnboundedRx},
     snapshot::{SnapUpdates, Snapshot},
@@ -510,12 +508,21 @@ fn audit_tick_summary_to_py(py: Python<'_>, tick: &TradingAuditTick) -> PyResult
     match &tick.event {
         EngineAudit::FeedEnded => {
             event_dict.set_item("kind", "FeedEnded")?;
+            let outputs = Py::new(py, PyNoneOneOrMany::empty())?;
+            let errors = Py::new(py, PyNoneOneOrMany::empty())?;
+            event_dict.set_item("outputs", outputs)?;
+            event_dict.set_item("errors", errors)?;
         }
         EngineAudit::Process(process) => {
             event_dict.set_item("kind", "Process")?;
             event_dict.set_item("event_type", engine_event_kind(&process.event))?;
             event_dict.set_item("output_count", process.outputs.len())?;
             event_dict.set_item("error_count", process.errors.len())?;
+
+            let outputs = wrap_none_one_or_many(py, process.outputs.clone())?;
+            let errors = wrap_none_one_or_many(py, process.errors.clone())?;
+            event_dict.set_item("outputs", outputs)?;
+            event_dict.set_item("errors", errors)?;
         }
     }
 
