@@ -11,20 +11,12 @@
 3. Implement bindings crate-by-crate with accompanying tests and docs.
 4. Publish and verify via `uv` environment using example E2E flows.
 
+
 ## Current Focus (2025-10-05)
-- Prepare Milestone 2 for backtest execution pipeline bindings.
-  - [x] Design async-to-sync wrapper for `backtest` and `run_backtests` using Tokio runtimes.
-  - [x] Define strategy/risk plumbing for default implementations using new argument wrappers.
-  - [x] Extend pytest coverage for single vs. multi-run flows once bindings exist.
-  - [x] Refresh README backtesting section with argument workflow example (2025-10-05).
-- [x] Expose engine feed mode selection to Python consumers.
-  - [x] Capture feed mode specification under `.agent/specs/python-system-feed-mode.md`.
-  - [x] Wire bindings for configuring `EngineFeedMode` from Python entry points.
-  - [x] Cover new argument via integration tests for live and backtest flows.
-- Expose account event bindings via PyO3 wrappers.
-  - [x] Capture requirements under `.agent/specs/python-account-event-bindings.md`.
-  - [x] Replace pure Python `AccountEvent`/`AccountEventKind` with Rust-backed bindings.
-  - [x] Update `PyMockExecutionClient` to emit typed account events and extend pytest coverage.
+- Introduce typed Python wrappers for engine `ActionOutput` results produced by audit streams.
+  - [ ] Capture spec under `.agent/specs/python-engine-action-output-bindings.md`.
+  - [ ] Add TDD coverage (Rust + Python) for the new wrappers.
+  - [ ] Implement PyO3 bindings and expose modules to Python consumers.
 
 ## Completed (2025-10-05)
 - Add integration coverage for backtest argument wrappers.
