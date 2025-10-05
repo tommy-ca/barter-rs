@@ -175,6 +175,335 @@ impl PyAuditContext {
     }
 }
 
+#[pyclass(module = "barter_python", name = "SendRequestsOutput", unsendable)]
+pub struct PySendRequestsOutput {
+    variant: &'static str,
+    sent: Py<PyNoneOneOrMany>,
+    errors: Py<PyNoneOneOrMany>,
+    sent_len: usize,
+    error_len: usize,
+}
+
+impl PySendRequestsOutput {
+    fn new(
+        variant: &'static str,
+        sent: Py<PyNoneOneOrMany>,
+        errors: Py<PyNoneOneOrMany>,
+        sent_len: usize,
+        error_len: usize,
+    ) -> Self {
+        Self {
+            variant,
+            sent,
+            errors,
+            sent_len,
+            error_len,
+        }
+    }
+
+    fn counts(&self) -> (usize, usize) {
+        (self.sent_len, self.error_len)
+    }
+
+    fn is_empty_inner(&self) -> bool {
+        self.sent_len == 0 && self.error_len == 0
+    }
+}
+
+#[pymethods]
+impl PySendRequestsOutput {
+    #[getter]
+    pub fn variant(&self) -> &'static str {
+        self.variant
+    }
+
+    #[getter]
+    pub fn sent(&self, py: Python<'_>) -> Py<PyNoneOneOrMany> {
+        self.sent.clone_ref(py)
+    }
+
+    #[getter]
+    pub fn errors(&self, py: Python<'_>) -> Py<PyNoneOneOrMany> {
+        self.errors.clone_ref(py)
+    }
+
+    #[getter]
+    pub fn sent_count(&self) -> usize {
+        self.sent_len
+    }
+
+    #[getter]
+    pub fn error_count(&self) -> usize {
+        self.error_len
+    }
+
+    #[getter]
+    pub fn is_empty(&self) -> bool {
+        self.is_empty_inner()
+    }
+
+    pub fn to_list(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.sent
+            .bind(py)
+            .call_method0("to_list")
+            .map(|result| result.into_py(py))
+    }
+
+    pub fn errors_to_list(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.errors
+            .bind(py)
+            .call_method0("to_list")
+            .map(|result| result.into_py(py))
+    }
+
+    pub fn __len__(&self) -> usize {
+        self.sent_len
+    }
+
+    pub fn __iter__(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.sent
+            .bind(py)
+            .call_method0("__iter__")
+            .map(|result| result.into_py(py))
+    }
+
+    pub fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "SendRequestsOutput(variant={}, sent={}, errors={})",
+            self.variant, self.sent_len, self.error_len
+        ))
+    }
+}
+
+#[pyclass(module = "barter_python", name = "ClosePositionsOutput", unsendable)]
+pub struct PyClosePositionsOutput {
+    cancels: Py<PySendRequestsOutput>,
+    opens: Py<PySendRequestsOutput>,
+}
+
+impl PyClosePositionsOutput {
+    fn new(cancels: Py<PySendRequestsOutput>, opens: Py<PySendRequestsOutput>) -> Self {
+        Self { cancels, opens }
+    }
+
+    fn is_empty_inner(&self, py: Python<'_>) -> bool {
+        let cancels_empty = {
+            let cancels_ref = self.cancels.bind(py).borrow();
+            cancels_ref.is_empty_inner()
+        };
+        let opens_empty = {
+            let opens_ref = self.opens.bind(py).borrow();
+            opens_ref.is_empty_inner()
+        };
+        cancels_empty && opens_empty
+    }
+}
+
+#[pymethods]
+impl PyClosePositionsOutput {
+    #[getter]
+    pub fn cancels(&self, py: Python<'_>) -> Py<PySendRequestsOutput> {
+        self.cancels.clone_ref(py)
+    }
+
+    #[getter]
+    pub fn opens(&self, py: Python<'_>) -> Py<PySendRequestsOutput> {
+        self.opens.clone_ref(py)
+    }
+
+    #[getter]
+    pub fn is_empty(&self, py: Python<'_>) -> PyResult<bool> {
+        Ok(self.is_empty_inner(py))
+    }
+
+    pub fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        let (cancel_sent, cancel_errors) = {
+            let cancels_ref = self.cancels.bind(py).borrow();
+            cancels_ref.counts()
+        };
+        let (open_sent, open_errors) = {
+            let opens_ref = self.opens.bind(py).borrow();
+            opens_ref.counts()
+        };
+
+        Ok(format!(
+            "ClosePositionsOutput(cancels_sent={}, cancels_errors={}, opens_sent={}, opens_errors={})",
+            cancel_sent, cancel_errors, open_sent, open_errors
+        ))
+    }
+}
+
+enum PyActionOutputInner {
+    CancelOrders { output: Py<PySendRequestsOutput> },
+    OpenOrders { output: Py<PySendRequestsOutput> },
+    ClosePositions { output: Py<PyClosePositionsOutput> },
+    Other {
+        original_variant: &'static str,
+        payload: Py<PyAny>,
+    },
+}
+
+impl PyActionOutputInner {
+    fn variant(&self) -> &'static str {
+        match self {
+            Self::CancelOrders { .. } => "CancelOrders",
+            Self::OpenOrders { .. } => "OpenOrders",
+            Self::ClosePositions { .. } => "ClosePositions",
+            Self::Other { .. } => "Other",
+        }
+    }
+
+    fn original_variant(&self) -> &'static str {
+        match self {
+            Self::CancelOrders { .. } => "CancelOrders",
+            Self::OpenOrders { .. } => "OpenOrders",
+            Self::ClosePositions { .. } => "ClosePositions",
+            Self::Other { original_variant, .. } => original_variant,
+        }
+    }
+
+    fn is_empty(&self, py: Python<'_>) -> bool {
+        match self {
+            Self::CancelOrders { output } | Self::OpenOrders { output } => {
+                output.bind(py).borrow().is_empty_inner()
+            }
+            Self::ClosePositions { output } => {
+                let close_ref = output.bind(py).borrow();
+                close_ref.is_empty_inner(py)
+            }
+            Self::Other { .. } => false,
+        }
+    }
+
+    fn clone_cancel_orders(&self, py: Python<'_>) -> Option<Py<PySendRequestsOutput>> {
+        match self {
+            Self::CancelOrders { output } => Some(output.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn clone_open_orders(&self, py: Python<'_>) -> Option<Py<PySendRequestsOutput>> {
+        match self {
+            Self::OpenOrders { output } => Some(output.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn clone_close_positions(&self, py: Python<'_>) -> Option<Py<PyClosePositionsOutput>> {
+        match self {
+            Self::ClosePositions { output } => Some(output.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn clone_other(&self, py: Python<'_>) -> Option<PyObject> {
+        match self {
+            Self::Other { payload, .. } => Some(payload.clone_ref(py).into_py(py)),
+            _ => None,
+        }
+    }
+}
+
+#[pyclass(module = "barter_python", name = "ActionOutput", unsendable)]
+pub struct PyActionOutput {
+    inner: PyActionOutputInner,
+}
+
+impl PyActionOutput {
+    fn from_action(py: Python<'_>, output: &ActionOutput) -> PyResult<Py<PyActionOutput>> {
+        let inner = match output {
+            ActionOutput::CancelOrders(result) => {
+                let wrapper =
+                    send_requests_output_to_py(py, "CancelOrders", result, order_request_cancel_to_py)?;
+                PyActionOutputInner::CancelOrders { output: wrapper }
+            }
+            ActionOutput::OpenOrders(result) => {
+                let wrapper =
+                    send_requests_output_to_py(py, "OpenOrders", result, order_request_open_to_py)?;
+                PyActionOutputInner::OpenOrders { output: wrapper }
+            }
+            ActionOutput::ClosePositions(result) => {
+                let cancels = send_requests_output_to_py(
+                    py,
+                    "CancelOrders",
+                    &result.cancels,
+                    order_request_cancel_to_py,
+                )?;
+                let opens = send_requests_output_to_py(
+                    py,
+                    "OpenOrders",
+                    &result.opens,
+                    order_request_open_to_py,
+                )?;
+                let close_wrapper = PyClosePositionsOutput::new(cancels, opens);
+                let close_wrapper = Py::new(py, close_wrapper)?;
+                PyActionOutputInner::ClosePositions {
+                    output: close_wrapper,
+                }
+            }
+            ActionOutput::GenerateAlgoOrders(result) => {
+                let payload = serialize_to_py_object(py, result)?;
+                let dict = PyDict::new_bound(py);
+                dict.set_item("variant", "GenerateAlgoOrders")?;
+                dict.set_item("payload", payload)?;
+                PyActionOutputInner::Other {
+                    original_variant: "GenerateAlgoOrders",
+                    payload: dict.into_py(py),
+                }
+            }
+        };
+
+        Py::new(py, PyActionOutput { inner })
+    }
+}
+
+#[pymethods]
+impl PyActionOutput {
+    #[getter]
+    pub fn variant(&self) -> &'static str {
+        self.inner.variant()
+    }
+
+    #[getter]
+    pub fn original_variant(&self) -> &'static str {
+        self.inner.original_variant()
+    }
+
+    #[getter]
+    pub fn cancel_orders(&self, py: Python<'_>) -> Option<Py<PySendRequestsOutput>> {
+        self.inner.clone_cancel_orders(py)
+    }
+
+    #[getter]
+    pub fn open_orders(&self, py: Python<'_>) -> Option<Py<PySendRequestsOutput>> {
+        self.inner.clone_open_orders(py)
+    }
+
+    #[getter]
+    pub fn close_positions(&self, py: Python<'_>) -> Option<Py<PyClosePositionsOutput>> {
+        self.inner.clone_close_positions(py)
+    }
+
+    #[getter]
+    pub fn other(&self, py: Python<'_>) -> Option<PyObject> {
+        self.inner.clone_other(py)
+    }
+
+    #[getter]
+    pub fn is_empty(&self, py: Python<'_>) -> bool {
+        self.inner.is_empty(py)
+    }
+
+    pub fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        Ok(format!(
+            "ActionOutput(variant={}, original_variant={}, empty={})",
+            self.inner.variant(),
+            self.inner.original_variant(),
+            self.inner.is_empty(py)
+        ))
+    }
+}
+
 #[pyclass(module = "barter_python", name = "AuditEvent", unsendable)]
 pub struct PyAuditEvent {
     kind: AuditEventKind,
@@ -884,59 +1213,29 @@ where
 }
 
 fn action_output_to_py(py: Python<'_>, output: &ActionOutput) -> PyResult<PyObject> {
-    match output {
-        ActionOutput::CancelOrders(result) => {
-            send_requests_output_to_py(py, "CancelOrders", result, order_request_cancel_to_py)
-        }
-        ActionOutput::OpenOrders(result) => {
-            send_requests_output_to_py(py, "OpenOrders", result, order_request_open_to_py)
-        }
-        ActionOutput::ClosePositions(result) => {
-            let dict = PyDict::new_bound(py);
-            dict.set_item("variant", "ClosePositions")?;
-            let cancels = send_requests_output_to_py(
-                py,
-                "CancelOrders",
-                &result.cancels,
-                order_request_cancel_to_py,
-            )?;
-            let opens = send_requests_output_to_py(
-                py,
-                "OpenOrders",
-                &result.opens,
-                order_request_open_to_py,
-            )?;
-            dict.set_item("cancels", cancels)?;
-            dict.set_item("opens", opens)?;
-            Ok(dict.into_py(py))
-        }
-        _ => serialize_to_py_object(py, output),
-    }
+    PyActionOutput::from_action(py, output).map(|value| value.into_py(py))
 }
 
 fn send_requests_output_to_py<State, F>(
     py: Python<'_>,
-    variant: &str,
+    variant: &'static str,
     output: &SendRequestsOutput<State>,
     converter: F,
-) -> PyResult<PyObject>
+) -> PyResult<Py<PySendRequestsOutput>>
 where
     State: Clone,
     F: Fn(Python<'_>, &OrderEvent<State>) -> PyResult<PyObject>,
 {
-    let dict = PyDict::new_bound(py);
-    dict.set_item("variant", variant)?;
-
     let sent = order_requests_to_py(py, &output.sent, &converter)?;
-    dict.set_item("sent", sent)?;
-    dict.set_item("sent_count", output.sent.len())?;
-
     let errors = order_request_errors_to_py(py, &output.errors, &converter)?;
-    dict.set_item("errors", errors)?;
-    dict.set_item("error_count", output.errors.len())?;
-    dict.set_item("has_errors", !output.errors.is_none())?;
-
-    Ok(dict.into_py(py))
+    let wrapper = PySendRequestsOutput::new(
+        variant,
+        sent,
+        errors,
+        output.sent.len(),
+        output.errors.len(),
+    );
+    Py::new(py, wrapper)
 }
 
 fn order_requests_to_py<State, F>(
@@ -1117,18 +1416,22 @@ fn load_historic_clock_and_market_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use barter::engine::action::{
+        generate_algo_orders::GenerateAlgoOrdersOutput,
+        send_requests::SendCancelsAndOpensOutput,
+    };
     use barter_execution::order::{
         OrderKey, OrderKind, TimeInForce,
         id::{ClientOrderId, StrategyId},
-        request::{OrderRequestOpen, RequestOpen},
+        request::{OrderRequestCancel, OrderRequestOpen, RequestCancel, RequestOpen},
     };
     use barter_instrument::{Side, exchange::ExchangeIndex, instrument::InstrumentIndex};
-    use pyo3::types::{PyDict, PyList};
+    use pyo3::types::PyList;
     use rust_decimal::Decimal;
     use rust_decimal::prelude::FromPrimitive;
 
     #[test]
-    fn action_output_open_orders_converts_requests_to_wrappers() {
+    fn action_output_open_orders_exposes_structured_wrapper() {
         Python::with_gil(|py| {
             let key = OrderKey {
                 exchange: ExchangeIndex(1),
@@ -1155,27 +1458,213 @@ mod tests {
 
             let py_object = action_output_to_py(py, &ActionOutput::OpenOrders(output))
                 .expect("convert action output");
-            let dict = py_object
-                .downcast_bound::<PyDict>(py)
-                .expect("action output to dict");
+            let action = py_object.bind(py);
 
-            let variant_obj = dict
-                .get_item("variant")
-                .expect("variant lookup failed")
-                .expect("variant present");
-            let variant: String = variant_obj.extract().expect("variant string");
+            assert_eq!(
+                action.get_type().name().expect("action type name"),
+                "ActionOutput"
+            );
+
+            let variant: String = action
+                .getattr("variant")
+                .expect("variant attribute")
+                .extract()
+                .expect("variant string");
             assert_eq!(variant, "OpenOrders");
 
-            let sent_obj = dict
-                .get_item("sent")
-                .expect("sent lookup failed")
-                .expect("sent present");
-            let sent_list_obj = sent_obj.call_method0("to_list").expect("to_list succeeds");
-            let sent_list = sent_list_obj.downcast::<PyList>().expect("list conversion");
+            let open_wrapper = action
+                .getattr("open_orders")
+                .expect("open_orders attribute");
+            assert_eq!(
+                open_wrapper.get_type().name().expect("wrapper type name"),
+                "SendRequestsOutput"
+            );
 
+            let len: usize = open_wrapper
+                .call_method0("__len__")
+                .expect("__len__ call")
+                .extract()
+                .expect("__len__ result");
+            assert_eq!(len, 1);
+
+            let sent = open_wrapper
+                .getattr("sent")
+                .expect("sent attribute");
+            assert_eq!(
+                sent.get_type().name().expect("sent type name"),
+                "NoneOneOrMany"
+            );
+
+            let sent_list_obj = sent
+                .call_method0("to_list")
+                .expect("sent to_list");
+            let sent_list = sent_list_obj
+                .downcast::<PyList>()
+                .expect("sent to PyList");
             assert_eq!(sent_list.len(), 1);
             let first = sent_list.get_item(0).expect("first item");
             assert!(first.is_instance_of::<PyOrderRequestOpen>());
+
+            let errors = open_wrapper
+                .getattr("errors")
+                .expect("errors attribute");
+            let errors_list_obj = errors
+                .call_method0("to_list")
+                .expect("errors to_list");
+            let errors_list = errors_list_obj
+                .downcast::<PyList>()
+                .expect("errors to PyList");
+            assert!(errors_list.is_empty());
+        });
+    }
+
+    #[test]
+    fn action_output_close_positions_exposes_nested_wrappers() {
+        Python::with_gil(|py| {
+            let key = OrderKey {
+                exchange: ExchangeIndex(7),
+                instrument: InstrumentIndex(3),
+                strategy: StrategyId::new("closure"),
+                cid: ClientOrderId::new("cid-close"),
+            };
+
+            let cancel_request = OrderRequestCancel {
+                key: key.clone(),
+                state: RequestCancel::new(None),
+            };
+
+            let open_request = OrderRequestOpen {
+                key: key.clone(),
+                state: RequestOpen::new(
+                    Side::Sell,
+                    Decimal::from_f64(99.95).unwrap(),
+                    Decimal::from_f64(0.5).unwrap(),
+                    OrderKind::Limit,
+                    TimeInForce::GoodUntilCancelled { post_only: true },
+                ),
+            };
+
+            let cancels = SendRequestsOutput::new(
+                NoneOneOrMany::One(cancel_request.clone()),
+                NoneOneOrMany::None,
+            );
+            let opens = SendRequestsOutput::new(
+                NoneOneOrMany::One(open_request.clone()),
+                NoneOneOrMany::None,
+            );
+
+            let combined = SendCancelsAndOpensOutput::new(cancels, opens);
+            let py_object = action_output_to_py(py, &ActionOutput::ClosePositions(combined))
+                .expect("convert close positions");
+            let action = py_object.bind(py);
+
+            assert_eq!(
+                action.get_type().name().expect("action type"),
+                "ActionOutput"
+            );
+            let variant: String = action
+                .getattr("variant")
+                .expect("variant attribute")
+                .extract()
+                .expect("variant string");
+            assert_eq!(variant, "ClosePositions");
+
+            let close_wrapper = action
+                .getattr("close_positions")
+                .expect("close_positions attribute");
+            assert_eq!(
+                close_wrapper.get_type().name().expect("close type name"),
+                "ClosePositionsOutput"
+            );
+
+            let cancels_wrapper = close_wrapper
+                .getattr("cancels")
+                .expect("cancels attribute");
+            assert_eq!(
+                cancels_wrapper
+                    .get_type()
+                    .name()
+                    .expect("cancels type name"),
+                "SendRequestsOutput"
+            );
+
+            let opens_wrapper = close_wrapper
+                .getattr("opens")
+                .expect("opens attribute");
+            assert_eq!(
+                opens_wrapper.get_type().name().expect("opens type name"),
+                "SendRequestsOutput"
+            );
+
+            let cancels_len: usize = cancels_wrapper
+                .call_method0("__len__")
+                .expect("cancels len")
+                .extract()
+                .expect("cancels usize");
+            assert_eq!(cancels_len, 1);
+
+            let opens_len: usize = opens_wrapper
+                .call_method0("__len__")
+                .expect("opens len")
+                .extract()
+                .expect("opens usize");
+            assert_eq!(opens_len, 1);
+
+            let opens_sent = opens_wrapper
+                .getattr("sent")
+                .expect("opens sent");
+            let opens_list_obj = opens_sent
+                .call_method0("to_list")
+                .expect("opens to_list");
+            let opens_list = opens_list_obj
+                .downcast::<PyList>()
+                .expect("opens PyList");
+            let first_open = opens_list.get_item(0).expect("first open");
+            assert!(first_open.is_instance_of::<PyOrderRequestOpen>());
+
+            let cancels_sent = cancels_wrapper
+                .getattr("sent")
+                .expect("cancels sent");
+            let cancels_list_obj = cancels_sent
+                .call_method0("to_list")
+                .expect("cancels to_list");
+            let cancels_list = cancels_list_obj
+                .downcast::<PyList>()
+                .expect("cancels PyList");
+            let first_cancel = cancels_list.get_item(0).expect("first cancel");
+            assert!(first_cancel.is_instance_of::<PyOrderRequestCancel>());
+        });
+    }
+
+    #[test]
+    fn action_output_generate_algo_orders_falls_back_to_other_variant() {
+        Python::with_gil(|py| {
+            let fallback = GenerateAlgoOrdersOutput::default();
+            let py_object = action_output_to_py(py, &ActionOutput::GenerateAlgoOrders(fallback))
+                .expect("convert generate algo orders");
+            let action = py_object.bind(py);
+
+            let variant: String = action
+                .getattr("variant")
+                .expect("variant attribute")
+                .extract()
+                .expect("variant string");
+            assert_eq!(variant, "Other");
+
+            let other = action
+                .getattr("other")
+                .expect("other attribute");
+            assert_eq!(other.get_type().name().expect("other type"), "dict");
+
+            let open_none = action
+                .getattr("open_orders")
+                .expect("open_orders attribute");
+            assert!(open_none.is_none());
+
+            let cancel_none = action
+                .getattr("cancel_orders")
+                .expect("cancel_orders attribute");
+            assert!(cancel_none.is_none());
         });
     }
 

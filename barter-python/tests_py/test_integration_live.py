@@ -126,6 +126,44 @@ def test_audit_updates_typed_helpers(example_paths: dict[str, Path]) -> None:
             assert isinstance(event.outputs, bp.NoneOneOrMany)
             assert isinstance(event.errors, bp.NoneOneOrMany)
 
+            outputs_list = event.outputs.to_list()
+            for output in outputs_list:
+                assert output is not None
+                if isinstance(output, bp.ActionOutput):
+                    assert output.variant in {
+                        "CancelOrders",
+                        "OpenOrders",
+                        "ClosePositions",
+                        "Other",
+                    }
+                    if output.variant == "ClosePositions":
+                        close = output.close_positions
+                        assert close is not None
+                        assert isinstance(close, bp.ClosePositionsOutput)
+                        assert isinstance(close.cancels, bp.SendRequestsOutput)
+                        assert isinstance(close.opens, bp.SendRequestsOutput)
+                        assert isinstance(close.cancels.to_list(), list)
+                        assert isinstance(close.opens.to_list(), list)
+                    elif output.variant == "OpenOrders":
+                        opens = output.open_orders
+                        assert opens is not None
+                        assert isinstance(opens, bp.SendRequestsOutput)
+                        assert isinstance(len(opens), int)
+                        assert isinstance(opens.to_list(), list)
+                        assert isinstance(opens.errors_to_list(), list)
+                    elif output.variant == "CancelOrders":
+                        cancels = output.cancel_orders
+                        assert cancels is not None
+                        assert isinstance(cancels, bp.SendRequestsOutput)
+                        assert isinstance(cancels.to_list(), list)
+                        assert isinstance(cancels.errors_to_list(), list)
+                    else:
+                        other_payload = output.other
+                        assert isinstance(other_payload, dict)
+                        assert "variant" in other_payload
+                else:
+                    assert isinstance(output, dict)
+
         summary = typed_tick.to_dict()
         assert summary["event"]["kind"] == event.kind
 
@@ -174,8 +212,22 @@ def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
         assert isinstance(errors, bp.NoneOneOrMany)
         assert len(outputs) >= 0
         assert len(errors) >= 0
-        assert isinstance(outputs.to_list(), list)
-        assert isinstance(errors.to_list(), list)
+        output_list = outputs.to_list()
+        error_list = errors.to_list()
+        assert isinstance(output_list, list)
+        assert isinstance(error_list, list)
+        for output in output_list:
+            if isinstance(output, bp.ActionOutput):
+                assert output.variant in {
+                    "CancelOrders",
+                    "OpenOrders",
+                    "ClosePositions",
+                    "Other",
+                }
+            else:
+                assert isinstance(output, dict)
+        for err in error_list:
+            assert isinstance(err, dict)
 
         # Audit channel is single-use; subsequent calls return None
         assert handle.take_audit() is None

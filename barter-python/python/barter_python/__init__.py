@@ -72,8 +72,6 @@ OrderState = execution.OrderState
 
 # Export request classes
 RequestOpen = execution.RequestOpen
-# OrderRequestOpen = execution.OrderRequestOpen  # Use PyO3 version
-# OrderRequestCancel = execution.OrderRequestCancel  # Use PyO3 version
 OrderResponseCancel = execution.OrderResponseCancel
 
 # Export event classes
