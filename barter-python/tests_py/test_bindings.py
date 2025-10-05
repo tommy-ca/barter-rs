@@ -49,6 +49,22 @@ def test_index_wrappers_roundtrip() -> None:
     assert "InstrumentIndex" in repr(instrument_idx)
 
 
+def test_sequence_binding_round_trip() -> None:
+    seq = bp.Sequence(5)
+    assert int(seq) == 5
+    assert seq.value == 5
+
+    prev = seq.fetch_add()
+    assert isinstance(prev, bp.Sequence)
+    assert int(prev) == 5
+    assert int(seq) == 6
+
+    next_value = seq.next_value()
+    assert next_value == 7
+    assert int(seq) == 7
+    assert repr(seq) == "Sequence(value=7)"
+
+
 def test_order_key_from_index_wrappers() -> None:
     exchange_idx = bp.ExchangeIndex(2)
     instrument_idx = bp.InstrumentIndex(7)

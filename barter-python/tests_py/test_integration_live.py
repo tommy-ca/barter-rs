@@ -95,7 +95,9 @@ def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
         snapshot = snap_updates.snapshot.value
         assert "state_summary" in snapshot
         assert "context" in snapshot
-        assert isinstance(snapshot["context"]["sequence"], int)
+        sequence = snapshot["context"]["sequence"]
+        assert isinstance(sequence, bp.Sequence)
+        assert int(sequence) >= 0
         assert "asset_count" in snapshot["state_summary"]
 
         updates = snap_updates.updates
@@ -105,7 +107,9 @@ def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
         next_tick = updates.recv(timeout=1.0)
         assert next_tick is not None
         assert next_tick["event"]["kind"] in {"Process", "FeedEnded"}
-        assert next_tick["context"]["sequence"] >= snapshot["context"]["sequence"]
+        next_sequence = next_tick["context"]["sequence"]
+        assert isinstance(next_sequence, bp.Sequence)
+        assert int(next_sequence) >= int(sequence)
 
         # Audit channel is single-use; subsequent calls return None
         assert handle.take_audit() is None

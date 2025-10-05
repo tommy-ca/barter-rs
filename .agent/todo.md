@@ -32,6 +32,12 @@
   - [x] Implement PyO3 strategy bindings and wire through Python package.
   - [x] Validate ergonomics & docs for strategy helpers post binding switch.
 
+## Active (2025-10-05)
+- [x] Implement `PySequence` bindings for engine sequencing (spec: `.agent/specs/python-sequence-bindings.md`).
+  - [x] Add Rust coverage for sequence wrapper semantics.
+  - [x] Update Python audit context translation to emit typed sequences.
+  - [x] Extend pytest coverage for sequence ergonomics.
+
 ## Planned (2025-10-03)
 - [x] Update top-level README with Python quickstart guidance. (2025-10-04)
 - [x] Run `cargo test -p barter-python` *(blocked: linker fails to find libpython; see existing TODO)*

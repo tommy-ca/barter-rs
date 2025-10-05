@@ -11,7 +11,13 @@
 3. Implement bindings crate-by-crate with accompanying tests and docs.
 4. Publish and verify via `uv` environment using example E2E flows.
 
-## Current Focus (2025-10-04)
+## Current Focus (2025-10-05)
+- Bridge remaining core barter crates through Rust-first bindings.
+  - [x] Capture binding gaps for sequencing and audit metadata in `.agent/specs`.
+  - [x] Extend PyO3 surface with strongly typed wrappers for engine sequencing.
+  - [x] Update Python integration layers & tests to exercise new bindings end-to-end.
+
+## Completed (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.
   - [x] Finalise spec requirements under `.agent/specs/python-strategy-bindings.md`.
   - [x] Add pytest coverage asserting parity with existing helpers and error handling.

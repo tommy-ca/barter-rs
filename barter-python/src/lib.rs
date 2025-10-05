@@ -39,7 +39,7 @@ use books::{PyLevel, PyOrderBook, calculate_mid_price, calculate_volume_weighted
 
 use barter::engine::{command::Command, state::trading::TradingState};
 use barter::execution::AccountStreamEvent;
-use barter::{EngineEvent, Timed};
+use barter::{EngineEvent, Sequence, Timed};
 use barter_data::{
     books::{Level, OrderBook},
     event::{DataKind, MarketEvent},
@@ -87,7 +87,7 @@ use instrument::{PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyQu
 use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
 use metric::{PyField, PyMetric, PyTag, PyValue};
-use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyModule};
+use pyo3::{Bound, exceptions::PyValueError, prelude::*, pyclass::CompareOp, types::PyModule};
 use risk::{
     PyDefaultRiskManager, PyRiskApproved, PyRiskRefused, calculate_abs_percent_difference,
     calculate_delta, calculate_quote_notional,
@@ -136,6 +136,71 @@ impl PyTimedF64 {
             "TimedF64(value={}, time={})",
             self.inner.value, self.inner.time
         ))
+    }
+}
+
+/// Wrapper around [`Sequence`] for Python exposure.
+#[pyclass(module = "barter_python", name = "Sequence", unsendable)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PySequence {
+    inner: Sequence,
+}
+
+impl PySequence {
+    pub(crate) fn from_inner(inner: Sequence) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PySequence {
+    /// Create a new [`Sequence`] with the provided starting value.
+    #[new]
+    #[pyo3(signature = (value))]
+    pub fn __new__(value: u64) -> Self {
+        Self {
+            inner: Sequence(value),
+        }
+    }
+
+    /// Return the current sequence counter as an integer.
+    #[getter]
+    pub fn value(&self) -> u64 {
+        self.inner.value()
+    }
+
+    /// Increment the sequence and return the previous value as a new wrapper.
+    pub fn fetch_add(&mut self) -> Self {
+        let previous = self.inner.fetch_add();
+        Self { inner: previous }
+    }
+
+    /// Increment the sequence and return the new counter value.
+    pub fn next_value(&mut self) -> u64 {
+        let _ = self.inner.fetch_add();
+        self.inner.value()
+    }
+
+    /// Convert the sequence to an integer for Python's `int()`.
+    fn __int__(&self) -> u64 {
+        self.inner.value()
+    }
+
+    /// Represent the sequence for debugging.
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("Sequence(value={})", self.inner.value()))
+    }
+
+    /// Support rich comparisons by comparing the underlying counter.
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyResult<bool> {
+        match op {
+            CompareOp::Eq => Ok(self.inner == other.inner),
+            CompareOp::Ne => Ok(self.inner != other.inner),
+            CompareOp::Lt => Ok(self.inner.value() < other.inner.value()),
+            CompareOp::Le => Ok(self.inner.value() <= other.inner.value()),
+            CompareOp::Gt => Ok(self.inner.value() > other.inner.value()),
+            CompareOp::Ge => Ok(self.inner.value() >= other.inner.value()),
+        }
     }
 }
 
@@ -826,6 +891,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutionConfig>()?;
     m.add_class::<PyEngineEvent>()?;
     m.add_class::<PyTimedF64>()?;
+    m.add_class::<PySequence>()?;
     m.add_class::<PySystemHandle>()?;
     m.add_class::<PyClientOrderId>()?;
     m.add_class::<PyOrderId>()?;
@@ -972,6 +1038,20 @@ mod tests {
 
         assert_eq!(timed.value(), 42.5);
         assert_eq!(timed.time(), time);
+    }
+
+    #[test]
+    fn sequence_wrapper_advances_like_rust() {
+        let mut sequence = PySequence::from_inner(Sequence(10));
+        assert_eq!(sequence.value(), 10);
+
+        let previous = sequence.fetch_add();
+        assert_eq!(previous.value(), 10);
+        assert_eq!(sequence.value(), 11);
+
+        let next_value = sequence.next_value();
+        assert_eq!(next_value, 12);
+        assert_eq!(sequence.value(), 12);
     }
 
     #[test]

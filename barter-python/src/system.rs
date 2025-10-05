@@ -1,6 +1,6 @@
 use crate::{
-    PyEngineEvent,
-    command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen, parse_decimal},
+    PyEngineEvent, PySequence,
+    command::{PyInstrumentFilter, PyOrderRequestCancel, PyOrderRequestOpen},
     common::{SummaryInterval, parse_initial_balances, parse_summary_interval},
     config::PySystemConfig,
     integration::{PySnapUpdates, PySnapshot},
@@ -34,11 +34,7 @@ use barter_data::{
         reconnect::{Event, stream::ReconnectingStream},
     },
 };
-use barter_execution::balance::Balance;
 use barter_instrument::{
-    Keyed,
-    asset::{ExchangeAsset, name::AssetNameInternal},
-    exchange::ExchangeId,
     index::IndexedInstruments,
     instrument::InstrumentIndex,
 };
@@ -47,7 +43,7 @@ use barter_integration::{
     snapshot::{SnapUpdates, Snapshot},
 };
 use futures::{Stream, StreamExt, stream};
-use pyo3::{Bound, exceptions::PyValueError, prelude::*, types::PyDict};
+use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 use std::{
@@ -532,7 +528,9 @@ fn audit_tick_summary_to_py(py: Python<'_>, tick: &TradingAuditTick) -> PyResult
 
 fn context_to_py(py: Python<'_>, context: &EngineContext) -> PyResult<Py<PyDict>> {
     let dict = PyDict::new_bound(py);
-    dict.set_item("sequence", context.sequence.0)?;
+    let sequence = PySequence::from_inner(context.sequence);
+    let sequence = Py::new(py, sequence)?;
+    dict.set_item("sequence", sequence)?;
     dict.set_item("time", context.time.to_rfc3339())?;
     Ok(dict.into())
 }
