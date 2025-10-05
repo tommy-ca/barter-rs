@@ -37,3 +37,6 @@
 ## Follow-Ups
 - Explore exposing additional `barter::strategy` utilities (eg/ disconnect / trading-disabled
   helpers) once the close-position path is stable.
+- Prefer the Rust-backed `barter_python.InstrumentFilter` class across Python modules rather than
+  the legacy Protocol placeholder so type hints and runtime behaviour stay aligned with the
+  bindings (2025-10-05).
