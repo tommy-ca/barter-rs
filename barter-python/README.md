@@ -42,6 +42,22 @@ summary_dict = summary.to_dict()
 print(summary_dict["instruments"][first_name]["pnl"])
 PY
 
+# Inspect indexed instruments
+python - <<'PY'
+import barter_python as bp
+
+config = bp.SystemConfig.from_json("../barter/examples/config/system_config.json")
+indexed = bp.IndexedInstruments.from_system_config(config)
+
+binance = bp.ExchangeId.BINANCE_SPOT
+btc_index = indexed.instrument_index_from_exchange_name(binance, "BTCUSDT")
+btc_asset = indexed.asset(indexed.asset_index(binance, "btc"))
+
+print("Exchange index:", indexed.exchange_index(binance).index)
+print("Instrument index:", btc_index.index)
+print("BTC asset exchange symbol:", btc_asset.name_exchange)
+PY
+
 # Seed initial balances when starting from Python
 python - <<'PY'
 import barter_python as bp
