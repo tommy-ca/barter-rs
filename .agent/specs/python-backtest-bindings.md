@@ -26,7 +26,7 @@
 ### Milestone 2 — Execution Pipeline (2025-10-05)
 - Wire the wrappers into synchronous helpers that execute `backtest`/`run_backtests` behind the scenes while releasing the GIL. ✅
 - Extend pytest coverage to exercise single and multi-run flows using canned market data fixtures. ✅
-- Document usage patterns in the README and integration guides. (Follow-up: refresh README examples to mention new helpers.)
+- Document usage patterns in the README and integration guides. ✅ (README backtesting section updated 2025-10-05)
 
 ## Out of Scope
 - Custom strategy or risk manager injection beyond the default engine implementations.

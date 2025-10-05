@@ -430,6 +430,52 @@ for name, tear_sheet in summary.instruments.items():
 - `backtest(args_constant, args_dynamic)` - Run single backtest
 - `run_backtests(args_constant, dynamic_args_list)` - Run multiple backtests
 
+#### Argument Workflow
+Use the strongly typed wrappers to supply configuration, market data, and risk settings to the
+Rust backtest engine.
+
+```python
+from decimal import Decimal
+
+import barter_python as bp
+from barter_python import backtest
+
+config = bp.SystemConfig.from_json("examples/config/system_config.json")
+market_data = backtest.MarketDataInMemory.from_json_file(
+    "tests_py/data/synthetic_market_data.json",
+)
+
+args_constant = backtest.BacktestArgsConstant(
+    system_config=config,
+    market_data=market_data,
+    summary_interval="annual_252",  # daily | annual_252 | annual_365
+    initial_balances=[
+        {"exchange": "binance_spot", "asset": "usdt", "total": "10000", "free": "10000"},
+    ],
+)
+
+baseline = backtest.BacktestArgsDynamic(
+    id="baseline",
+    risk_free_return=Decimal("0.02"),
+)
+
+alt = backtest.BacktestArgsDynamic(
+    id="alternative",
+    risk_free_return=Decimal("0.01"),
+)
+
+single_summary = backtest.backtest(args_constant, baseline)
+multi_summary = backtest.run_backtests(args_constant, [baseline, alt])
+
+print(single_summary.trading_summary.total_pnl)
+for summary in multi_summary.summaries:
+    print(summary.id, summary.risk_free_return)
+```
+
+- `summary_interval` accepts `"daily"`, `"annual_252"`, or `"annual_365"`.
+- `initial_balances` lets you seed the engine with balances before replaying market data.
+- Custom strategy and risk managers are not yet exposed; the defaults are applied automatically.
+
 ### Market Data
 
 #### Subscriptions
