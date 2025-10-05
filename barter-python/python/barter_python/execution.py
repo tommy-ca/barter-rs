@@ -43,6 +43,16 @@ _asset_balance_new = _core.asset_balance_new
 _balance_new = _core.balance_new
 
 try:
+    _execution_bindings = _core.execution
+except AttributeError:  # pragma: no cover - extension submodule unavailable
+    _execution_bindings = None
+else:
+    if hasattr(_execution_bindings, "OrderKind"):
+        OrderKind = _execution_bindings.OrderKind
+    if hasattr(_execution_bindings, "TimeInForce"):
+        TimeInForce = _execution_bindings.TimeInForce
+
+try:
     _MockExecutionClient = _core.MockExecutionClient
 except AttributeError as _mock_import_error:  # pragma: no cover - extension missing
     _MockExecutionClient = None
@@ -654,7 +664,7 @@ AccountEventKindType = Union[
     "AssetBalance",
     "Order[ExchangeKey, InstrumentKey, AssetKey]",
     "OrderResponseCancel[ExchangeKey, AssetKey, InstrumentKey]",
-    Trade[AssetKey, InstrumentKey],
+    "Trade[AssetKey, InstrumentKey]",
 ]
 
 

@@ -46,6 +46,12 @@
 - Call `shutdown_with_summary` twice to guarantee the second invocation errors with
   "system is not running".
 
+### 5. Backtest Argument Wrappers
+- Build `BacktestArgsConstant` from a system config, market data, and seeded balances.
+- Create multiple `BacktestArgsDynamic` configurations with unique identifiers and risk-free rates.
+- Execute `backtest.backtest` and `backtest.run_backtests` and assert IDs and summaries match expectations.
+- Ensure the multi-run summary reports the number of executed backtests and yields trading summaries sorted by ID.
+
 ## Tooling & Execution
 - Prefer `pytest -m integration` to group the above scenarios; keep fast unit tests separate.
 - Leverage `maturin develop` during CI and local runs to build extension in release mode.

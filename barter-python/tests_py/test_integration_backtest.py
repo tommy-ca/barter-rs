@@ -8,6 +8,7 @@ from typing import Callable
 import pytest
 
 import barter_python as bp
+from barter_python import backtest
 from barter_python.backtest import MarketDataInMemory
 
 
@@ -168,4 +169,45 @@ def test_execution_config_basic():
     assert round_tripped.latency_ms == mock_config.latency_ms
 
 
-# TODO: Add more comprehensive backtest integration tests once the full implementation is complete
+@pytest.mark.integration
+def test_backtest_argument_wrappers_end_to_end(example_paths: dict[str, Path]) -> None:
+    """Exercise the Rust-backed backtest wrappers through the Python surface."""
+
+    system_config = bp.SystemConfig.from_json(str(example_paths["system_config"]))
+    market_data = MarketDataInMemory.from_json_file(example_paths["market_data"])
+
+    args_constant = backtest.BacktestArgsConstant(
+        system_config=system_config,
+        market_data=market_data,
+        summary_interval="daily",
+        initial_balances=[
+            {
+                "exchange": "binance_spot",
+                "asset": "usdt",
+                "total": Decimal("5000"),
+                "free": Decimal("5000"),
+            },
+        ],
+    )
+
+    baseline = backtest.BacktestArgsDynamic(
+        id="baseline",
+        risk_free_return=Decimal("0.01"),
+    )
+
+    alt = backtest.BacktestArgsDynamic(
+        id="alternative",
+        risk_free_return=Decimal("0.02"),
+    )
+
+    summary = backtest.backtest(args_constant, baseline)
+    assert summary.id == "baseline"
+    assert summary.risk_free_return == Decimal("0.01")
+    assert summary.trading_summary.time_engine_start <= summary.trading_summary.time_engine_end
+
+    multi = backtest.run_backtests(args_constant, [baseline, alt])
+    assert multi.num_backtests == 2
+    assert multi.duration_ms >= 0
+
+    ids = {result.id for result in multi.summaries}
+    assert ids == {"baseline", "alternative"}

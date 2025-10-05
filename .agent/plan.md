@@ -23,6 +23,9 @@
   - [x] Cover new argument via integration tests for live and backtest flows.
 
 ## Completed (2025-10-05)
+- Add integration coverage for backtest argument wrappers.
+  - [x] Added scenario 5 to `.agent/specs/python-integration-tests.md`.
+  - [x] Implemented `test_backtest_argument_wrappers_end_to_end` exercising `backtest` and `run_backtests`.
 - Expose typed audit tick bindings to Python consumers.
   - [x] Document requirements under `.agent/specs/python-audit-tick-bindings.md`.
   - [x] Add `PyAuditContext`, `PyAuditEvent`, and `PyAuditTick` with `recv_tick` helpers on `AuditUpdates`.
