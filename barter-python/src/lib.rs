@@ -89,8 +89,9 @@ use summary::{
     PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
 };
 use system::{
-    PyActionOutput, PyAuditContext, PyAuditEvent, PyAuditTick, PyAuditUpdates, PyClosePositionsOutput,
-    PySendRequestsOutput, PySystemHandle, run_historic_backtest, start_system,
+    PyActionOutput, PyAuditContext, PyAuditEvent, PyAuditTick, PyAuditUpdates,
+    PyClosePositionsOutput, PyEngineOutput, PyPositionExit, PySendRequestsOutput, PySystemHandle,
+    run_historic_backtest, start_system,
 };
 
 static EXCHANGE_ID_CACHE: Mutex<Option<HashMap<String, ExchangeId>>> = Mutex::new(None);
@@ -265,6 +266,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySnapUpdates>()?;
     m.add_class::<PySendRequestsOutput>()?;
     m.add_class::<PyClosePositionsOutput>()?;
+    m.add_class::<PyPositionExit>()?;
+    m.add_class::<PyEngineOutput>()?;
     m.add_class::<PyActionOutput>()?;
     m.add_class::<PyAuditContext>()?;
     m.add_class::<PyAuditEvent>()?;

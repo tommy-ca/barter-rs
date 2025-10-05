@@ -7,13 +7,16 @@ use crate::{
     },
     common::{SummaryInterval, parse_initial_balances, parse_summary_interval},
     config::PySystemConfig,
+    execution::PyTradeId,
+    instrument::{PyInstrumentIndex, PySide},
     integration::{PySnapUpdates, PySnapshot},
-    summary::{PyTradingSummary, summary_to_py},
+    summary::{PyTradingSummary, decimal_to_py, summary_to_py},
 };
 use barter::engine::{
     EngineOutput,
     action::{ActionOutput, send_requests::SendRequestsOutput},
     error::EngineError,
+    state::position::PositionExited,
 };
 use barter::{
     EngineEvent, Sequence,
@@ -43,8 +46,10 @@ use barter_data::{
         reconnect::{Event, stream::ReconnectingStream},
     },
 };
-use barter_execution::order::OrderEvent;
-use barter_instrument::{index::IndexedInstruments, instrument::InstrumentIndex};
+use barter_execution::{order::OrderEvent, trade::TradeId};
+use barter_instrument::{
+    Side, asset::QuoteAsset, index::IndexedInstruments, instrument::InstrumentIndex,
+};
 use barter_integration::{
     channel::{Tx, UnboundedRx},
     collection::none_one_or_many::NoneOneOrMany,
@@ -52,7 +57,11 @@ use barter_integration::{
 };
 use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, stream};
-use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
+use pyo3::{
+    exceptions::PyValueError,
+    prelude::*,
+    types::{PyDict, PyList},
+};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
 use serde::Serialize;
@@ -172,6 +181,302 @@ pub struct PyAuditContext {
 impl PyAuditContext {
     fn new(sequence: Sequence, time: DateTime<Utc>) -> Self {
         Self { sequence, time }
+    }
+}
+
+#[pyclass(module = "barter_python", name = "PositionExit", unsendable)]
+pub struct PyPositionExit {
+    instrument: InstrumentIndex,
+    side: Side,
+    price_entry_average: Decimal,
+    quantity_abs_max: Decimal,
+    pnl_realised: Decimal,
+    fees_enter: Decimal,
+    fees_exit: Decimal,
+    time_enter: DateTime<Utc>,
+    time_exit: DateTime<Utc>,
+    trades: Vec<TradeId>,
+}
+
+impl PyPositionExit {
+    fn from_position(exit: &PositionExited<QuoteAsset, InstrumentIndex>) -> Self {
+        Self {
+            instrument: exit.instrument,
+            side: exit.side,
+            price_entry_average: exit.price_entry_average,
+            quantity_abs_max: exit.quantity_abs_max,
+            pnl_realised: exit.pnl_realised,
+            fees_enter: exit.fees_enter.fees,
+            fees_exit: exit.fees_exit.fees,
+            time_enter: exit.time_enter,
+            time_exit: exit.time_exit,
+            trades: exit.trades.clone(),
+        }
+    }
+
+    fn trades_to_list(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let list = PyList::empty_bound(py);
+        for trade in &self.trades {
+            let trade_id = PyTradeId::from_inner(trade.clone());
+            let trade_value = Py::new(py, trade_id)?;
+            list.append(trade_value.into_py(py))?;
+        }
+        Ok(list.into_py(py))
+    }
+}
+
+#[pymethods]
+impl PyPositionExit {
+    #[getter]
+    pub fn instrument(&self, py: Python<'_>) -> PyResult<Py<PyInstrumentIndex>> {
+        Py::new(py, PyInstrumentIndex::from_inner(self.instrument))
+    }
+
+    #[getter]
+    pub fn side(&self, py: Python<'_>) -> PyResult<Py<PySide>> {
+        Py::new(py, PySide::from_side(self.side))
+    }
+
+    #[getter]
+    pub fn price_entry_average(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.price_entry_average)
+    }
+
+    #[getter]
+    pub fn quantity_abs_max(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.quantity_abs_max)
+    }
+
+    #[getter]
+    pub fn pnl_realised(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.pnl_realised)
+    }
+
+    #[getter]
+    pub fn fees_enter(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.fees_enter)
+    }
+
+    #[getter]
+    pub fn fees_exit(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.fees_exit)
+    }
+
+    #[getter]
+    pub fn time_enter(&self) -> String {
+        self.time_enter.to_rfc3339()
+    }
+
+    #[getter]
+    pub fn time_exit(&self) -> String {
+        self.time_exit.to_rfc3339()
+    }
+
+    #[getter]
+    pub fn trades(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.trades_to_list(py)
+    }
+
+    pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let dict = PyDict::new_bound(py);
+        let instrument = self.instrument(py)?;
+        dict.set_item("instrument", instrument.into_py(py))?;
+        let side = self.side(py)?;
+        dict.set_item("side", side.into_py(py))?;
+        dict.set_item(
+            "price_entry_average",
+            decimal_to_py(py, self.price_entry_average)?,
+        )?;
+        dict.set_item(
+            "quantity_abs_max",
+            decimal_to_py(py, self.quantity_abs_max)?,
+        )?;
+        dict.set_item("pnl_realised", decimal_to_py(py, self.pnl_realised)?)?;
+        dict.set_item("fees_enter", decimal_to_py(py, self.fees_enter)?)?;
+        dict.set_item("fees_exit", decimal_to_py(py, self.fees_exit)?)?;
+        dict.set_item("time_enter", self.time_enter())?;
+        dict.set_item("time_exit", self.time_exit())?;
+        dict.set_item("trades", self.trades_to_list(py)?)?;
+        Ok(dict.into_py(py))
+    }
+
+    pub fn __repr__(&self) -> String {
+        format!(
+            "PositionExit(instrument={}, side={:?}, quantity_abs_max={}, pnl_realised={})",
+            self.instrument, self.side, self.quantity_abs_max, self.pnl_realised
+        )
+    }
+}
+
+enum PyEngineOutputInner {
+    Commanded { output: Py<PyActionOutput> },
+    OnTradingDisabled { payload: PyObject },
+    AccountDisconnect { payload: PyObject },
+    MarketDisconnect { payload: PyObject },
+    PositionExit { output: Py<PyPositionExit> },
+    AlgoOrders { payload: PyObject },
+}
+
+impl PyEngineOutputInner {
+    fn variant(&self) -> &'static str {
+        match self {
+            Self::Commanded { .. } => "Commanded",
+            Self::OnTradingDisabled { .. } => "OnTradingDisabled",
+            Self::AccountDisconnect { .. } => "AccountDisconnect",
+            Self::MarketDisconnect { .. } => "MarketDisconnect",
+            Self::PositionExit { .. } => "PositionExit",
+            Self::AlgoOrders { .. } => "AlgoOrders",
+        }
+    }
+
+    fn commanded(&self, py: Python<'_>) -> Option<Py<PyActionOutput>> {
+        match self {
+            Self::Commanded { output } => Some(output.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn trading_disabled(&self, py: Python<'_>) -> Option<PyObject> {
+        match self {
+            Self::OnTradingDisabled { payload } => Some(payload.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn account_disconnect(&self, py: Python<'_>) -> Option<PyObject> {
+        match self {
+            Self::AccountDisconnect { payload } => Some(payload.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn market_disconnect(&self, py: Python<'_>) -> Option<PyObject> {
+        match self {
+            Self::MarketDisconnect { payload } => Some(payload.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn position_exit(&self, py: Python<'_>) -> Option<Py<PyPositionExit>> {
+        match self {
+            Self::PositionExit { output } => Some(output.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn algo_orders(&self, py: Python<'_>) -> Option<PyObject> {
+        match self {
+            Self::AlgoOrders { payload } => Some(payload.clone_ref(py)),
+            _ => None,
+        }
+    }
+
+    fn has_payload(&self) -> bool {
+        match self {
+            Self::Commanded { .. }
+            | Self::OnTradingDisabled { .. }
+            | Self::AccountDisconnect { .. }
+            | Self::MarketDisconnect { .. }
+            | Self::PositionExit { .. }
+            | Self::AlgoOrders { .. } => true,
+        }
+    }
+}
+
+#[pyclass(module = "barter_python", name = "EngineOutput", unsendable)]
+pub struct PyEngineOutput {
+    inner: PyEngineOutputInner,
+}
+
+impl PyEngineOutput {
+    fn from_engine_output<OnTradingDisabled, OnDisconnect>(
+        py: Python<'_>,
+        output: &EngineOutput<OnTradingDisabled, OnDisconnect>,
+    ) -> PyResult<Py<PyEngineOutput>>
+    where
+        EngineOutput<OnTradingDisabled, OnDisconnect>: Serialize,
+        OnTradingDisabled: Serialize,
+        OnDisconnect: Serialize,
+    {
+        let inner = match output {
+            EngineOutput::Commanded(action) => {
+                let output = PyActionOutput::from_action(py, action)?;
+                PyEngineOutputInner::Commanded { output }
+            }
+            EngineOutput::OnTradingDisabled(value) => {
+                let payload = serialize_to_py_object(py, value)?;
+                PyEngineOutputInner::OnTradingDisabled { payload }
+            }
+            EngineOutput::AccountDisconnect(value) => {
+                let payload = serialize_to_py_object(py, value)?;
+                PyEngineOutputInner::AccountDisconnect { payload }
+            }
+            EngineOutput::MarketDisconnect(value) => {
+                let payload = serialize_to_py_object(py, value)?;
+                PyEngineOutputInner::MarketDisconnect { payload }
+            }
+            EngineOutput::PositionExit(value) => {
+                let output = Py::new(py, PyPositionExit::from_position(value))?;
+                PyEngineOutputInner::PositionExit { output }
+            }
+            EngineOutput::AlgoOrders(value) => {
+                let payload = serialize_to_py_object(py, value)?;
+                PyEngineOutputInner::AlgoOrders { payload }
+            }
+        };
+
+        Py::new(py, PyEngineOutput { inner })
+    }
+}
+
+#[pymethods]
+impl PyEngineOutput {
+    #[getter]
+    pub fn variant(&self) -> &'static str {
+        self.inner.variant()
+    }
+
+    #[getter]
+    pub fn commanded(&self, py: Python<'_>) -> Option<Py<PyActionOutput>> {
+        self.inner.commanded(py)
+    }
+
+    #[getter]
+    pub fn trading_disabled(&self, py: Python<'_>) -> Option<PyObject> {
+        self.inner.trading_disabled(py)
+    }
+
+    #[getter]
+    pub fn account_disconnect(&self, py: Python<'_>) -> Option<PyObject> {
+        self.inner.account_disconnect(py)
+    }
+
+    #[getter]
+    pub fn market_disconnect(&self, py: Python<'_>) -> Option<PyObject> {
+        self.inner.market_disconnect(py)
+    }
+
+    #[getter]
+    pub fn position_exit(&self, py: Python<'_>) -> Option<Py<PyPositionExit>> {
+        self.inner.position_exit(py)
+    }
+
+    #[getter]
+    pub fn algo_orders(&self, py: Python<'_>) -> Option<PyObject> {
+        self.inner.algo_orders(py)
+    }
+
+    #[getter]
+    pub fn other(&self, _py: Python<'_>) -> Option<PyObject> {
+        None
+    }
+
+    pub fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "EngineOutput(variant={}, has_payload={})",
+            self.inner.variant(),
+            self.inner.has_payload()
+        ))
     }
 }
 
@@ -334,9 +639,15 @@ impl PyClosePositionsOutput {
 }
 
 enum PyActionOutputInner {
-    CancelOrders { output: Py<PySendRequestsOutput> },
-    OpenOrders { output: Py<PySendRequestsOutput> },
-    ClosePositions { output: Py<PyClosePositionsOutput> },
+    CancelOrders {
+        output: Py<PySendRequestsOutput>,
+    },
+    OpenOrders {
+        output: Py<PySendRequestsOutput>,
+    },
+    ClosePositions {
+        output: Py<PyClosePositionsOutput>,
+    },
     Other {
         original_variant: &'static str,
         payload: Py<PyAny>,
@@ -358,7 +669,9 @@ impl PyActionOutputInner {
             Self::CancelOrders { .. } => "CancelOrders",
             Self::OpenOrders { .. } => "OpenOrders",
             Self::ClosePositions { .. } => "ClosePositions",
-            Self::Other { original_variant, .. } => original_variant,
+            Self::Other {
+                original_variant, ..
+            } => original_variant,
         }
     }
 
@@ -413,8 +726,12 @@ impl PyActionOutput {
     fn from_action(py: Python<'_>, output: &ActionOutput) -> PyResult<Py<PyActionOutput>> {
         let inner = match output {
             ActionOutput::CancelOrders(result) => {
-                let wrapper =
-                    send_requests_output_to_py(py, "CancelOrders", result, order_request_cancel_to_py)?;
+                let wrapper = send_requests_output_to_py(
+                    py,
+                    "CancelOrders",
+                    result,
+                    order_request_cancel_to_py,
+                )?;
                 PyActionOutputInner::CancelOrders { output: wrapper }
             }
             ActionOutput::OpenOrders(result) => {
@@ -1200,16 +1517,13 @@ where
 fn engine_output_to_py<OnTradingDisabled, OnDisconnect>(
     py: Python<'_>,
     output: &EngineOutput<OnTradingDisabled, OnDisconnect>,
-) -> PyResult<PyObject>
+) -> PyResult<Py<PyEngineOutput>>
 where
     EngineOutput<OnTradingDisabled, OnDisconnect>: Serialize,
     OnTradingDisabled: Serialize,
     OnDisconnect: Serialize,
 {
-    match output {
-        EngineOutput::Commanded(action) => action_output_to_py(py, action),
-        _ => serialize_to_py_object(py, output),
-    }
+    PyEngineOutput::from_engine_output(py, output)
 }
 
 fn action_output_to_py(py: Python<'_>, output: &ActionOutput) -> PyResult<PyObject> {
@@ -1417,15 +1731,18 @@ fn load_historic_clock_and_market_stream(
 mod tests {
     use super::*;
     use barter::engine::action::{
-        generate_algo_orders::GenerateAlgoOrdersOutput,
-        send_requests::SendCancelsAndOpensOutput,
+        generate_algo_orders::GenerateAlgoOrdersOutput, send_requests::SendCancelsAndOpensOutput,
     };
-    use barter_execution::order::{
-        OrderKey, OrderKind, TimeInForce,
-        id::{ClientOrderId, StrategyId},
-        request::{OrderRequestCancel, OrderRequestOpen, RequestCancel, RequestOpen},
+    use barter_execution::{
+        order::{
+            OrderKey, OrderKind, TimeInForce,
+            id::{ClientOrderId, StrategyId},
+            request::{OrderRequestCancel, OrderRequestOpen, RequestCancel, RequestOpen},
+        },
+        trade::AssetFees,
     };
     use barter_instrument::{Side, exchange::ExchangeIndex, instrument::InstrumentIndex};
+    use chrono::{TimeZone, Utc};
     use pyo3::types::PyList;
     use rust_decimal::Decimal;
     use rust_decimal::prelude::FromPrimitive;
@@ -1487,30 +1804,20 @@ mod tests {
                 .expect("__len__ result");
             assert_eq!(len, 1);
 
-            let sent = open_wrapper
-                .getattr("sent")
-                .expect("sent attribute");
+            let sent = open_wrapper.getattr("sent").expect("sent attribute");
             assert_eq!(
                 sent.get_type().name().expect("sent type name"),
                 "NoneOneOrMany"
             );
 
-            let sent_list_obj = sent
-                .call_method0("to_list")
-                .expect("sent to_list");
-            let sent_list = sent_list_obj
-                .downcast::<PyList>()
-                .expect("sent to PyList");
+            let sent_list_obj = sent.call_method0("to_list").expect("sent to_list");
+            let sent_list = sent_list_obj.downcast::<PyList>().expect("sent to PyList");
             assert_eq!(sent_list.len(), 1);
             let first = sent_list.get_item(0).expect("first item");
             assert!(first.is_instance_of::<PyOrderRequestOpen>());
 
-            let errors = open_wrapper
-                .getattr("errors")
-                .expect("errors attribute");
-            let errors_list_obj = errors
-                .call_method0("to_list")
-                .expect("errors to_list");
+            let errors = open_wrapper.getattr("errors").expect("errors attribute");
+            let errors_list_obj = errors.call_method0("to_list").expect("errors to_list");
             let errors_list = errors_list_obj
                 .downcast::<PyList>()
                 .expect("errors to PyList");
@@ -1577,9 +1884,7 @@ mod tests {
                 "ClosePositionsOutput"
             );
 
-            let cancels_wrapper = close_wrapper
-                .getattr("cancels")
-                .expect("cancels attribute");
+            let cancels_wrapper = close_wrapper.getattr("cancels").expect("cancels attribute");
             assert_eq!(
                 cancels_wrapper
                     .get_type()
@@ -1588,9 +1893,7 @@ mod tests {
                 "SendRequestsOutput"
             );
 
-            let opens_wrapper = close_wrapper
-                .getattr("opens")
-                .expect("opens attribute");
+            let opens_wrapper = close_wrapper.getattr("opens").expect("opens attribute");
             assert_eq!(
                 opens_wrapper.get_type().name().expect("opens type name"),
                 "SendRequestsOutput"
@@ -1610,21 +1913,13 @@ mod tests {
                 .expect("opens usize");
             assert_eq!(opens_len, 1);
 
-            let opens_sent = opens_wrapper
-                .getattr("sent")
-                .expect("opens sent");
-            let opens_list_obj = opens_sent
-                .call_method0("to_list")
-                .expect("opens to_list");
-            let opens_list = opens_list_obj
-                .downcast::<PyList>()
-                .expect("opens PyList");
+            let opens_sent = opens_wrapper.getattr("sent").expect("opens sent");
+            let opens_list_obj = opens_sent.call_method0("to_list").expect("opens to_list");
+            let opens_list = opens_list_obj.downcast::<PyList>().expect("opens PyList");
             let first_open = opens_list.get_item(0).expect("first open");
             assert!(first_open.is_instance_of::<PyOrderRequestOpen>());
 
-            let cancels_sent = cancels_wrapper
-                .getattr("sent")
-                .expect("cancels sent");
+            let cancels_sent = cancels_wrapper.getattr("sent").expect("cancels sent");
             let cancels_list_obj = cancels_sent
                 .call_method0("to_list")
                 .expect("cancels to_list");
@@ -1651,9 +1946,7 @@ mod tests {
                 .expect("variant string");
             assert_eq!(variant, "Other");
 
-            let other = action
-                .getattr("other")
-                .expect("other attribute");
+            let other = action.getattr("other").expect("other attribute");
             assert_eq!(other.get_type().name().expect("other type"), "dict");
 
             let open_none = action
@@ -1665,6 +1958,125 @@ mod tests {
                 .getattr("cancel_orders")
                 .expect("cancel_orders attribute");
             assert!(cancel_none.is_none());
+        });
+    }
+
+    #[test]
+    fn engine_output_commanded_wraps_action_output() {
+        Python::with_gil(|py| {
+            let key = OrderKey {
+                exchange: ExchangeIndex(2),
+                instrument: InstrumentIndex(4),
+                strategy: StrategyId::new("engine-commanded"),
+                cid: ClientOrderId::new("cid-7"),
+            };
+
+            let request = OrderRequestOpen {
+                key: key.clone(),
+                state: RequestOpen::new(
+                    Side::Sell,
+                    Decimal::from_f64(120.0).unwrap(),
+                    Decimal::from_f64(0.25).unwrap(),
+                    OrderKind::Limit,
+                    TimeInForce::GoodUntilCancelled { post_only: true },
+                ),
+            };
+
+            let output =
+                SendRequestsOutput::new(NoneOneOrMany::One(request.clone()), NoneOneOrMany::None);
+
+            let engine_output: EngineOutput<(), ()> =
+                EngineOutput::Commanded(ActionOutput::OpenOrders(output));
+            let py_output = engine_output_to_py(py, &engine_output).expect("convert engine output");
+            let wrapper = py_output.bind(py);
+
+            assert_eq!(
+                wrapper.get_type().name().expect("wrapper type"),
+                "EngineOutput"
+            );
+
+            let variant: String = wrapper
+                .getattr("variant")
+                .expect("variant attribute")
+                .extract()
+                .expect("variant string");
+            assert_eq!(variant, "Commanded");
+
+            let commanded = wrapper.getattr("commanded").expect("commanded attribute");
+            assert!(commanded.is_instance_of::<PyActionOutput>());
+
+            let open_orders = commanded.getattr("open_orders").expect("open_orders attr");
+            assert!(open_orders.is_instance_of::<PySendRequestsOutput>());
+        });
+    }
+
+    #[test]
+    fn engine_output_position_exit_exposes_structured_payload() {
+        Python::with_gil(|py| {
+            let exit = PositionExited {
+                instrument: InstrumentIndex(11),
+                side: Side::Buy,
+                price_entry_average: Decimal::from_f64(101.0).unwrap(),
+                quantity_abs_max: Decimal::from_f64(1.5).unwrap(),
+                pnl_realised: Decimal::from_f64(4.25).unwrap(),
+                fees_enter: AssetFees::quote_fees(Decimal::from_f64(0.05).unwrap()),
+                fees_exit: AssetFees::quote_fees(Decimal::from_f64(0.08).unwrap()),
+                time_enter: Utc.with_ymd_and_hms(2024, 6, 1, 10, 0, 0).unwrap(),
+                time_exit: Utc.with_ymd_and_hms(2024, 6, 1, 11, 0, 0).unwrap(),
+                trades: vec![TradeId::new("t-1"), TradeId::new("t-2")],
+            };
+
+            let engine_output = EngineOutput::<(), ()>::PositionExit(exit);
+            let py_output = engine_output_to_py(py, &engine_output).expect("convert position exit");
+            let wrapper = py_output.bind(py);
+
+            let variant: String = wrapper
+                .getattr("variant")
+                .expect("variant attribute")
+                .extract()
+                .expect("variant string");
+            assert_eq!(variant, "PositionExit");
+
+            let position_exit = wrapper
+                .getattr("position_exit")
+                .expect("position_exit attr");
+            assert!(position_exit.is_instance_of::<PyPositionExit>());
+
+            let instrument = position_exit
+                .getattr("instrument")
+                .expect("instrument attr");
+            assert!(instrument.is_instance_of::<PyInstrumentIndex>());
+
+            let trades = position_exit.getattr("trades").expect("trades attr");
+            let trades_list = trades.downcast::<PyList>().expect("trades list");
+            assert_eq!(trades_list.len(), 2);
+        });
+    }
+
+    #[test]
+    fn engine_output_trading_disabled_serializes_payload() {
+        Python::with_gil(|py| {
+            let engine_output: EngineOutput<String, ()> =
+                EngineOutput::OnTradingDisabled(String::from("disabled"));
+            let py_output =
+                engine_output_to_py(py, &engine_output).expect("convert trading disabled output");
+            let wrapper = py_output.bind(py);
+
+            let variant: String = wrapper
+                .getattr("variant")
+                .expect("variant attr")
+                .extract()
+                .expect("variant string");
+            assert_eq!(variant, "OnTradingDisabled");
+
+            let payload = wrapper
+                .getattr("trading_disabled")
+                .expect("trading_disabled attr");
+            let value: String = payload.extract().expect("payload string");
+            assert_eq!(value, "disabled");
+
+            let commanded = wrapper.getattr("commanded").expect("commanded attr");
+            assert!(commanded.is_none());
         });
     }
 

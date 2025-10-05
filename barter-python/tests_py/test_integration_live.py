@@ -129,38 +129,69 @@ def test_audit_updates_typed_helpers(example_paths: dict[str, Path]) -> None:
             outputs_list = event.outputs.to_list()
             for output in outputs_list:
                 assert output is not None
-                if isinstance(output, bp.ActionOutput):
+                if isinstance(output, bp.EngineOutput):
                     assert output.variant in {
-                        "CancelOrders",
-                        "OpenOrders",
-                        "ClosePositions",
-                        "Other",
+                        "Commanded",
+                        "OnTradingDisabled",
+                        "AccountDisconnect",
+                        "MarketDisconnect",
+                        "PositionExit",
+                        "AlgoOrders",
                     }
-                    if output.variant == "ClosePositions":
-                        close = output.close_positions
-                        assert close is not None
-                        assert isinstance(close, bp.ClosePositionsOutput)
-                        assert isinstance(close.cancels, bp.SendRequestsOutput)
-                        assert isinstance(close.opens, bp.SendRequestsOutput)
-                        assert isinstance(close.cancels.to_list(), list)
-                        assert isinstance(close.opens.to_list(), list)
-                    elif output.variant == "OpenOrders":
-                        opens = output.open_orders
-                        assert opens is not None
-                        assert isinstance(opens, bp.SendRequestsOutput)
-                        assert isinstance(len(opens), int)
-                        assert isinstance(opens.to_list(), list)
-                        assert isinstance(opens.errors_to_list(), list)
-                    elif output.variant == "CancelOrders":
-                        cancels = output.cancel_orders
-                        assert cancels is not None
-                        assert isinstance(cancels, bp.SendRequestsOutput)
-                        assert isinstance(cancels.to_list(), list)
-                        assert isinstance(cancels.errors_to_list(), list)
+
+                    if output.variant == "Commanded":
+                        commanded = output.commanded
+                        assert commanded is not None
+                        assert isinstance(commanded, bp.ActionOutput)
+                        assert commanded.variant in {
+                            "CancelOrders",
+                            "OpenOrders",
+                            "ClosePositions",
+                            "Other",
+                        }
+                        if commanded.variant == "ClosePositions":
+                            close = commanded.close_positions
+                            assert close is not None
+                            assert isinstance(close, bp.ClosePositionsOutput)
+                            assert isinstance(close.cancels, bp.SendRequestsOutput)
+                            assert isinstance(close.opens, bp.SendRequestsOutput)
+                            assert isinstance(close.cancels.to_list(), list)
+                            assert isinstance(close.opens.to_list(), list)
+                        elif commanded.variant == "OpenOrders":
+                            opens = commanded.open_orders
+                            assert opens is not None
+                            assert isinstance(opens, bp.SendRequestsOutput)
+                            assert isinstance(len(opens), int)
+                            assert isinstance(opens.to_list(), list)
+                            assert isinstance(opens.errors_to_list(), list)
+                        elif commanded.variant == "CancelOrders":
+                            cancels = commanded.cancel_orders
+                            assert cancels is not None
+                            assert isinstance(cancels, bp.SendRequestsOutput)
+                            assert isinstance(cancels.to_list(), list)
+                            assert isinstance(cancels.errors_to_list(), list)
+                        else:
+                            other_payload = commanded.other
+                            assert isinstance(other_payload, dict)
+                            assert "variant" in other_payload
+                    elif output.variant == "PositionExit":
+                        position = output.position_exit
+                        if position is not None:
+                            assert isinstance(position, bp.PositionExit)
+                            assert isinstance(position.instrument, bp.InstrumentIndex)
+                            assert isinstance(position.quantity_abs_max, Decimal)
+                            assert isinstance(position.pnl_realised, Decimal)
+                            trades = position.trades
+                            assert isinstance(trades, list)
                     else:
-                        other_payload = output.other
-                        assert isinstance(other_payload, dict)
-                        assert "variant" in other_payload
+                        payload = (
+                            output.trading_disabled
+                            or output.account_disconnect
+                            or output.market_disconnect
+                            or output.algo_orders
+                        )
+                        if payload is not None:
+                            assert payload is not None
                 else:
                     assert isinstance(output, dict)
 
@@ -217,13 +248,23 @@ def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
         assert isinstance(output_list, list)
         assert isinstance(error_list, list)
         for output in output_list:
-            if isinstance(output, bp.ActionOutput):
+            if isinstance(output, bp.EngineOutput):
                 assert output.variant in {
-                    "CancelOrders",
-                    "OpenOrders",
-                    "ClosePositions",
-                    "Other",
+                    "Commanded",
+                    "OnTradingDisabled",
+                    "AccountDisconnect",
+                    "MarketDisconnect",
+                    "PositionExit",
+                    "AlgoOrders",
                 }
+                if output.variant == "Commanded":
+                    commanded = output.commanded
+                    if commanded is not None:
+                        assert isinstance(commanded, bp.ActionOutput)
+                elif output.variant == "PositionExit":
+                    position = output.position_exit
+                    if position is not None:
+                        assert isinstance(position, bp.PositionExit)
             else:
                 assert isinstance(output, dict)
         for err in error_list:
