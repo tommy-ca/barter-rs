@@ -27,6 +27,12 @@
   - [x] Expose PyO3 bindings & Python wrapper for a `MockExecutionClient` harness.
   - [x] Add TDD coverage (pytest + doctest) exercising snapshots and stream polling.
 
+## Completed (2025-10-05)
+- Expose execution balance wrappers to the Python API.
+  - [x] Align module exports with the Rust-backed `Balance` and `AssetBalance` bindings.
+  - [x] Update pytest coverage asserting execution types are surfaced to Python callers.
+  - [x] Run `uv run pytest -q tests_py` and `cargo test -p barter-python` after the migration.
+
 ## Completed (2025-10-04)
 - Replace Python close-position helpers with Rust-backed strategy bindings.
   - [x] Finalise spec requirements under `.agent/specs/python-strategy-bindings.md`.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Generic, TypeVar, Union
@@ -23,7 +23,6 @@ _OrderKind = _core.OrderKind
 _StrategyId = _core.StrategyId
 _asset_balance_new = _core.asset_balance_new
 _balance_new = _core.balance_new
-_Balance = _core.Balance
 _TimeInForce = _core.TimeInForce
 
 try:
@@ -45,6 +44,37 @@ OrderKind = _OrderKind
 TimeInForce = _TimeInForce
 balance_new = _balance_new
 asset_balance_new = _asset_balance_new
+
+
+def _capture_balance_type():
+    sample = _balance_new(Decimal("0"), Decimal("0"))
+    return type(sample)
+
+
+def _capture_asset_balance_type():
+    sample_balance = _balance_new(Decimal("0"), Decimal("0"))
+    sample_asset_balance = _asset_balance_new(
+        0,
+        sample_balance,
+        datetime(1970, 1, 1, tzinfo=timezone.utc),
+    )
+    return type(sample_asset_balance)
+
+
+Balance = _capture_balance_type()
+AssetBalance = _capture_asset_balance_type()
+
+
+def _balance_new_classmethod(cls, total, free):
+    return cls(total, free)
+
+
+def _asset_balance_new_classmethod(cls, asset, balance, time_exchange):
+    return cls(asset, balance, time_exchange)
+
+
+Balance.new = classmethod(_balance_new_classmethod)
+AssetBalance.new = classmethod(_asset_balance_new_classmethod)
 
 
 class ExecutionInstrumentMap:
@@ -93,108 +123,6 @@ class ExecutionInstrumentMap:
 
     def __repr__(self) -> str:
         return repr(self._inner)
-
-
-class Balance:
-    """Python-friendly wrapper around the Rust-backed balance type."""
-
-    __slots__ = ("_inner",)
-
-    def __init__(self, total, free):
-        self._inner = _balance_new(total, free)
-
-    @classmethod
-    def new(cls, total, free):
-        return cls(total, free)
-
-    @classmethod
-    def _from_inner(cls, inner: _Balance):
-        obj = object.__new__(cls)
-        obj._inner = inner
-        return obj
-
-    @property
-    def total(self):
-        return self._inner.total
-
-    @property
-    def free(self):
-        return self._inner.free
-
-    def used(self):
-        return self._inner.used()
-
-    def to_dict(self):
-        return self._inner.to_dict()
-
-    def __getattr__(self, name: str):
-        return getattr(self._inner, name)
-
-    def __repr__(self) -> str:
-        return repr(self._inner)
-
-    def __str__(self) -> str:
-        return str(self._inner)
-
-    def __eq__(self, other: object) -> bool:
-        other_inner = getattr(other, "_inner", other)
-        return self._inner == other_inner
-
-    def __hash__(self) -> int:
-        return hash(self._inner)
-
-
-class AssetBalance:
-    """Python wrapper exposing constructors for the Rust asset balance type."""
-
-    __slots__ = ("_inner",)
-
-    def __init__(self, asset, balance, time_exchange):
-        if isinstance(balance, Balance):
-            balance_inner = balance._inner
-        elif isinstance(balance, _Balance):
-            balance_inner = balance
-        else:
-            raise TypeError("balance must be a Balance value")
-        self._inner = _asset_balance_new(asset, balance_inner, time_exchange)
-
-    @classmethod
-    def new(cls, asset, balance, time_exchange):
-        return cls(asset, balance, time_exchange)
-
-    @classmethod
-    def _from_inner(cls, inner: _AssetBalance):
-        obj = object.__new__(cls)
-        obj._inner = inner
-        return obj
-
-    @property
-    def asset(self):
-        return self._inner.asset
-
-    @property
-    def balance(self) -> Balance:
-        return Balance._from_inner(self._inner.balance)
-
-    @property
-    def time_exchange(self):
-        return self._inner.time_exchange
-
-    def __getattr__(self, name: str):
-        return getattr(self._inner, name)
-
-    def __repr__(self) -> str:
-        return repr(self._inner)
-
-    def __str__(self) -> str:
-        return str(self._inner)
-
-    def __eq__(self, other: object) -> bool:
-        other_inner = getattr(other, "_inner", other)
-        return self._inner == other_inner
-
-    def __hash__(self) -> int:
-        return hash(self._inner)
 
 
 class MockExecutionClient:

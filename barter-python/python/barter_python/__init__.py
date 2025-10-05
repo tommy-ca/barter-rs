@@ -43,6 +43,10 @@ __all__.append("ExecutionInstrumentMap")
 MockExecutionClient = execution.MockExecutionClient
 __all__.append("MockExecutionClient")
 
+Balance = execution.Balance
+AssetBalance = execution.AssetBalance
+
+
 
 def __getattr__(name: str):
     return getattr(_core, name)

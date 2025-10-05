@@ -262,6 +262,11 @@ class TestBalance:
         assert balance.free == Decimal("95.2")
         assert balance.__class__.__module__ == "barter_python"
 
+    def test_matches_extension_class(self):
+        balance = Balance(Decimal("100.5"), Decimal("95.2"))
+        assert isinstance(balance, bp.Balance)
+        assert type(balance) is bp.Balance
+
 
 class TestAssetBalance:
     def test_creation(self):
@@ -312,6 +317,16 @@ class TestAssetBalance:
         assert asset_balance.asset == BTC_ASSET_INDEX
         assert asset_balance.balance.total == Decimal("3.0")
         assert asset_balance.__class__.__module__ == "barter_python"
+
+    def test_matches_extension_class(self):
+        balance = Balance(Decimal("3.0"), Decimal("1.5"))
+        asset_balance = AssetBalance(
+            BTC_ASSET_INDEX,
+            balance,
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        assert isinstance(asset_balance, bp.AssetBalance)
+        assert type(asset_balance) is bp.AssetBalance
 
 
 class TestAssetFees:
