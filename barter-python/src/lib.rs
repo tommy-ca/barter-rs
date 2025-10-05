@@ -73,8 +73,10 @@ use command::{
     clone_filter, collect_cancel_requests, collect_open_requests, parse_decimal, parse_side,
 };
 use config::{PyExecutionConfig, PyMockExecutionConfig, PySystemConfig};
+#[cfg(feature = "python-tests")]
+use data::_testing_dynamic_trades;
 use data::{
-    PyDynamicStreams, PyExchangeId, PySubKind, PySubscription, PySubscriptionId,
+    PyDynamicStreams, PyExchangeId, PyMarketStream, PySubKind, PySubscription, PySubscriptionId,
     init_dynamic_streams,
 };
 use execution::{
@@ -852,6 +854,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubscription>()?;
     m.add_class::<PySubscriptionId>()?;
     m.add_class::<PyDynamicStreams>()?;
+    m.add_class::<PyMarketStream>()?;
     m.add_class::<PyAsset>()?;
     m.add_class::<PyAssetIndex>()?;
     m.add_class::<PyQuoteAsset>()?;
@@ -880,6 +883,8 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
     m.add_function(wrap_pyfunction!(start_system, m)?)?;
     m.add_function(wrap_pyfunction!(init_dynamic_streams, m)?)?;
+    #[cfg(feature = "python-tests")]
+    m.add_function(wrap_pyfunction!(_testing_dynamic_trades, m)?)?;
     m.add_function(wrap_pyfunction!(balance_new, m)?)?;
     m.add_function(wrap_pyfunction!(asset_balance_new, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_sharpe_ratio, m)?)?;

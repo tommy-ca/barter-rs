@@ -187,7 +187,7 @@ fn market_stream_event_to_py(
     }
 }
 
-fn market_event_to_py(
+pub(crate) fn market_event_to_py(
     py: Python<'_>,
     event: &MarketEvent<InstrumentIndex, DataKind>,
     data_module: &Bound<'_, PyModule>,
