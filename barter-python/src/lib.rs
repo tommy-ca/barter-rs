@@ -81,21 +81,21 @@ use config::{PyExecutionConfig, PyMockExecutionConfig, PySystemConfig};
 #[cfg(feature = "python-tests")]
 use data::_testing_dynamic_trades;
 use data::{
-    PyDynamicStreams, PyExchangeId, PyMarketStream, PySubKind, PySubscription, PySubscriptionId,
+    PyAsyncMarketStream, PyDynamicStreams, PyExchangeId, PyMarketStream, PySubKind, PySubscription, PySubscriptionId,
     exchange_supports_instrument_kind, init_dynamic_streams,
 };
 use error::{PySocketErrorInfo, SocketError as PySocketErrorExc};
 use execution::{
     PyActiveOrderState, PyAssetFees, PyCancelInFlightState, PyCancelledState, PyClientOrderId,
     PyExecutionAssetBalance, PyExecutionBalance, PyExecutionInstrumentMap, PyInactiveOrderState,
-    PyMockExecutionClient, PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderKind,
-    PyOrderState, PyStrategyId, PyTimeInForce, PyTrade, PyTradeId, asset_balance_new, balance_new,
+    PyMockExecutionClient, PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderKind, PyOrderState, PyStrategyId,
+    PyTimeInForce, PyTrade, PyTradeId, asset_balance_new, balance_new,
 };
 use instrument::{
     PyAsset, PyAssetIndex, PyAssetNameExchange, PyAssetNameInternal, PyExchangeIndex,
     PyIndexedInstruments, PyInstrumentIndex, PyInstrumentNameExchange, PyInstrumentNameInternal,
-    PyInstrumentSpec, PyInstrumentSpecNotional, PyInstrumentSpecPrice, PyInstrumentSpecQuantity,
-    PyOrderQuantityUnits, PyQuoteAsset, PySide,
+    PyOrderQuantityUnits, PyInstrumentSpec, PyInstrumentSpecNotional, PyInstrumentSpecPrice,
+    PyInstrumentSpecQuantity, PyQuoteAsset, PySide,
 };
 use integration::{PySnapUpdates, PySnapshot};
 use logging::{init_json_logging_py, init_tracing};
@@ -106,6 +106,8 @@ use risk::{
     calculate_delta, calculate_quote_notional,
 };
 use serde_json::Value as JsonValue;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use strategy::build_ioc_market_order_to_close_position;
 use summary::{
     PyAssetTearSheet, PyBacktestSummary, PyBalance, PyDrawdown, PyInstrumentTearSheet,
@@ -126,6 +128,9 @@ use system::{
 
 
 
+
+static EXCHANGE_ID_CACHE: Mutex<Option<HashMap<String, ExchangeId>>> = Mutex::new(None);
+
 fn parse_exchange_id(value: &str) -> PyResult<ExchangeId> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -133,11 +138,29 @@ fn parse_exchange_id(value: &str) -> PyResult<ExchangeId> {
     }
 
     let normalized = trimmed.to_ascii_lowercase();
-    serde_json::from_value(JsonValue::String(normalized)).map_err(|_| {
+
+    // Check cache first
+    if let Some(cache) = EXCHANGE_ID_CACHE.lock().unwrap().as_ref() {
+        if let Some(&exchange_id) = cache.get(&normalized) {
+            return Ok(exchange_id);
+        }
+    }
+
+    // Parse and cache
+    let exchange_id = serde_json::from_value(JsonValue::String(normalized.clone())).map_err(|_| {
         PyValueError::new_err(format!(
             "unknown exchange identifier: {trimmed}. expected snake_case exchange ids such as 'binance_spot'"
         ))
-    })
+    })?;
+
+    // Initialize cache if needed and insert
+    let mut cache = EXCHANGE_ID_CACHE.lock().unwrap();
+    if cache.is_none() {
+        *cache = Some(HashMap::new());
+    }
+    cache.as_mut().unwrap().insert(normalized, exchange_id);
+
+    Ok(exchange_id)
 }
 
 fn parse_order_book_level(value: Option<(f64, f64)>, label: &str) -> PyResult<Option<Level>> {
@@ -236,6 +259,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySubscriptionId>()?;
     m.add_class::<PyDynamicStreams>()?;
     m.add_class::<PyMarketStream>()?;
+    m.add_class::<PyAsyncMarketStream>()?;
     m.add_class::<PyAssetNameInternal>()?;
     m.add_class::<PyAssetNameExchange>()?;
     m.add_class::<PyInstrumentNameInternal>()?;

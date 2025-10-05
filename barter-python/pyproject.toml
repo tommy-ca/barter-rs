@@ -5,16 +5,24 @@ build-backend = "maturin"
 [project]
 name = "barter-python"
 version = "0.1.2"
-description = "Python bindings for the Barter trading engine"
+description = "High-performance Python bindings for the Barter algorithmic trading engine"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "barter-rs maintainers" }]
+authors = [
+    { name = "Barter Developers", email = "dev@barter.rs" },
+]
+maintainers = [
+    { name = "Barter Developers", email = "dev@barter.rs" },
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "Intended Audience :: Financial and Insurance Industry",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -22,22 +30,49 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Rust",
     "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
 ]
-keywords = ["trading", "algorithmic", "finance", "rust", "bindings"]
+keywords = [
+    "trading",
+    "algorithmic-trading",
+    "finance",
+    "quantitative",
+    "high-frequency-trading",
+    "rust",
+    "python-bindings",
+    "market-data",
+    "backtesting",
+    "execution",
+]
 
 [project.urls]
-Homepage = "https://github.com/barter-rs/barter-rs"
-Documentation = "https://docs.rs/barter/latest/barter/"
+Homepage = "https://barter.rs"
+Documentation = "https://docs.barter.rs/python/"
 Repository = "https://github.com/barter-rs/barter-rs"
+"Bug Reports" = "https://github.com/barter-rs/barter-rs/issues"
+"Source" = "https://github.com/barter-rs/barter-rs"
+Changelog = "https://github.com/barter-rs/barter-rs/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 test = [
     "pytest>=8.3",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
 ]
 dev = [
     "ruff>=0.6.0",
+    "mypy>=1.8",
+    "black>=24.0",
+    "pre-commit>=3.6",
+]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=1.3",
+    "myst-parser>=2.0",
 ]
 
 [project.scripts]
@@ -48,6 +83,20 @@ bindings = "pyo3"
 module-name = "barter_python"
 features = ["extension-module"]
 python-source = "python"
+include = [
+    { path = "python/**/*.py", format = "sdist" },
+    { path = "python/**/*.pyi", format = "sdist" },
+    { path = "README.md", format = "sdist" },
+    { path = "LICENSE", format = "sdist" },
+]
+exclude = [
+    "python/**/*.pyc",
+    "python/**/__pycache__",
+    "python/**/*.pyo",
+]
+compatibility = "manylinux2014"
+strip = true
+zig = false
 
 [tool.pytest.ini_options]
 minversion = "8.0"

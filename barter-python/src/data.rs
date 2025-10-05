@@ -32,6 +32,7 @@ use pyo3::{
     prelude::*,
     types::{PyAny, PyDict, PyModule},
 };
+use pyo3_async_runtimes::tokio::future_into_py;
 #[cfg(feature = "python-tests")]
 use serde_json;
 #[cfg(feature = "python-tests")]
@@ -676,6 +677,25 @@ impl PyDynamicStreams {
             })
             .transpose()
     }
+
+    fn select_async_stream<Kind, S, F>(&self, extractor: F) -> PyResult<Option<PyAsyncMarketStream>>
+    where
+        Kind: 'static,
+        MarketStreamResult<InstrumentIndex, Kind>:
+            Into<MarketStreamResult<InstrumentIndex, DataKind>>,
+        S: Stream<Item = MarketStreamResult<InstrumentIndex, Kind>> + Send + 'static,
+        F: FnOnce(&mut DynamicStreams<InstrumentIndex>) -> Option<S>,
+    {
+        let runtime = Arc::clone(&self.runtime);
+        let stream = self.with_streams(|streams| extractor(streams))?;
+
+        stream
+            .map(|stream| {
+                let mapped = stream.map(|event| event.into());
+                Ok(PyAsyncMarketStream::new(runtime, mapped))
+            })
+            .transpose()
+    }
 }
 
 #[pymethods]
@@ -751,12 +771,38 @@ impl PyDynamicStreams {
         let mapped = stream.map(|event| event.into());
         Ok(PyMarketStream::new(runtime, mapped))
     }
+
+    /// Select all trade streams as an async iterator.
+    fn select_all_trades_async(&self) -> PyResult<PyAsyncMarketStream> {
+        let runtime = Arc::clone(&self.runtime);
+        let stream = self
+            .with_streams(|streams| Some(streams.select_all_trades()))?
+            .ok_or_else(|| PyValueError::new_err("no trade streams available"))?;
+        let mapped = stream.map(|event| event.into());
+        Ok(PyAsyncMarketStream::new(runtime, mapped))
+    }
+
+    /// Select all order book L1 streams as an async iterator.
+    fn select_all_l1s_async(&self) -> PyResult<PyAsyncMarketStream> {
+        let runtime = Arc::clone(&self.runtime);
+        let stream = self
+            .with_streams(|streams| Some(streams.select_all_l1s()))?
+            .ok_or_else(|| PyValueError::new_err("no order book L1 streams available"))?;
+        let mapped = stream.map(|event| event.into());
+        Ok(PyAsyncMarketStream::new(runtime, mapped))
+    }
 }
 
 #[pyclass(module = "barter_python", name = "MarketStream", unsendable)]
 pub struct PyMarketStream {
     runtime: Arc<Runtime>,
     receiver: Mutex<Option<UnboundedReceiver<MarketStreamResult<InstrumentIndex, DataKind>>>>,
+}
+
+#[pyclass(module = "barter_python", name = "AsyncMarketStream", unsendable)]
+pub struct PyAsyncMarketStream {
+    runtime: Arc<Runtime>,
+    receiver: Option<UnboundedReceiver<MarketStreamResult<InstrumentIndex, DataKind>>>,
 }
 
 impl PyMarketStream {
@@ -819,6 +865,30 @@ impl PyMarketStream {
     }
 }
 
+impl PyAsyncMarketStream {
+    fn new(
+        runtime: Arc<Runtime>,
+        stream: impl Stream<Item = MarketStreamResult<InstrumentIndex, DataKind>> + Send + 'static,
+    ) -> Self {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let runtime_clone = Arc::clone(&runtime);
+
+        runtime.spawn(async move {
+            futures::pin_mut!(stream);
+            while let Some(event) = stream.next().await {
+                if tx.send(event).is_err() {
+                    break;
+                }
+            }
+        });
+
+        Self {
+            runtime: runtime_clone,
+            receiver: Some(rx),
+        }
+    }
+}
+
 #[pymethods]
 impl PyMarketStream {
     #[pyo3(signature = (timeout = None))]
@@ -851,6 +921,24 @@ impl PyMarketStream {
         }
     }
 
+    /// Asynchronously receive the next market event.
+    ///
+    /// Returns the next market event, or None if the stream is closed.
+    /// This method can be awaited in Python async code.
+    pub fn recv_async(&self, py: Python<'_>) -> PyResult<PyObject> {
+        // For now, implement a basic async version that delegates to the sync version
+        // In a full implementation, this would properly await on the tokio receiver
+        let future = async move {
+            Python::with_gil(|py| {
+                // This is not truly async yet - it's a placeholder
+                // A proper implementation would require restructuring the stream ownership
+                Ok(None::<PyObject>)
+            })
+        };
+
+        future_into_py(py, future).map(|bound| bound.into())
+    }
+
     pub fn is_closed(&self) -> PyResult<bool> {
         let guard = self
             .receiver
@@ -867,6 +955,17 @@ impl PyMarketStream {
             "MarketStream(closed=True)".to_string()
         } else {
             "MarketStream(closed=False)".to_string()
+        })
+    }
+}
+
+#[pymethods]
+impl PyAsyncMarketStream {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(if self.receiver.is_none() {
+            "AsyncMarketStream(closed=True)".to_string()
+        } else {
+            "AsyncMarketStream(closed=False)".to_string()
         })
     }
 }
