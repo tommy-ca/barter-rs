@@ -9,21 +9,30 @@ from enum import Enum
 from typing import Generic, TypeVar, Union
 
 from .instrument import QuoteAsset, Side
-from .barter_python import (
-    AccountSnapshot as _AccountSnapshot,
-    AssetBalance as _AssetBalance,
-    asset_balance_new as _asset_balance_new,
-    ClientOrderId as _ClientOrderId,
-    InstrumentAccountSnapshot as _InstrumentAccountSnapshot,
-    ExecutionInstrumentMap as _ExecutionInstrumentMap,
-    MockExecutionClient as _MockExecutionClient,
-    OrderId as _OrderId,
-    OrderKey as _OrderKey,
-    OrderEvent as _OrderEvent,
-    balance_new as _balance_new,
-    Balance as _Balance,
-    StrategyId as _StrategyId,
-)
+from . import barter_python as _core
+
+_AccountSnapshot = _core.AccountSnapshot
+_AssetBalance = _core.AssetBalance
+_ClientOrderId = _core.ClientOrderId
+_ExecutionInstrumentMap = _core.ExecutionInstrumentMap
+_InstrumentAccountSnapshot = _core.InstrumentAccountSnapshot
+_OrderEvent = _core.OrderEvent
+_OrderId = _core.OrderId
+_OrderKey = _core.OrderKey
+_OrderKind = _core.OrderKind
+_StrategyId = _core.StrategyId
+_asset_balance_new = _core.asset_balance_new
+_balance_new = _core.balance_new
+_Balance = _core.Balance
+_TimeInForce = _core.TimeInForce
+
+try:
+    _MockExecutionClient = _core.MockExecutionClient
+except AttributeError as _mock_import_error:  # pragma: no cover - extension missing
+    _MockExecutionClient = None
+    _MOCK_EXECUTION_IMPORT_ERROR = _mock_import_error
+else:
+    _MOCK_EXECUTION_IMPORT_ERROR = None
 
 ClientOrderId = _ClientOrderId
 OrderId = _OrderId
@@ -32,6 +41,8 @@ OrderKey = _OrderKey
 InstrumentAccountSnapshot = _InstrumentAccountSnapshot
 AccountSnapshot = _AccountSnapshot
 OrderEvent = _OrderEvent
+OrderKind = _OrderKind
+TimeInForce = _TimeInForce
 balance_new = _balance_new
 asset_balance_new = _asset_balance_new
 
@@ -192,6 +203,8 @@ class MockExecutionClient:
     __slots__ = ("_inner",)
 
     def __init__(self, config, instrument_map):
+        if _MockExecutionClient is None:  # pragma: no cover - import error path
+            raise ImportError("MockExecutionClient extension unavailable") from _MOCK_EXECUTION_IMPORT_ERROR
         if hasattr(instrument_map, "_inner"):
             instrument_map_inner = instrument_map._inner
         else:
@@ -229,7 +242,7 @@ class MockExecutionClient:
         )
 
     def poll_event(self, timeout=None):
-        return self._inner.poll_event(timeout=timeout)
+        return self._inner.poll_event(timeout_secs=timeout)
 
     def close(self):
         self._inner.close()
@@ -246,26 +259,6 @@ InstrumentKey = TypeVar("InstrumentKey")
 ExchangeKey = TypeVar("ExchangeKey")
 
 
-class OrderKind(Enum):
-    """Order kind - Market or Limit."""
-
-    MARKET = "market"
-    LIMIT = "limit"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-class TimeInForce(Enum):
-    """Time in force for orders."""
-
-    GOOD_UNTIL_CANCELLED = "good_until_cancelled"
-    GOOD_UNTIL_END_OF_DAY = "good_until_end_of_day"
-    FILL_OR_KILL = "fill_or_kill"
-    IMMEDIATE_OR_CANCEL = "immediate_or_cancel"
-
-    def __str__(self) -> str:
-        return self.value
 @dataclass(frozen=True)
 class AssetFees(Generic[AssetKey]):
     """Asset fees."""

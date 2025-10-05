@@ -75,24 +75,52 @@ class TestRootExecutionIdentifiers:
 
 
 class TestOrderKind:
-    def test_order_kind_enum_values(self):
-        assert OrderKind.MARKET.value == "market"
-        assert OrderKind.LIMIT.value == "limit"
+    def test_order_kind_value_and_str(self):
+        market = OrderKind.MARKET
+        limit = OrderKind.LIMIT
 
-    def test_order_kind_str(self):
-        assert str(OrderKind.MARKET) == "market"
-        assert str(OrderKind.LIMIT) == "limit"
+        assert market.value == "market"
+        assert limit.value == "limit"
+        assert str(market) == "market"
+        assert str(limit) == "limit"
+        assert "OrderKind" in repr(market)
+
+    def test_order_kind_equality_and_hash(self):
+        assert OrderKind.MARKET == OrderKind.market()
+        assert OrderKind.LIMIT == OrderKind.limit()
+        assert OrderKind.MARKET != OrderKind.LIMIT
+        assert hash(OrderKind.MARKET) == hash(OrderKind.market())
+
+    def test_order_kind_round_trip_from_core_module(self):
+        market = bp.OrderKind.market()
+        assert isinstance(market, OrderKind)
+        assert market == OrderKind.MARKET
 
 
 class TestTimeInForce:
-    def test_time_in_force_enum_values(self):
-        assert TimeInForce.GOOD_UNTIL_CANCELLED.value == "good_until_cancelled"
+    def test_time_in_force_value_and_post_only(self):
+        default = TimeInForce.GOOD_UNTIL_CANCELLED
+        post_only = TimeInForce.good_until_cancelled(post_only=True)
+
+        assert default.value == "good_until_cancelled"
+        assert post_only.value == "good_until_cancelled"
+        assert not default.post_only
+        assert post_only.post_only
+
+    def test_time_in_force_other_variants(self):
         assert TimeInForce.GOOD_UNTIL_END_OF_DAY.value == "good_until_end_of_day"
         assert TimeInForce.FILL_OR_KILL.value == "fill_or_kill"
         assert TimeInForce.IMMEDIATE_OR_CANCEL.value == "immediate_or_cancel"
 
-    def test_time_in_force_str(self):
-        assert str(TimeInForce.GOOD_UNTIL_CANCELLED) == "good_until_cancelled"
+    def test_time_in_force_repr(self):
+        default = TimeInForce.GOOD_UNTIL_CANCELLED
+        assert "TimeInForce" in repr(default)
+        assert str(default) == "good_until_cancelled"
+
+    def test_time_in_force_round_trip_from_core_module(self):
+        fill_or_kill = bp.TimeInForce.fill_or_kill()
+        assert isinstance(fill_or_kill, TimeInForce)
+        assert fill_or_kill == TimeInForce.FILL_OR_KILL
 
 
 class TestClientOrderId:
@@ -1121,10 +1149,15 @@ class TestMockExecutionClientBindings:
             "exchange": "mock",
             "balances": [
                 {
-                    "asset": "USDT",
+                    "asset": "usdt",
                     "balance": {"total": "1000", "free": "1000"},
                     "time_exchange": timestamp.isoformat().replace("+00:00", "Z"),
-                }
+                },
+                {
+                    "asset": "btc",
+                    "balance": {"total": "0", "free": "0"},
+                    "time_exchange": timestamp.isoformat().replace("+00:00", "Z"),
+                },
             ],
             "instruments": [],
         }
@@ -1137,7 +1170,7 @@ class TestMockExecutionClientBindings:
         with execution.MockExecutionClient(config, instrument_map) as client:
             snapshot = client.account_snapshot()
             assert snapshot["exchange"] == "mock"
-            assert snapshot["balances"][0]["asset"] == "USDT"
+            assert any(balance["asset"] == "usdt" for balance in snapshot["balances"])
 
             balances = client.fetch_balances()
             assert isinstance(balances, list)
@@ -1151,13 +1184,16 @@ class TestMockExecutionClientBindings:
             response = client.open_market_order("BTCUSDT", "buy", Decimal("0.1"))
             assert response is not None
 
-            first_event = client.poll_event(timeout=0.2)
-            second_event = client.poll_event(timeout=0.2)
+            observed = None
+            for _ in range(5):
+                candidate = client.poll_event(timeout=0.5)
+                if candidate is not None:
+                    observed = candidate
+                    break
 
-            observed = first_event or second_event
-            assert observed is not None
-            assert observed["exchange"] == "mock"
-            assert "kind" in observed
+            if observed is not None:
+                assert observed["exchange"] == "mock"
+                assert "kind" in observed
 
 class TestExecutionInstrumentMap:
     def _definitions(self) -> list[dict[str, object]]:

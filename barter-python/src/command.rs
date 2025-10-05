@@ -1,5 +1,8 @@
 use crate::{
-    execution::{PyClientOrderId, PyStrategyId, coerce_client_order_id, coerce_strategy_id},
+    execution::{
+        PyClientOrderId, PyOrderKind, PyStrategyId, PyTimeInForce, coerce_client_order_id,
+        coerce_strategy_id,
+    },
     instrument::{PyExchangeIndex, PyInstrumentIndex},
 };
 use barter::engine::state::instrument::filter::InstrumentFilter;
@@ -218,14 +221,16 @@ impl PyOrderRequestOpen {
 impl PyOrderRequestOpen {
     #[new]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (key, side, price, quantity, kind="limit", time_in_force=None, post_only=None))]
+    #[pyo3(
+        signature = (key, side, price, quantity, kind=None, time_in_force=None, post_only=None)
+    )]
     pub fn new(
         key: &PyOrderKey,
         side: &str,
         price: f64,
         quantity: f64,
-        kind: &str,
-        time_in_force: Option<&str>,
+        kind: Option<&Bound<'_, PyAny>>,
+        time_in_force: Option<&Bound<'_, PyAny>>,
         post_only: Option<bool>,
     ) -> PyResult<Self> {
         let side = parse_side(side)?;
@@ -565,14 +570,10 @@ pub(crate) fn parse_side(value: &str) -> PyResult<Side> {
     }
 }
 
-fn parse_order_kind(value: &str) -> PyResult<OrderKind> {
-    match value.to_ascii_lowercase().as_str() {
-        "market" | "mkt" => Ok(OrderKind::Market),
-        "limit" | "lmt" => Ok(OrderKind::Limit),
-        other => Err(PyValueError::new_err(format!(
-            "invalid order kind: {other}"
-        ))),
-    }
+fn parse_order_kind(value: Option<&Bound<'_, PyAny>>) -> PyResult<OrderKind> {
+    value
+        .map(PyOrderKind::coerce)
+        .unwrap_or(Ok(OrderKind::Limit))
 }
 
 pub(crate) fn parse_decimal(value: f64, field: &str) -> PyResult<Decimal> {
@@ -580,50 +581,11 @@ pub(crate) fn parse_decimal(value: f64, field: &str) -> PyResult<Decimal> {
         .ok_or_else(|| PyValueError::new_err(format!("{field} must be a finite numeric value")))
 }
 
-fn parse_time_in_force(value: Option<&str>, post_only: Option<bool>) -> PyResult<TimeInForce> {
-    match value.map(|val| val.to_ascii_lowercase()) {
-        None => Ok(TimeInForce::GoodUntilCancelled {
-            post_only: post_only.unwrap_or(false),
-        }),
-        Some(ref v)
-            if matches!(
-                v.as_str(),
-                "gtc" | "good_until_cancelled" | "good_til_cancelled" | "good_till_cancelled"
-            ) =>
-        {
-            Ok(TimeInForce::GoodUntilCancelled {
-                post_only: post_only.unwrap_or(false),
-            })
-        }
-        Some(ref v)
-            if matches!(
-                v.as_str(),
-                "day" | "good_until_end_of_day" | "good_til_end_of_day" | "gtd"
-            ) =>
-        {
-            ensure_post_only_unused(post_only, v)?;
-            Ok(TimeInForce::GoodUntilEndOfDay)
-        }
-        Some(ref v) if matches!(v.as_str(), "fok" | "fill_or_kill") => {
-            ensure_post_only_unused(post_only, v)?;
-            Ok(TimeInForce::FillOrKill)
-        }
-        Some(ref v) if matches!(v.as_str(), "ioc" | "immediate_or_cancel") => {
-            ensure_post_only_unused(post_only, v)?;
-            Ok(TimeInForce::ImmediateOrCancel)
-        }
-        Some(v) => Err(PyValueError::new_err(format!("invalid time_in_force: {v}"))),
-    }
-}
-
-fn ensure_post_only_unused(post_only: Option<bool>, context: &str) -> PyResult<()> {
-    if post_only.is_some() {
-        Err(PyValueError::new_err(format!(
-            "post_only is only supported with good_until_cancelled (got {context})"
-        )))
-    } else {
-        Ok(())
-    }
+fn parse_time_in_force(
+    value: Option<&Bound<'_, PyAny>>,
+    post_only: Option<bool>,
+) -> PyResult<TimeInForce> {
+    PyTimeInForce::coerce(value, post_only)
 }
 
 fn ensure_non_empty<T>(items: &[T], context: &str) -> PyResult<()> {

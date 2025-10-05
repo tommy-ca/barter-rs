@@ -84,8 +84,8 @@ use data::{
 use execution::{
     PyActiveOrderState, PyAssetFees, PyCancelInFlightState, PyCancelledState, PyClientOrderId,
     PyExecutionAssetBalance, PyExecutionBalance, PyExecutionInstrumentMap, PyInactiveOrderState,
-    PyMockExecutionClient, PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderState,
-    PyStrategyId, PyTrade, PyTradeId, asset_balance_new, balance_new,
+    PyMockExecutionClient, PyOpenState, PyOrderError, PyOrderEvent, PyOrderId, PyOrderKind,
+    PyOrderState, PyStrategyId, PyTimeInForce, PyTrade, PyTradeId, asset_balance_new, balance_new,
 };
 use instrument::{
     PyAsset, PyAssetIndex, PyAssetNameExchange, PyAssetNameInternal, PyExchangeIndex,
@@ -913,6 +913,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutionInstrumentMap>()?;
     m.add_class::<PyMockExecutionClient>()?;
     m.add_class::<PyOrderKey>()?;
+    m.add_class::<PyOrderKind>()?;
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;
     m.add_class::<PyOrderSnapshot>()?;
@@ -934,6 +935,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDrawdown>()?;
     m.add_class::<PyMeanDrawdown>()?;
     m.add_class::<PyBalance>()?;
+    m.add_class::<PyTimeInForce>()?;
     m.add_class::<PyExchangeId>()?;
     m.add_class::<PySubKind>()?;
     m.add_class::<PySubscription>()?;
@@ -1034,7 +1036,10 @@ mod tests {
         instrument::InstrumentIndex,
     };
     use chrono::{TimeDelta, TimeZone};
-    use pyo3::{Python, types::PyDict};
+    use pyo3::{
+        Python,
+        types::{PyDict, PyString},
+    };
     use rust_decimal::prelude::ToPrimitive;
 
     #[test]
@@ -1443,15 +1448,19 @@ mod tests {
             StrategyId::new("strategy-alpha"),
             ClientOrderId::new("cid-1"),
         );
-        let open_request = PyOrderRequestOpen::new(
-            &key,
-            "buy",
-            105.25,
-            0.75,
-            "limit",
-            Some("good_until_cancelled"),
-            Some(true),
-        )
+        let open_request = Python::with_gil(|py| {
+            let kind = PyString::new_bound(py, "limit").into_any();
+            let tif = PyString::new_bound(py, "good_until_cancelled").into_any();
+            PyOrderRequestOpen::new(
+                &key,
+                "buy",
+                105.25,
+                0.75,
+                Some(&kind),
+                Some(&tif),
+                Some(true),
+            )
+        })
         .unwrap();
         let time_exchange = Utc.with_ymd_and_hms(2025, 9, 10, 11, 12, 13).unwrap();
 
@@ -1508,8 +1517,11 @@ mod tests {
             StrategyId::new("strategy-beta"),
             ClientOrderId::new("cid-2"),
         );
-        let open_request =
-            PyOrderRequestOpen::new(&key, "sell", 250.0, 1.5, "limit", None, None).unwrap();
+        let open_request = Python::with_gil(|py| {
+            let kind = PyString::new_bound(py, "limit").into_any();
+            PyOrderRequestOpen::new(&key, "sell", 250.0, 1.5, Some(&kind), None, None)
+        })
+        .unwrap();
 
         let snapshot = PyOrderSnapshot::from_open_request(&open_request, None, None, 0.0).unwrap();
 

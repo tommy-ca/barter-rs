@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import barter_python as bp
 from barter_python.data import Candle, DataKind, MarketEvent, PublicTrade
 from barter_python.engine import (
     AllInstrumentsFilter,
@@ -275,10 +276,11 @@ class TestEngine:
         engine = Engine(initial_state, DefaultStrategy(), DefaultRiskManager())
 
         # Prepare account snapshot with one balance and one order
-        balance = ExecutionAssetBalance.new(
-            asset="USDT",
+        time_exchange = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+        balance_wrapper = ExecutionAssetBalance.new(
+            asset=bp.AssetIndex(0),
             balance=ExecutionBalance.new(Decimal("1000"), Decimal("400")),
-            time_exchange=datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
+            time_exchange=time_exchange,
         )
 
         order_key = OrderKey(
@@ -297,13 +299,10 @@ class TestEngine:
             state=OrderState.active(OpenInFlight()),  # type: ignore[arg-type]
         )
 
-        instrument_snapshot = InstrumentAccountSnapshot.new(  # type: ignore[arg-type]
-            instrument=1, orders=[order]
-        )
-        snapshot = AccountSnapshot.new(
+        snapshot = AccountSnapshot(
             exchange=0,  # type: ignore[arg-type]
-            balances=[balance],
-            instruments=[instrument_snapshot],
+            balances=[(0, 1000.0, 400.0, time_exchange)],
+            instruments=[],
         )
         account_event = AccountEvent.new(
             exchange=0,  # type: ignore[arg-type]
@@ -312,10 +311,18 @@ class TestEngine:
 
         engine.process_account_event(account_event)
 
-        assert "USDT" in engine.state.balances
-        balance_state = engine.state.balances["USDT"]
+        assert "0" in engine.state.balances
+        balance_state = engine.state.balances["0"]
+        assert balance_state == balance_wrapper
+        assert balance_state.asset == 0
         assert balance_state.balance.total == Decimal("1000")
         assert balance_state.balance.free == Decimal("400")
+
+        order_event = AccountEvent.new(
+            exchange=0,  # type: ignore[arg-type]
+            kind=AccountEventKind.order_snapshot(order),
+        )
+        engine.process_account_event(order_event)
 
         inst_state_after = engine.state.get_instrument_state(1)  # type: ignore[arg-type]
         assert inst_state_after is not None

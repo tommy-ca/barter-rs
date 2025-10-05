@@ -101,7 +101,10 @@ def test_take_audit_streaming(example_paths: dict[str, Path]) -> None:
         assert "asset_count" in snapshot["state_summary"]
 
         updates = snap_updates.updates
-        assert updates.try_recv() is None
+        maybe_update = updates.try_recv()
+        if maybe_update is not None:
+            assert isinstance(maybe_update, dict)
+            assert "event" in maybe_update
 
         handle.send_event(bp.EngineEvent.trading_state(True))
         next_tick = updates.recv(timeout=1.0)

@@ -330,11 +330,19 @@ class Engine(Generic[State]):
     ) -> None:
         """Refresh balances and orders from a full account snapshot."""
 
+        balances_seq = snapshot.balances
+        if callable(balances_seq):
+            balances_seq = balances_seq()
+
         self.state.balances = {
-            str(balance.asset): balance for balance in snapshot.balances
+            str(balance.asset): balance for balance in balances_seq
         }
 
-        for instrument_snapshot in snapshot.instruments:
+        instruments_seq = snapshot.instruments
+        if callable(instruments_seq):
+            instruments_seq = instruments_seq()
+
+        for instrument_snapshot in instruments_seq:
             instrument_id = instrument_snapshot.instrument
             existing_state = self.state.get_instrument_state(instrument_id)
 
@@ -344,8 +352,12 @@ class Engine(Generic[State]):
                     exchange=exchange,
                 )
 
+            orders_seq = instrument_snapshot.orders
+            if callable(orders_seq):
+                orders_seq = orders_seq()
+
             existing_state.orders = {
-                order.key: order for order in instrument_snapshot.orders
+                order.key: order for order in orders_seq
             }
 
             self.state.update_instrument_state(instrument_id, existing_state)

@@ -12,6 +12,10 @@
 4. Publish and verify via `uv` environment using example E2E flows.
 
 ## Current Focus (2025-10-05)
+- Bridge execution order enums into the Python API.
+  - [x] Capture binding requirements in `.agent/specs/python-order-enum-bindings.md`.
+  - [x] Expose PyO3 `OrderKind` and `TimeInForce` wrappers and re-export via `execution.py`.
+  - [x] Extend pytest and Rust coverage for the new wrappers (cargo test, uv run pytest on 2025-10-05).
 - Expand execution instrument mapping coverage to the Python API.
   - [x] Capture binding requirements in `.agent/specs/python-execution-instrument-map.md`.
   - [x] Expose `ExecutionInstrumentMap` wrappers & generator functions via PyO3.

@@ -63,6 +63,53 @@ fn ensure_non_empty(value: &str, label: &str) -> PyResult<()> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pyo3::{Python, types::PyString};
+
+    #[test]
+    fn order_kind_coerce_accepts_wrappers_and_strings() {
+        Python::with_gil(|py| {
+            let class = py.get_type_bound::<PyOrderKind>();
+            let market_bound = class.call1(("market",)).unwrap();
+            assert_eq!(
+                PyOrderKind::coerce(&market_bound).unwrap(),
+                OrderKind::Market
+            );
+
+            let limit_text = PyString::new_bound(py, "limit").into_any();
+            assert_eq!(PyOrderKind::coerce(&limit_text).unwrap(), OrderKind::Limit);
+        });
+    }
+
+    #[test]
+    fn time_in_force_coerce_handles_variants_and_post_only() {
+        Python::with_gil(|py| {
+            let tif_class = py.get_type_bound::<PyTimeInForce>();
+            let gtc_bound = tif_class.call1(("good_until_cancelled",)).unwrap();
+            match PyTimeInForce::coerce(Some(&gtc_bound), None).unwrap() {
+                TimeInForce::GoodUntilCancelled { post_only } => assert!(!post_only),
+                other => panic!("unexpected variant: {other:?}"),
+            }
+
+            match PyTimeInForce::coerce(None, Some(true)).unwrap() {
+                TimeInForce::GoodUntilCancelled { post_only } => assert!(post_only),
+                other => panic!("unexpected variant: {other:?}"),
+            }
+
+            let fill_text = PyString::new_bound(py, "fill_or_kill").into_any();
+            assert!(matches!(
+                PyTimeInForce::coerce(Some(&fill_text), None).unwrap(),
+                TimeInForce::FillOrKill
+            ));
+
+            let err = PyTimeInForce::coerce(Some(&gtc_bound), Some(true));
+            assert!(err.is_err());
+        });
+    }
+}
+
 fn extract_decimal(value: &Bound<'_, PyAny>, label: &str) -> PyResult<Decimal> {
     let binding = value.str()?;
     Decimal::from_str(binding.to_str()?)
@@ -365,6 +412,311 @@ impl PyExecutionAssetBalance {
                 self.inner.time_exchange,
             ))
         })
+    }
+}
+
+/// Wrapper around [`OrderKind`] for Python exposure.
+#[pyclass(module = "barter_python", name = "OrderKind", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyOrderKind {
+    inner: OrderKind,
+}
+
+impl PyOrderKind {
+    pub(crate) fn inner(&self) -> OrderKind {
+        self.inner
+    }
+
+    pub(crate) fn from_inner(inner: OrderKind) -> Self {
+        Self { inner }
+    }
+
+    fn value_str(inner: OrderKind) -> &'static str {
+        match inner {
+            OrderKind::Market => "market",
+            OrderKind::Limit => "limit",
+        }
+    }
+
+    fn normalized(value: &str) -> String {
+        value.trim().to_ascii_lowercase()
+    }
+
+    fn parse_known(normalized: &str) -> Option<OrderKind> {
+        match normalized {
+            "market" | "mkt" => Some(OrderKind::Market),
+            "limit" | "lmt" => Some(OrderKind::Limit),
+            _ => None,
+        }
+    }
+
+    fn from_value(value: &str) -> PyResult<Self> {
+        let normalized = Self::normalized(value);
+        let Some(inner) = Self::parse_known(&normalized) else {
+            return Err(PyValueError::new_err(format!(
+                "invalid order kind: {value}"
+            )));
+        };
+
+        Ok(Self { inner })
+    }
+
+    pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<OrderKind> {
+        if value.is_none() {
+            return Err(PyValueError::new_err(
+                "order kind must be provided as a string or OrderKind value",
+            ));
+        }
+
+        if let Ok(wrapper) = value.extract::<Py<PyOrderKind>>() {
+            let borrowed = wrapper.borrow(value.py());
+            return Ok(borrowed.inner());
+        }
+
+        if let Ok(text) = value.extract::<&str>() {
+            return Ok(Self::from_value(text)?.inner());
+        }
+
+        if let Ok(display) = value.str() {
+            return Ok(Self::from_value(display.to_str()?)?.inner());
+        }
+
+        Err(PyValueError::new_err(
+            "order kind must be 'market', 'limit', or an OrderKind value",
+        ))
+    }
+}
+
+#[pymethods]
+impl PyOrderKind {
+    #[new]
+    #[pyo3(signature = (value))]
+    pub fn __new__(value: &str) -> PyResult<Self> {
+        Self::from_value(value)
+    }
+
+    #[classmethod]
+    pub fn market(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(OrderKind::Market)
+    }
+
+    #[classmethod]
+    pub fn limit(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(OrderKind::Limit)
+    }
+
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn MARKET() -> Self {
+        Self::from_inner(OrderKind::Market)
+    }
+
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn LIMIT() -> Self {
+        Self::from_inner(OrderKind::Limit)
+    }
+
+    #[getter]
+    pub fn value(&self) -> &'static str {
+        Self::value_str(self.inner)
+    }
+
+    fn __str__(&self) -> String {
+        Self::value_str(self.inner).to_string()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("OrderKind('{}')", Self::value_str(self.inner))
+    }
+}
+
+/// Wrapper around [`TimeInForce`] for Python exposure.
+#[pyclass(module = "barter_python", name = "TimeInForce", eq, hash, frozen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PyTimeInForce {
+    inner: TimeInForce,
+}
+
+impl PyTimeInForce {
+    pub(crate) fn inner(&self) -> TimeInForce {
+        self.inner
+    }
+
+    pub(crate) fn from_inner(inner: TimeInForce) -> Self {
+        Self { inner }
+    }
+
+    fn value_str(inner: TimeInForce) -> &'static str {
+        match inner {
+            TimeInForce::GoodUntilCancelled { .. } => "good_until_cancelled",
+            TimeInForce::GoodUntilEndOfDay => "good_until_end_of_day",
+            TimeInForce::FillOrKill => "fill_or_kill",
+            TimeInForce::ImmediateOrCancel => "immediate_or_cancel",
+        }
+    }
+
+    fn normalize(value: &str) -> String {
+        value.trim().to_ascii_lowercase()
+    }
+
+    fn ensure_post_only_unused(post_only: Option<bool>, context: &str) -> PyResult<()> {
+        if post_only.is_some() {
+            return Err(PyValueError::new_err(format!(
+                "post_only is only valid for good_until_cancelled (got {context})"
+            )));
+        }
+        Ok(())
+    }
+
+    fn parse_value(value: &str, post_only: Option<bool>) -> PyResult<TimeInForce> {
+        let normalized = Self::normalize(value);
+        match normalized.as_str() {
+            "gtc" | "good_until_cancelled" | "good_til_cancelled" | "good_till_cancelled" => {
+                Ok(TimeInForce::GoodUntilCancelled {
+                    post_only: post_only.unwrap_or(false),
+                })
+            }
+            "day" | "good_until_end_of_day" | "good_til_end_of_day" | "gtd" => {
+                Self::ensure_post_only_unused(post_only, &normalized)?;
+                Ok(TimeInForce::GoodUntilEndOfDay)
+            }
+            "fok" | "fill_or_kill" => {
+                Self::ensure_post_only_unused(post_only, &normalized)?;
+                Ok(TimeInForce::FillOrKill)
+            }
+            "ioc" | "immediate_or_cancel" => {
+                Self::ensure_post_only_unused(post_only, &normalized)?;
+                Ok(TimeInForce::ImmediateOrCancel)
+            }
+            other => Err(PyValueError::new_err(format!(
+                "invalid time_in_force: {other}"
+            ))),
+        }
+    }
+
+    pub(crate) fn coerce(
+        value: Option<&Bound<'_, PyAny>>,
+        post_only: Option<bool>,
+    ) -> PyResult<TimeInForce> {
+        match value {
+            None => Ok(TimeInForce::GoodUntilCancelled {
+                post_only: post_only.unwrap_or(false),
+            }),
+            Some(bound) if bound.is_none() => Self::coerce(None, post_only),
+            Some(bound) => {
+                if let Ok(wrapper) = bound.extract::<Py<PyTimeInForce>>() {
+                    let borrowed = wrapper.borrow(bound.py());
+                    if let Some(flag) = post_only {
+                        if flag != borrowed.is_post_only() {
+                            return Err(PyValueError::new_err(
+                                "post_only argument must match provided TimeInForce value",
+                            ));
+                        }
+                    }
+
+                    return Ok(borrowed.inner());
+                }
+
+                if let Ok(text) = bound.extract::<&str>() {
+                    return Self::parse_value(text, post_only);
+                }
+
+                if let Ok(text) = bound.str() {
+                    return Self::parse_value(text.to_str()?, post_only);
+                }
+
+                Err(PyValueError::new_err(
+                    "time_in_force must be a string or TimeInForce value",
+                ))
+            }
+        }
+    }
+
+    fn is_post_only(&self) -> bool {
+        matches!(
+            self.inner,
+            TimeInForce::GoodUntilCancelled { post_only: true }
+        )
+    }
+}
+
+#[pymethods]
+impl PyTimeInForce {
+    #[new]
+    #[pyo3(signature = (value, post_only=None))]
+    pub fn __new__(value: &str, post_only: Option<bool>) -> PyResult<Self> {
+        Ok(Self::from_inner(Self::parse_value(value, post_only)?))
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (post_only=false))]
+    pub fn good_until_cancelled(_cls: &Bound<'_, PyType>, post_only: bool) -> Self {
+        Self::from_inner(TimeInForce::GoodUntilCancelled { post_only })
+    }
+
+    #[classmethod]
+    pub fn good_until_end_of_day(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(TimeInForce::GoodUntilEndOfDay)
+    }
+
+    #[classmethod]
+    pub fn fill_or_kill(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(TimeInForce::FillOrKill)
+    }
+
+    #[classmethod]
+    pub fn immediate_or_cancel(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(TimeInForce::ImmediateOrCancel)
+    }
+
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn GOOD_UNTIL_CANCELLED() -> Self {
+        Self::from_inner(TimeInForce::GoodUntilCancelled { post_only: false })
+    }
+
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn GOOD_UNTIL_END_OF_DAY() -> Self {
+        Self::from_inner(TimeInForce::GoodUntilEndOfDay)
+    }
+
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn FILL_OR_KILL() -> Self {
+        Self::from_inner(TimeInForce::FillOrKill)
+    }
+
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn IMMEDIATE_OR_CANCEL() -> Self {
+        Self::from_inner(TimeInForce::ImmediateOrCancel)
+    }
+
+    #[getter]
+    pub fn value(&self) -> &'static str {
+        Self::value_str(self.inner)
+    }
+
+    #[getter]
+    pub fn post_only(&self) -> bool {
+        self.is_post_only()
+    }
+
+    fn __str__(&self) -> String {
+        Self::value_str(self.inner).to_string()
+    }
+
+    fn __repr__(&self) -> String {
+        match self.inner {
+            TimeInForce::GoodUntilCancelled { post_only } => {
+                format!("TimeInForce('good_until_cancelled', post_only={post_only})")
+            }
+            TimeInForce::GoodUntilEndOfDay => "TimeInForce('good_until_end_of_day')".to_string(),
+            TimeInForce::FillOrKill => "TimeInForce('fill_or_kill')".to_string(),
+            TimeInForce::ImmediateOrCancel => "TimeInForce('immediate_or_cancel')".to_string(),
+        }
     }
 }
 

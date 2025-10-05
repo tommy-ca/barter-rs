@@ -1204,7 +1204,8 @@ mod tests {
                 .select_trades(&exchange)?
                 .expect("trade stream available");
 
-            let event = stream.recv(py, None)?.expect("event");
+            let wrapper = stream.recv(py, None)?.expect("event");
+            let event = wrapper.getattr(py, "event")?;
             let exchange_value: String = event.getattr(py, "exchange")?.extract(py)?;
             assert_eq!(exchange_value, ExchangeId::BinanceSpot.as_str());
 
@@ -1218,7 +1219,7 @@ mod tests {
             Ok(())
         });
 
-        assert!(result.is_ok());
+        result.unwrap();
     }
 
     #[test]
@@ -1230,13 +1231,14 @@ mod tests {
                 .expect("trade stream available");
 
             let reconnect = stream.recv(py, None)?.expect("reconnect event");
-            let reconnect_dict = reconnect.downcast_bound::<PyDict>(py)?;
-            let kind: String = reconnect_dict.get_item("kind")?.unwrap().extract()?;
+            let kind: String = reconnect.getattr(py, "kind")?.extract(py)?;
             assert_eq!(kind, "reconnecting");
+            let exchange: String = reconnect.getattr(py, "exchange")?.extract(py)?;
+            assert_eq!(exchange, ExchangeId::BinanceSpot.as_str());
             Ok(())
         });
 
-        assert!(result.is_ok());
+        result.unwrap();
     }
 
     #[test]
@@ -1252,6 +1254,6 @@ mod tests {
             Ok(())
         });
 
-        assert!(result.is_ok());
+        result.unwrap();
     }
 }
