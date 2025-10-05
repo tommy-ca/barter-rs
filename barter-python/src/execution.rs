@@ -113,7 +113,7 @@ fn key_error_to_py(error: KeyError) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
 
-fn instrument_configs_from_py(
+pub(crate) fn instrument_configs_from_py(
     py: Python<'_>,
     value: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<InstrumentConfig>> {
@@ -562,14 +562,14 @@ pub(crate) fn coerce_client_order_id(value: Option<&Bound<'_, PyAny>>) -> PyResu
     }
 }
 
-fn serialize_to_json<T>(value: &T) -> PyResult<String>
+pub(crate) fn serialize_to_json<T>(value: &T) -> PyResult<String>
 where
     T: Serialize,
 {
     serde_json::to_string(value).map_err(|err| PyValueError::new_err(err.to_string()))
 }
 
-fn serialize_to_py_dict<T>(py: Python<'_>, value: &T) -> PyResult<PyObject>
+pub(crate) fn serialize_to_py_dict<T>(py: Python<'_>, value: &T) -> PyResult<PyObject>
 where
     T: Serialize,
 {

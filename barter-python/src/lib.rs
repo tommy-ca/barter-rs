@@ -88,8 +88,8 @@ use execution::{
     PyTradeId, asset_balance_new, balance_new,
 };
 use instrument::{
-    PyAsset, PyAssetIndex, PyExchangeIndex, PyInstrumentIndex, PyInstrumentSpec,
-    PyInstrumentSpecNotional, PyInstrumentSpecPrice, PyInstrumentSpecQuantity,
+    PyAsset, PyAssetIndex, PyExchangeIndex, PyIndexedInstruments, PyInstrumentIndex,
+    PyInstrumentSpec, PyInstrumentSpecNotional, PyInstrumentSpecPrice, PyInstrumentSpecQuantity,
     PyOrderQuantityUnits, PyQuoteAsset, PySide,
 };
 use integration::{PySnapUpdates, PySnapshot};
@@ -943,6 +943,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyQuoteAsset>()?;
     m.add_class::<PyExchangeIndex>()?;
     m.add_class::<PyInstrumentIndex>()?;
+    m.add_class::<PyIndexedInstruments>()?;
     m.add_class::<PyOrderQuantityUnits>()?;
     m.add_class::<PyInstrumentSpecPrice>()?;
     m.add_class::<PyInstrumentSpecQuantity>()?;

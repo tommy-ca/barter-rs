@@ -1,21 +1,30 @@
 use std::str::FromStr;
 
+use barter::system::config::InstrumentConfig;
 use barter_instrument::{
     Side,
+    asset::name::AssetNameInternal,
     asset::{Asset, AssetIndex, QuoteAsset},
     exchange::ExchangeIndex,
+    index::{IndexedInstruments, error::IndexError},
     instrument::{
         InstrumentIndex,
+        name::InstrumentNameExchange,
         spec::{
             InstrumentSpec, InstrumentSpecNotional, InstrumentSpecPrice, InstrumentSpecQuantity,
             OrderQuantityUnits,
         },
     },
 };
-use pyo3::{Bound, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*};
+use pyo3::{Bound, PyAny, PyResult, Python, exceptions::PyValueError, prelude::*, types::PyType};
 use rust_decimal::{Decimal, prelude::FromPrimitive};
 
-use crate::summary::decimal_to_py;
+use crate::{
+    config::PySystemConfig,
+    data::PyExchangeId,
+    execution::{instrument_configs_from_py, serialize_to_py_dict},
+    summary::decimal_to_py,
+};
 
 /// Wrapper around [`Asset`] for Python exposure.
 #[pyclass(module = "barter_python", name = "Asset", unsendable)]
@@ -630,6 +639,144 @@ impl PyInstrumentSpec {
             price.__repr__(),
             quantity.__repr__(),
             notional.__repr__(),
+        )
+    }
+}
+
+fn index_error_to_py(error: IndexError) -> PyErr {
+    PyValueError::new_err(error.to_string())
+}
+
+#[pyclass(module = "barter_python", name = "IndexedInstruments", unsendable)]
+#[derive(Debug, Clone)]
+pub struct PyIndexedInstruments {
+    inner: IndexedInstruments,
+}
+
+impl PyIndexedInstruments {
+    fn from_configs(configs: Vec<InstrumentConfig>) -> Self {
+        Self {
+            inner: IndexedInstruments::new(configs),
+        }
+    }
+}
+
+#[pymethods]
+impl PyIndexedInstruments {
+    #[classmethod]
+    #[pyo3(signature = (config))]
+    pub fn from_system_config(_cls: &Bound<'_, PyType>, config: &PySystemConfig) -> Self {
+        let mut config = config.clone_inner();
+        Self::from_configs(std::mem::take(&mut config.instruments))
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (definitions))]
+    pub fn from_definitions(
+        _cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        definitions: PyObject,
+    ) -> PyResult<Self> {
+        let definitions = definitions.bind(py);
+        let configs = instrument_configs_from_py(py, &definitions)?;
+        Ok(Self::from_configs(configs))
+    }
+
+    pub fn __len__(&self) -> usize {
+        self.inner.instruments().len()
+    }
+
+    #[getter]
+    pub fn exchanges_len(&self) -> usize {
+        self.inner.exchanges().len()
+    }
+
+    #[getter]
+    pub fn assets_len(&self) -> usize {
+        self.inner.assets().len()
+    }
+
+    #[pyo3(signature = (exchange))]
+    pub fn exchange_index(&self, exchange: &PyExchangeId) -> PyResult<PyExchangeIndex> {
+        let index = self
+            .inner
+            .find_exchange_index(exchange.as_inner())
+            .map_err(index_error_to_py)?;
+        Ok(PyExchangeIndex::from_inner(index))
+    }
+
+    #[pyo3(signature = (index))]
+    pub fn exchange_id(&self, index: &PyExchangeIndex) -> PyResult<PyExchangeId> {
+        let exchange = self
+            .inner
+            .find_exchange(index.inner())
+            .map_err(index_error_to_py)?;
+        Ok(PyExchangeId::from_inner(exchange))
+    }
+
+    #[pyo3(signature = (exchange, asset_name_internal))]
+    pub fn asset_index(
+        &self,
+        exchange: &PyExchangeId,
+        asset_name_internal: &str,
+    ) -> PyResult<PyAssetIndex> {
+        let asset_name = AssetNameInternal::new(asset_name_internal);
+        let index = self
+            .inner
+            .find_asset_index(exchange.as_inner(), &asset_name)
+            .map_err(index_error_to_py)?;
+        Ok(PyAssetIndex::from_inner(index))
+    }
+
+    #[pyo3(signature = (index))]
+    pub fn asset(&self, index: &PyAssetIndex) -> PyResult<PyAsset> {
+        let exchange_asset = self
+            .inner
+            .find_asset(index.inner())
+            .map_err(index_error_to_py)?;
+        Ok(PyAsset::from_inner(exchange_asset.asset.clone()))
+    }
+
+    #[pyo3(signature = (exchange, name_exchange))]
+    pub fn instrument_index_from_exchange_name(
+        &self,
+        exchange: &PyExchangeId,
+        name_exchange: &str,
+    ) -> PyResult<PyInstrumentIndex> {
+        let exchange_id = exchange.as_inner();
+        let name_exchange = InstrumentNameExchange::new(name_exchange.to_string());
+        let maybe_index = self.inner.instruments().iter().find_map(|keyed| {
+            (keyed.value.exchange.value == exchange_id
+                && keyed.value.name_exchange == name_exchange)
+                .then_some(keyed.key)
+        });
+
+        maybe_index
+            .map(PyInstrumentIndex::from_inner)
+            .ok_or_else(|| {
+                index_error_to_py(IndexError::InstrumentIndex(format!(
+                    "instrument {} not found for exchange {}",
+                    name_exchange.as_ref(),
+                    exchange_id.as_str()
+                )))
+            })
+    }
+
+    #[pyo3(signature = (index))]
+    pub fn instrument(&self, py: Python<'_>, index: &PyInstrumentIndex) -> PyResult<PyObject> {
+        let instrument = self
+            .inner
+            .find_instrument(index.inner())
+            .map_err(index_error_to_py)?;
+        serialize_to_py_dict(py, instrument)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "IndexedInstruments(exchanges={}, assets={}, instruments={})",
+            self.inner.exchanges().len(),
+            self.inner.assets().len(),
+            self.inner.instruments().len()
         )
     }
 }
