@@ -46,6 +46,9 @@ __all__.append("MockExecutionClient")
 Balance = execution.Balance
 AssetBalance = execution.AssetBalance
 
+TradingSummaryGenerator = _core.TradingSummaryGenerator
+__all__.append("TradingSummaryGenerator")
+
 # Export execution classes
 OrderId = execution.OrderId
 StrategyId = execution.StrategyId

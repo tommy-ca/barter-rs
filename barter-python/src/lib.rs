@@ -86,12 +86,12 @@ use std::sync::Mutex;
 use strategy::build_ioc_market_order_to_close_position;
 use summary::{
     PyAssetTearSheet, PyBacktestSummary, PyDrawdown, PyInstrumentTearSheet, PyMeanDrawdown,
-    PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary,
+    PyMetricWithInterval, PyMultiBacktestSummary, PyTradingSummary, PyTradingSummaryGenerator,
 };
 use system::{
     PyActionOutput, PyAuditContext, PyAuditEvent, PyAuditTick, PyAuditUpdates,
     PyClosePositionsOutput, PyEngineOutput, PyPositionExit, PySendRequestsOutput, PySystemHandle,
-    run_historic_backtest, start_system,
+    run_historic_backtest, run_historic_backtest_with_generator, start_system,
 };
 
 static EXCHANGE_ID_CACHE: Mutex<Option<HashMap<String, ExchangeId>>> = Mutex::new(None);
@@ -219,6 +219,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyOrderRequestOpen>()?;
     m.add_class::<PyOrderRequestCancel>()?;
     m.add_class::<PyTradingSummary>()?;
+    m.add_class::<PyTradingSummaryGenerator>()?;
     m.add_class::<PyInstrumentTearSheet>()?;
     m.add_class::<PyAssetTearSheet>()?;
     m.add_class::<PyMetricWithInterval>()?;
@@ -281,6 +282,7 @@ pub fn barter_python(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(shutdown_event, m)?)?;
     m.add_function(wrap_pyfunction!(timed_f64, m)?)?;
     m.add_function(wrap_pyfunction!(run_historic_backtest, m)?)?;
+    m.add_function(wrap_pyfunction!(run_historic_backtest_with_generator, m)?)?;
     m.add_function(wrap_pyfunction!(backtest::backtest, m)?)?;
     m.add_function(wrap_pyfunction!(backtest::run_backtests, m)?)?;
     m.add_function(wrap_pyfunction!(start_system, m)?)?;

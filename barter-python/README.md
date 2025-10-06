@@ -625,6 +625,31 @@ for name, tear_sheet in summary.instruments.items():
     print(f"{name}: PnL={tear_sheet.pnl}, Sharpe={tear_sheet.sharpe_ratio.value}")
 ```
 
+#### Incremental Updates
+
+Use `TradingSummaryGenerator` to continue evolving a summary after a backtest or shutdown:
+
+```python
+from decimal import Decimal
+
+summary, generator = bp.run_historic_backtest_with_generator(
+    config,
+    "tests_py/data/synthetic_market_data.json",
+    risk_free_return=0.015,
+)
+
+instrument_map = bp.ExecutionInstrumentMap.from_system_config(
+    bp.ExchangeId.BINANCE_SPOT,
+    config,
+)
+asset_index = instrument_map.asset_index(instrument_map.asset_names()[0])
+balance = bp.Balance.new(Decimal("1000"), Decimal("975"))
+generator.update_from_balance(bp.AssetBalance.new(asset_index, balance, summary.time_engine_end))
+
+next_summary = generator.generate("annual_365")
+print(next_summary.time_engine_end)
+```
+
 ## API Reference
 
 ### Engine Management
@@ -642,6 +667,7 @@ for name, tear_sheet in summary.instruments.items():
 - `SystemHandle.is_running()` - Check if system is active
 - `SystemHandle.send_event(event)` - Send event to running system
 - `SystemHandle.shutdown_with_summary(**kwargs)` - Shutdown and get summary
+- `SystemHandle.shutdown_with_summary_generator(**kwargs)` - Shutdown and get summary plus generator
 - `SystemHandle.abort()` - Immediately terminate system
 
 #### Engine Events
@@ -660,6 +686,7 @@ for name, tear_sheet in summary.instruments.items():
 #### Backtest Execution
 - `backtest(args_constant, args_dynamic)` - Run single backtest
 - `run_backtests(args_constant, dynamic_args_list)` - Run multiple backtests
+- `run_historic_backtest_with_generator(config, market_data, **kwargs)` - Backtest returning a generator for incremental updates
 
 #### Argument Workflow
 Use the strongly typed wrappers to supply configuration, market data, and risk settings to the

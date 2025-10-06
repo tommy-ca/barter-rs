@@ -22,6 +22,14 @@
   - [x] Implement Rust wrappers and re-export from the Python extension module.
   - [x] Extend Rust unit tests and Python integration tests for the new wrappers.
 
+## Completed (2025-10-06)
+- Bridge trading summary generator bindings into Python.
+  - [x] Captured requirements in `.agent/specs/python-trading-summary-generator-bindings.md`.
+  - [x] Added Rust unit tests and Python integration tests for generator updates.
+  - [x] Implemented `PyTradingSummaryGenerator`, `run_historic_backtest_with_generator`, and
+        `SystemHandle.shutdown_with_summary_generator`.
+  - [x] Documented incremental summary workflow in `barter-python/README.md`.
+
 ## Completed (2025-10-05)
 - Add integration coverage for backtest argument wrappers.
   - [x] Added scenario 5 to `.agent/specs/python-integration-tests.md`.

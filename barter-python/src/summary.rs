@@ -7,11 +7,15 @@ use barter::statistic::{
         sharpe::SharpeRatio,
         sortino::SortinoRatio,
     },
-    summary::{TradingSummary, asset::TearSheetAsset, instrument::TearSheet},
-    time::TimeInterval,
+    summary::{
+        TradingSummary, TradingSummaryGenerator, asset::TearSheetAsset, instrument::TearSheet,
+    },
+    time::{Annual252, Annual365, Daily, TimeInterval},
 };
 use barter_execution::balance::Balance;
+use barter_integration::snapshot::Snapshot;
 use chrono::{DateTime, Utc};
+use pyo3::exceptions::PyTypeError;
 use pyo3::{
     PyClass,
     prelude::*,
@@ -19,6 +23,110 @@ use pyo3::{
 };
 use rust_decimal::Decimal;
 use std::fmt::Write;
+
+use crate::{
+    common::{SummaryInterval, parse_summary_interval},
+    execution::PyExecutionAssetBalance,
+    system::PyPositionExit,
+};
+
+#[pyclass(module = "barter_python", name = "TradingSummaryGenerator", unsendable)]
+pub struct PyTradingSummaryGenerator {
+    inner: TradingSummaryGenerator,
+}
+
+impl PyTradingSummaryGenerator {
+    pub(crate) fn from_inner(
+        py: Python<'_>,
+        generator: TradingSummaryGenerator,
+    ) -> PyResult<Py<PyTradingSummaryGenerator>> {
+        Py::new(py, PyTradingSummaryGenerator { inner: generator })
+    }
+
+    fn duration_to_py(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let duration = self
+            .inner
+            .time_engine_now
+            .signed_duration_since(self.inner.time_engine_start);
+        let millis = duration.num_milliseconds();
+        timedelta_from_millis(py, millis)
+    }
+
+    fn generate_internal(
+        &mut self,
+        py: Python<'_>,
+        interval: Option<&str>,
+    ) -> PyResult<Py<PyTradingSummary>> {
+        let summary_interval = parse_summary_interval(interval)?;
+        match summary_interval {
+            SummaryInterval::Daily => summary_to_py(py, self.inner.generate(Daily)),
+            SummaryInterval::Annual252 => summary_to_py(py, self.inner.generate(Annual252)),
+            SummaryInterval::Annual365 => summary_to_py(py, self.inner.generate(Annual365)),
+        }
+    }
+}
+
+#[pymethods]
+impl PyTradingSummaryGenerator {
+    #[new]
+    fn __new__() -> PyResult<Self> {
+        Err(PyTypeError::new_err(
+            "TradingSummaryGenerator instances are created internally; use backtest or shutdown helpers",
+        ))
+    }
+
+    #[getter]
+    pub fn risk_free_return(&self, py: Python<'_>) -> PyResult<PyObject> {
+        decimal_to_py(py, self.inner.risk_free_return)
+    }
+
+    #[getter]
+    pub fn time_engine_start(&self) -> DateTime<Utc> {
+        self.inner.time_engine_start
+    }
+
+    #[getter]
+    pub fn time_engine_now(&self) -> DateTime<Utc> {
+        self.inner.time_engine_now
+    }
+
+    #[getter]
+    pub fn trading_duration(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.duration_to_py(py)
+    }
+
+    #[pyo3(signature = (interval = None))]
+    pub fn generate(
+        &mut self,
+        py: Python<'_>,
+        interval: Option<&str>,
+    ) -> PyResult<Py<PyTradingSummary>> {
+        self.generate_internal(py, interval)
+    }
+
+    pub fn update_from_balance(&mut self, balance: &PyExecutionAssetBalance) -> PyResult<()> {
+        let snapshot = Snapshot::new(&balance.inner);
+        self.inner.update_from_balance(snapshot);
+        Ok(())
+    }
+
+    pub fn update_from_position(&mut self, position: &PyPositionExit) -> PyResult<()> {
+        let exited = position.to_position_exited();
+        self.inner.update_from_position(&exited);
+        Ok(())
+    }
+
+    pub fn update_time_now(&mut self, time: DateTime<Utc>) {
+        self.inner.update_time_now(time);
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "TradingSummaryGenerator(risk_free_return={}, time_now={})",
+            self.inner.risk_free_return, self.inner.time_engine_now
+        ))
+    }
+}
 
 pub fn summary_to_py<Interval>(
     py: Python<'_>,
@@ -901,4 +1009,116 @@ fn timedelta_from_millis(py: Python<'_>, millis: i64) -> PyResult<PyObject> {
     let delta_cls = module.getattr("timedelta")?;
     let kwargs = [("milliseconds", millis)].into_py_dict_bound(py);
     Ok(delta_cls.call((), Some(&kwargs))?.into_py(py))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use barter::engine::state::position::PositionExited;
+    use barter::statistic::summary::{
+        asset::TearSheetAssetGenerator, instrument::TearSheetGenerator,
+    };
+    use barter_execution::balance::{AssetBalance as ExecAssetBalance, Balance as ExecBalance};
+    use barter_execution::trade::{AssetFees, TradeId};
+    use barter_instrument::{
+        Side,
+        asset::{AssetIndex, ExchangeAsset, name::AssetNameInternal},
+        exchange::ExchangeId,
+        instrument::{InstrumentIndex, name::InstrumentNameInternal},
+    };
+    use barter_integration::collection::FnvIndexMap;
+    use chrono::{TimeDelta, TimeZone, Utc};
+    use rust_decimal::Decimal;
+    use std::str::FromStr;
+
+    fn sample_generator(start: DateTime<Utc>) -> TradingSummaryGenerator {
+        let mut instruments = FnvIndexMap::default();
+        instruments.insert(
+            InstrumentNameInternal::new("binance_spot-btc_usdt"),
+            TearSheetGenerator::init(start),
+        );
+
+        let mut assets = FnvIndexMap::default();
+        assets.insert(
+            ExchangeAsset::new(ExchangeId::BinanceSpot, AssetNameInternal::new("usdt")),
+            TearSheetAssetGenerator::default(),
+        );
+
+        TradingSummaryGenerator::new(Decimal::ZERO, start, start, instruments, assets)
+    }
+
+    #[test]
+    fn generator_updates_from_balance() {
+        Python::with_gil(|py| {
+            let start = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+            let generator = sample_generator(start);
+
+            let py_generator = PyTradingSummaryGenerator::from_inner(py, generator).unwrap();
+            let update_time = start + TimeDelta::hours(1);
+
+            let balance = ExecBalance::new(
+                Decimal::from_str("1000").unwrap(),
+                Decimal::from_str("975").unwrap(),
+            );
+            let asset_balance = ExecAssetBalance::new(AssetIndex(0), balance, update_time);
+            let py_balance =
+                Py::new(py, PyExecutionAssetBalance::from_inner(asset_balance)).unwrap();
+
+            {
+                let balance_ref = py_balance.borrow(py);
+                py_generator
+                    .borrow_mut(py)
+                    .update_from_balance(&balance_ref)
+                    .unwrap();
+            }
+
+            py_generator.borrow_mut(py).update_time_now(update_time);
+
+            let generated = py_generator
+                .borrow_mut(py)
+                .generate(py, Some("annual_252"))
+                .unwrap();
+
+            let summary = generated.borrow(py);
+            assert_eq!(summary.time_engine_end(), update_time);
+        });
+    }
+
+    #[test]
+    fn generator_updates_from_position() {
+        Python::with_gil(|py| {
+            let start = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+            let generator = sample_generator(start);
+
+            let py_generator = PyTradingSummaryGenerator::from_inner(py, generator).unwrap();
+
+            let exit_time = start + TimeDelta::minutes(30);
+            let position = PositionExited {
+                instrument: InstrumentIndex(0),
+                side: Side::Buy,
+                price_entry_average: Decimal::from_str("10000").unwrap(),
+                quantity_abs_max: Decimal::from_str("1").unwrap(),
+                pnl_realised: Decimal::from_str("50").unwrap(),
+                fees_enter: AssetFees::quote_fees(Decimal::from_str("5").unwrap()),
+                fees_exit: AssetFees::quote_fees(Decimal::from_str("5").unwrap()),
+                time_enter: start,
+                time_exit: exit_time,
+                trades: vec![TradeId::new("trade-1")],
+            };
+
+            let py_position = Py::new(py, PyPositionExit::from_position(&position)).unwrap();
+            {
+                let position_ref = py_position.borrow(py);
+                py_generator
+                    .borrow_mut(py)
+                    .update_from_position(&position_ref)
+                    .unwrap();
+            }
+
+            let summary = py_generator.borrow_mut(py).generate(py, None).unwrap();
+
+            let summary_ref = summary.borrow(py);
+            assert_eq!(summary_ref.time_engine_end(), exit_time);
+        });
+    }
 }

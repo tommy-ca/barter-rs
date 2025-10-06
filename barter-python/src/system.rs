@@ -10,7 +10,7 @@ use crate::{
     execution::PyTradeId,
     instrument::{PyInstrumentIndex, PySide},
     integration::{PySnapUpdates, PySnapshot},
-    summary::{PyTradingSummary, decimal_to_py, summary_to_py},
+    summary::{PyTradingSummary, PyTradingSummaryGenerator, decimal_to_py, summary_to_py},
 };
 use barter::engine::{
     EngineOutput,
@@ -31,7 +31,10 @@ use barter::{
         },
     },
     risk::DefaultRiskManager,
-    statistic::time::{Annual252, Annual365, Daily},
+    statistic::{
+        summary::TradingSummaryGenerator,
+        time::{Annual252, Annual365, Daily},
+    },
     strategy::DefaultStrategy,
     system::{
         System,
@@ -46,7 +49,10 @@ use barter_data::{
         reconnect::{Event, stream::ReconnectingStream},
     },
 };
-use barter_execution::{order::OrderEvent, trade::TradeId};
+use barter_execution::{
+    order::OrderEvent,
+    trade::{AssetFees, TradeId},
+};
 use barter_instrument::{
     Side, asset::QuoteAsset, index::IndexedInstruments, instrument::InstrumentIndex,
 };
@@ -199,7 +205,7 @@ pub struct PyPositionExit {
 }
 
 impl PyPositionExit {
-    fn from_position(exit: &PositionExited<QuoteAsset, InstrumentIndex>) -> Self {
+    pub(crate) fn from_position(exit: &PositionExited<QuoteAsset, InstrumentIndex>) -> Self {
         Self {
             instrument: exit.instrument,
             side: exit.side,
@@ -222,6 +228,21 @@ impl PyPositionExit {
             list.append(trade_value.into_py(py))?;
         }
         Ok(list.into_py(py))
+    }
+
+    pub(crate) fn to_position_exited(&self) -> PositionExited<QuoteAsset, InstrumentIndex> {
+        PositionExited {
+            instrument: self.instrument,
+            side: self.side,
+            price_entry_average: self.price_entry_average,
+            quantity_abs_max: self.quantity_abs_max,
+            pnl_realised: self.pnl_realised,
+            fees_enter: AssetFees::quote_fees(self.fees_enter),
+            fees_exit: AssetFees::quote_fees(self.fees_exit),
+            time_enter: self.time_enter,
+            time_exit: self.time_exit,
+            trades: self.trades.clone(),
+        }
     }
 }
 
@@ -1200,14 +1221,15 @@ impl PySystemHandle {
         }
     }
 
-    /// Shut down the system and return a trading summary.
+    /// Shut down the system and return a trading summary with its generator.
+    #[allow(clippy::type_complexity)]
     #[pyo3(signature = (risk_free_return = 0.05, interval = None))]
-    pub fn shutdown_with_summary(
+    pub fn shutdown_with_summary_generator(
         &self,
         py: Python<'_>,
         risk_free_return: f64,
         interval: Option<&str>,
-    ) -> PyResult<Py<PyTradingSummary>> {
+    ) -> PyResult<(Py<PyTradingSummary>, Py<PyTradingSummaryGenerator>)> {
         let system = self.take_system()?;
         let runtime = Arc::clone(&self.runtime);
 
@@ -1218,11 +1240,27 @@ impl PySystemHandle {
         let decimal_rfr = parse_risk_free_return(risk_free_return)?;
         let summary_interval = parse_summary_interval(interval)?;
         let mut generator = engine.trading_summary_generator(decimal_rfr);
-        match summary_interval {
-            SummaryInterval::Daily => summary_to_py(py, generator.generate(Daily)),
-            SummaryInterval::Annual252 => summary_to_py(py, generator.generate(Annual252)),
-            SummaryInterval::Annual365 => summary_to_py(py, generator.generate(Annual365)),
-        }
+
+        let summary = match summary_interval {
+            SummaryInterval::Daily => summary_to_py(py, generator.generate(Daily))?,
+            SummaryInterval::Annual252 => summary_to_py(py, generator.generate(Annual252))?,
+            SummaryInterval::Annual365 => summary_to_py(py, generator.generate(Annual365))?,
+        };
+
+        let generator = PyTradingSummaryGenerator::from_inner(py, generator)?;
+        Ok((summary, generator))
+    }
+
+    /// Shut down the system and return a trading summary.
+    #[pyo3(signature = (risk_free_return = 0.05, interval = None))]
+    pub fn shutdown_with_summary(
+        &self,
+        py: Python<'_>,
+        risk_free_return: f64,
+        interval: Option<&str>,
+    ) -> PyResult<Py<PyTradingSummary>> {
+        let (summary, _) = self.shutdown_with_summary_generator(py, risk_free_return, interval)?;
+        Ok(summary)
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -1312,19 +1350,7 @@ pub fn start_system(
     Ok(PySystemHandle::new(runtime, system))
 }
 
-/// Run a historic backtest using a [`SystemConfig`] and market data events encoded as JSON.
-#[pyfunction]
-#[pyo3(
-    signature = (
-        config,
-        market_data_path,
-        risk_free_return = 0.05,
-        interval = None,
-        initial_balances = None,
-        engine_feed_mode = None
-    )
-)]
-pub fn run_historic_backtest(
+fn run_historic_backtest_inner(
     py: Python<'_>,
     config: &PySystemConfig,
     market_data_path: &str,
@@ -1332,7 +1358,7 @@ pub fn run_historic_backtest(
     interval: Option<&str>,
     initial_balances: Option<PyObject>,
     engine_feed_mode: Option<&str>,
-) -> PyResult<Py<PyTradingSummary>> {
+) -> PyResult<(Py<PyTradingSummary>, TradingSummaryGenerator)> {
     let (clock, market_stream) =
         load_historic_clock_and_market_stream(Path::new(market_data_path))?;
 
@@ -1385,12 +1411,83 @@ pub fn run_historic_backtest(
     let decimal_rfr = parse_risk_free_return(risk_free_return)?;
     let summary_interval = parse_summary_interval(interval)?;
 
-    let mut summary = engine.trading_summary_generator(decimal_rfr);
-    match summary_interval {
-        SummaryInterval::Daily => summary_to_py(py, summary.generate(Daily)),
-        SummaryInterval::Annual252 => summary_to_py(py, summary.generate(Annual252)),
-        SummaryInterval::Annual365 => summary_to_py(py, summary.generate(Annual365)),
-    }
+    let mut generator = engine.trading_summary_generator(decimal_rfr);
+    let summary = match summary_interval {
+        SummaryInterval::Daily => summary_to_py(py, generator.generate(Daily))?,
+        SummaryInterval::Annual252 => summary_to_py(py, generator.generate(Annual252))?,
+        SummaryInterval::Annual365 => summary_to_py(py, generator.generate(Annual365))?,
+    };
+
+    Ok((summary, generator))
+}
+
+/// Run a historic backtest using a [`SystemConfig`] and market data events encoded as JSON.
+#[pyfunction]
+#[pyo3(
+    signature = (
+        config,
+        market_data_path,
+        risk_free_return = 0.05,
+        interval = None,
+        initial_balances = None,
+        engine_feed_mode = None
+    )
+)]
+pub fn run_historic_backtest(
+    py: Python<'_>,
+    config: &PySystemConfig,
+    market_data_path: &str,
+    risk_free_return: f64,
+    interval: Option<&str>,
+    initial_balances: Option<PyObject>,
+    engine_feed_mode: Option<&str>,
+) -> PyResult<Py<PyTradingSummary>> {
+    let (summary, _) = run_historic_backtest_inner(
+        py,
+        config,
+        market_data_path,
+        risk_free_return,
+        interval,
+        initial_balances,
+        engine_feed_mode,
+    )?;
+
+    Ok(summary)
+}
+
+/// Run a historic backtest and return both the summary and generator for incremental updates.
+#[pyfunction]
+#[pyo3(
+    signature = (
+        config,
+        market_data_path,
+        risk_free_return = 0.05,
+        interval = None,
+        initial_balances = None,
+        engine_feed_mode = None
+    )
+)]
+pub fn run_historic_backtest_with_generator(
+    py: Python<'_>,
+    config: &PySystemConfig,
+    market_data_path: &str,
+    risk_free_return: f64,
+    interval: Option<&str>,
+    initial_balances: Option<PyObject>,
+    engine_feed_mode: Option<&str>,
+) -> PyResult<(Py<PyTradingSummary>, Py<PyTradingSummaryGenerator>)> {
+    let (summary, generator) = run_historic_backtest_inner(
+        py,
+        config,
+        market_data_path,
+        risk_free_return,
+        interval,
+        initial_balances,
+        engine_feed_mode,
+    )?;
+
+    let generator = PyTradingSummaryGenerator::from_inner(py, generator)?;
+    Ok((summary, generator))
 }
 
 fn build_py_snapupdates(
